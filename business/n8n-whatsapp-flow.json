@@ -1,0 +1,89 @@
+{
+  "_comment": "JARVIS PRIME — n8n Lead Alert Flow. Import this in n8n: Workflows → Import from JSON",
+  "_setup_instructions": [
+    "1. In n8n, go to Workflows → New → three dots → Import",
+    "2. Paste this JSON",
+    "3. Set up credentials: Add 'WhatsApp Business API' or use Twilio/Ultramsg",
+    "4. Copy the Webhook URL from the Webhook node",
+    "5. Paste that URL into your .env.local as N8N_WEBHOOK_URL",
+    "6. Activate the workflow"
+  ],
+  "nodes": [
+    {
+      "name": "Webhook — Receive Lead",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "parameters": {
+        "path": "jarvis-lead",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "name": "Extract Lead Data",
+      "type": "n8n-nodes-base.set",
+      "position": [450, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            { "name": "name",    "value": "={{ $json.body.lead.name }}" },
+            { "name": "company", "value": "={{ $json.body.lead.company }}" },
+            { "name": "email",   "value": "={{ $json.body.lead.email }}" },
+            { "name": "phone",   "value": "={{ $json.body.lead.phone || 'Not provided' }}" },
+            { "name": "revenue", "value": "={{ $json.body.lead.revenue || 'Not provided' }}" },
+            { "name": "message", "value": "={{ $json.body.lead.message || 'No message' }}" },
+            { "name": "alert",   "value": "={{ $json.body.alert_message }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 200],
+      "_comment": "Using Ultramsg (free tier: 300 msg/mo). Swap with Twilio or WA Business API",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ultramsg.com/YOUR_INSTANCE_ID/messages/chat",
+        "bodyParameters": {
+          "parameters": [
+            { "name": "token", "value": "YOUR_ULTRAMSG_TOKEN" },
+            { "name": "to",    "value": "={{ '91' + $env.FOUNDER_WHATSAPP }}" },
+            { "name": "body",  "value": "={{ $json.alert }}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Send Auto-Reply Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 400],
+      "_comment": "Uses Resend free tier (3000 emails/mo). Set RESEND_API_KEY in n8n credentials.",
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "headers": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer YOUR_RESEND_API_KEY" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "body": "={\n  \"from\": \"JARVIS PRIME <hello@jarvis-prime.in>\",\n  \"to\": [\"{{ $json.email }}\"],\n  \"subject\": \"We received your request — talk soon!\",\n  \"html\": \"<p>Hi {{ $json.name }},</p><p>Thanks for reaching out to <strong>JARVIS PRIME</strong>. We'll review your details and reach out on WhatsApp within <strong>2 hours</strong> to schedule your free strategy call.</p><p>— Anuj<br/>JARVIS PRIME</p>\"\n}"
+      }
+    },
+    {
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [900, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"processed\", \"lead\": \"{{ $json.name }}\" }"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook — Receive Lead":  { "main": [[{ "node": "Extract Lead Data",      "type": "main", "index": 0 }]] },
+    "Extract Lead Data":       { "main": [[{ "node": "Send WhatsApp Alert",     "type": "main", "index": 0 }, { "node": "Send Auto-Reply Email", "type": "main", "index": 0 }]] },
+    "Send WhatsApp Alert":     { "main": [[{ "node": "Respond to Webhook",      "type": "main", "index": 0 }]] }
+  }
+}

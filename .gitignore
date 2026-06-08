@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment variables — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Next.js build output
+.next/
+out/
+
+# Misc
+.DS_Store
+*.log
+
+# Local Netlify folder
+.netlify

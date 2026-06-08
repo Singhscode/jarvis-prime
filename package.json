@@ -1,0 +1,19 @@
+{
+  "name": "jarvis-prime",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:site": "npm run dev --workspace=apps/site",
+    "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+    "build:site": "npm run build --workspace=apps/site",
+    "build:dashboard": "npm run build --workspace=apps/dashboard",
+    "dev": "concurrently \"npm run dev:site\" \"npm run dev:dashboard\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
