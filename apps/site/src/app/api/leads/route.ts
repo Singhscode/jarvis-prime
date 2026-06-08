@@ -30,6 +30,19 @@ export async function POST(req: NextRequest) {
       status: "new",
     };
 
+    // If Supabase is not configured, just return success
+    if (!supabaseAdmin) {
+      console.warn("[API /leads] Supabase not configured, skipping database save");
+      await Promise.allSettled([
+        sendTelegramAlert(lead),
+        triggerN8nWebhook(lead),
+      ]);
+      return NextResponse.json(
+        { success: true, message: "Lead received (database not configured)", id: "local" },
+        { status: 201 }
+      );
+    }
+
     const { data, error } = await supabaseAdmin
       .from("leads")
       .insert([lead])
@@ -58,6 +71,13 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { leads: [], count: 0, message: "Database not configured" },
+        { status: 200 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const limit = parseInt(searchParams.get("limit") || "50");
