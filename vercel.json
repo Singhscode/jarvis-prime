@@ -1,7 +1,6 @@
 {
-  "buildCommand": "npm run build:site",
+  "buildCommand": "npm run build --workspace=apps/site",
   "outputDirectory": "apps/site/.next",
-  "framework": "nextjs",
-  "nodejs": "18.x",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "cleanUrls": true
 }
