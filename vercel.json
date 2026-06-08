@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npm run build --workspace=apps/site",
+  "buildCommand": "cd apps/site && npm install && npm run build",
   "outputDirectory": "apps/site/.next",
-  "installCommand": "npm install",
-  "cleanUrls": true
+  "installCommand": "npm install"
 }
