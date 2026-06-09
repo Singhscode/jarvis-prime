@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { X } from 'lucide-react';
 
 // Floating Particles Background
 const FloatingParticles = () => {
@@ -102,6 +103,8 @@ const Section = ({ children, className = '', id = '' }: SectionProps) => (
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showCalendly, setShowCalendly] = useState(false);
+  const [showDemoVideo, setShowDemoVideo] = useState(false);
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
@@ -222,10 +225,14 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                <button className="px-8 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-2xl hover:shadow-cyan-400/50 transition-all transform hover:scale-105">
+                <button 
+                  onClick={() => setShowCalendly(true)}
+                  className="px-8 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-2xl hover:shadow-cyan-400/50 transition-all transform hover:scale-105">
                   Book Free Strategy Call
                 </button>
-                <button className="px-8 py-4 border border-cyan-400/50 rounded-lg font-semibold hover:bg-cyan-400/10 transition-all">
+                <button 
+                  onClick={() => setShowDemoVideo(true)}
+                  className="px-8 py-4 border border-cyan-400/50 rounded-lg font-semibold hover:bg-cyan-400/10 transition-all">
                   Watch Demo
                 </button>
               </motion.div>
@@ -853,6 +860,119 @@ export default function Home() {
           </div>
         </div>
       </motion.footer>
+
+      {/* Calendly Modal */}
+      <AnimatePresence>
+        {showCalendly && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowCalendly(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+            >
+              <div className="sticky top-0 flex justify-between items-center p-6 border-b border-white/10 bg-slate-900">
+                <h2 className="text-2xl font-bold">Book Your Free Strategy Call</h2>
+                <button
+                  onClick={() => setShowCalendly(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="mb-6">
+                  <p className="text-muted-text mb-4">
+                    Schedule a 30-minute strategy call with our team to discuss how JARVIS PRIME can help you generate qualified leads and close more deals.
+                  </p>
+                  <div className="space-y-3 text-sm text-muted-text">
+                    <div className="flex items-center gap-2">
+                      <span className="text-cyan-400">✓</span> Personalized strategy for your business
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-cyan-400">✓</span> ROI projections based on your niche
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-cyan-400">✓</span> Free audit of your current outreach process
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Calendly Embed */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-white/10">
+                  <p className="text-center text-muted-text mb-4">
+                    📅 Calendly integration would appear here
+                  </p>
+                  <a
+                    href="https://calendly.com/your-username/30min"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full px-6 py-3 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 text-center hover:shadow-lg hover:shadow-cyan-400/50 transition-all"
+                  >
+                    Open Calendly Link
+                  </a>
+                  <p className="text-xs text-muted-text text-center mt-3">
+                    💡 Tip: Replace the URL above with your actual Calendly link
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Demo Video Modal */}
+      <AnimatePresence>
+        {showDemoVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDemoVideo(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-slate-900 rounded-xl max-w-4xl w-full"
+            >
+              <div className="flex justify-between items-center p-6 border-b border-white/10">
+                <h2 className="text-2xl font-bold">JARVIS PRIME Demo</h2>
+                <button
+                  onClick={() => setShowDemoVideo(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
+                  <iframe
+                    className="absolute inset-0 w-full h-full"
+                    src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                    title="JARVIS PRIME Demo"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  ></iframe>
+                </div>
+                <p className="text-muted-text text-center mt-4 text-sm">
+                  💡 Tip: Replace the YouTube embed URL with your actual demo video
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
