@@ -104,7 +104,6 @@ const Section = ({ children, className = '', id = '' }: SectionProps) => (
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCalendly, setShowCalendly] = useState(false);
-  const [showDemoVideo, setShowDemoVideo] = useState(false);
   const { scrollY } = useScroll();
   const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
@@ -229,11 +228,6 @@ export default function Home() {
                   onClick={() => setShowCalendly(true)}
                   className="px-8 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-2xl hover:shadow-cyan-400/50 transition-all transform hover:scale-105">
                   Book Free Strategy Call
-                </button>
-                <button 
-                  onClick={() => setShowDemoVideo(true)}
-                  className="px-8 py-4 border border-cyan-400/50 rounded-lg font-semibold hover:bg-cyan-400/10 transition-all">
-                  Watch Demo
                 </button>
               </motion.div>
 
@@ -922,52 +916,6 @@ export default function Home() {
                     💡 Tip: Replace the URL above with your actual Calendly link
                   </p>
                 </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Demo Video Modal */}
-      <AnimatePresence>
-        {showDemoVideo && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowDemoVideo(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-slate-900 rounded-xl max-w-4xl w-full"
-            >
-              <div className="flex justify-between items-center p-6 border-b border-white/10">
-                <h2 className="text-2xl font-bold">JARVIS PRIME Demo</h2>
-                <button
-                  onClick={() => setShowDemoVideo(false)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition"
-                >
-                  <X size={24} />
-                </button>
-              </div>
-              <div className="p-6">
-                <div className="relative w-full bg-black rounded-lg overflow-hidden" style={{ paddingBottom: '56.25%' }}>
-                  <iframe
-                    className="absolute inset-0 w-full h-full"
-                    src="https://www.youtube.com/embed/dQw4w9WgXcQ"
-                    title="JARVIS PRIME Demo"
-                    frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  ></iframe>
-                </div>
-                <p className="text-muted-text text-center mt-4 text-sm">
-                  💡 Tip: Replace the YouTube embed URL with your actual demo video
-                </p>
               </div>
             </motion.div>
           </motion.div>
