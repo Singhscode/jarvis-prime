@@ -224,11 +224,18 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
               >
-                <button 
-                  onClick={() => setShowCalendly(true)}
-                  className="px-8 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-2xl hover:shadow-cyan-400/50 transition-all transform hover:scale-105">
-                  Book Free Strategy Call
-                </button>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button 
+                    onClick={() => setShowCalendly(true)}
+                    className="px-8 py-4 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-2xl hover:shadow-cyan-400/50 transition-all transform hover:scale-105">
+                    Book Free Strategy Call
+                  </button>
+                  <Link
+                    href="/dashboard"
+                    className="px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg font-semibold text-white hover:shadow-2xl hover:shadow-purple-500/50 transition-all transform hover:scale-105 text-center">
+                    Operations Portal
+                  </Link>
+                </div>
               </motion.div>
 
               {/* Trust Badges */}

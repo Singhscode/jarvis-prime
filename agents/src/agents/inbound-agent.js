@@ -150,14 +150,14 @@ Rules:
 
   try {
     const content = await callAI([{ role: "user", content: prompt }], { maxTokens: 400, temperature: 0.75 });
-    return wrapEmailHTML(content, lead.name, founderName, calendly);
+    return wrapEmailHTML(content, calendly);
   } catch (err) {
     console.error("[Inbound Agent] AI draft failed:", err.message);
     return fallbackEmail(lead, founderName, calendly);
   }
 }
 
-function wrapEmailHTML(body, recipientName, senderName, calendly) {
+function wrapEmailHTML(body, calendly) {
   return `
 <!DOCTYPE html>
 <html>
@@ -181,7 +181,7 @@ function fallbackEmail(lead, founderName, calendly) {
     <p>We've helped agencies like yours go from 3–5 scattered leads/month to 15–20 qualified calls on autopilot — in under 30 days.</p>
     <p>Can we get 30 minutes on a call this week? Book directly here: <a href="${calendly}">${calendly}</a></p>
     <p>Looking forward to speaking,<br/>${founderName}</p>`,
-    lead.name, founderName, calendly
+    calendly
   );
 }
 

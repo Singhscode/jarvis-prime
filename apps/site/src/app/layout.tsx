@@ -1,16 +1,14 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import PortalNav from '@/components/PortalNav';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "JARVIS PRIME — Generate 50+ Qualified Leads/Month Without Cold Calling",
+  title: 'JARVIS PRIME — AI Outbound Automation',
   description:
-    "Replace your entire SDR team with AI. Fully-automated lead generation, qualification & booking. ₹1/5th the cost of hiring. Start free pilot in 7 days.",
-  keywords: ["lead generation", "AI SDR", "outbound automation", "sales automation", "B2B lead gen", "India"],
-  openGraph: {
-    title: "JARVIS PRIME — Your AI Sales Assistant",
-    description: "Generate 50+ qualified leads/month while you sleep. Join 50+ agencies & SaaS companies scaling with JARVIS.",
-    type: "website",
-  },
+    'Generate 50-100 qualified leads per month. Book 8-12 discovery calls. Close 1-2 deals. All automated.',
 };
 
 export default function RootLayout({
@@ -19,8 +17,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-dark text-white antialiased">{children}</body>
+    <html lang="en">
+      <body className={inter.className}>
+        <PortalNav />
+        {children}
+      </body>
     </html>
   );
 }

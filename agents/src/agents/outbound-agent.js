@@ -1,303 +1,234 @@
 /**
- * JARVIS PRIME — Outbound Prospecting Agent
+ * JARVIS PRIME — Outbound Lead Agent
  *
- * Runs once daily (9 AM IST). For each run:
- *  1. Fetches prospects from Apollo.io free API
- *  2. Scores each against ICP
- *  3. Skips anyone already in our Supabase leads table
- *  4. AI-writes a personalized first line for each qualified prospect
- *  5. Sends cold email sequence (step 1) via Resend
- *  6. Logs to outreach_log in Supabase
- *  7. Sends daily summary to Telegram
+ * Runs daily. For each prospect in queue:
+ *  1. Checks if ready for outreach
+ *  2. Generates personalized email with AI
+ *  3. Sends via Resend
+ *  4. Updates prospect status
+ *  5. Schedules follow-ups
+ *
+ * Schedule: Every day at 9 AM IST
  */
 
-import { supabase }    from "../lib/supabase.js";
-import { callAI }      from "../lib/ai.js";
-import { sendEmail }   from "../lib/resend.js";
-import { sendTelegram } from "../lib/telegram.js";
-import { scoreICP }    from "../lib/icp-scorer.js";
-import { pathToFileURL } from "url";
+import { supabase }       from "../lib/supabase.js";
+import { callAI }         from "../lib/ai.js";
+import { sendEmail }      from "../lib/resend.js";
+import { sendTelegram }   from "../lib/telegram.js";
+import { scoreICP }       from "../lib/icp-scorer.js";
+import { pathToFileURL }  from "url";
 
-const DAILY_SEND_LIMIT = 40;
-
-const TARGET_TITLES = [
-  "Founder", "Co-Founder", "CEO", "Director", "Head of Sales",
-  "Head of Growth", "VP Sales", "Managing Director", "Owner"
-];
-
-const TARGET_INDUSTRIES = [
-  "Marketing Agency", "Digital Agency", "SaaS", "B2B Software",
-  "Advertising", "Lead Generation", "Growth Agency"
-];
+const DAILY_LIMIT = 30; // Max emails per day
 
 export async function runOutboundAgent() {
   console.log("\n[Outbound Agent] Starting run...", new Date().toLocaleString("en-IN"));
 
-  const prospects = await fetchApolloProspects();
+  // Get prospects ready for outreach
+  const { data: prospects, error } = await supabase
+    .from("prospects")
+    .select("*")
+    .in("status", ["ready", "contacted"])
+    .order("icp_score", { ascending: false })
+    .limit(DAILY_LIMIT);
 
-  if (!prospects.length) {
-    console.log("[Outbound Agent] No prospects fetched. Done.");
+  if (error) {
+    console.error("[Outbound Agent] Supabase fetch error:", error.message);
     return;
   }
 
-  console.log(`[Outbound Agent] Fetched ${prospects.length} raw prospects.`);
-
-  const existingEmails = await getExistingEmails();
-  const fresh = prospects.filter(p => !existingEmails.has(p.email?.toLowerCase()));
-  console.log(`[Outbound Agent] ${fresh.length} fresh prospects after dedup.`);
-
-  let sent = 0, skipped = 0, saved = 0;
-  const hotLeads = [];
-
-  for (const prospect of fresh) {
-    if (sent >= DAILY_SEND_LIMIT) break;
-
-    const lead = normalizeLead(prospect);
-    // Outbound prospects from CSV are pre-qualified (manually curated)
-    // Auto-score them as qualified for outreach
-    const icpResult = {
-      score: 18,
-      qualified: true,
-      hot: lead.title?.toLowerCase().includes("founder") || lead.title?.toLowerCase().includes("ceo"),
-      reasons: ["Pre-qualified via CSV import"],
-    };
-
-    const firstLine  = await generateFirstLine(lead);
-    const emailHtml  = buildColdEmail(lead, firstLine, 1);
-    const subject    = buildSubject(lead, 1);
-
-    const emailId = await sendEmail({ to: lead.email, subject, html: emailHtml });
-
-    if (emailId) {
-      await saveLead(lead, icpResult);
-      await logOutreach(lead, subject, emailHtml, 1);
-      sent++;
-      saved++;
-      if (icpResult.hot) hotLeads.push(lead);
-      await sleep(3000 + Math.random() * 5000);
-    }
+  if (!prospects || prospects.length === 0) {
+    console.log("[Outbound Agent] No prospects ready. Done.");
+    return;
   }
 
-  const summary = `📤 *Outbound Agent — Daily Report*\n\n` +
-    `✅ Emails sent: ${sent}/${DAILY_SEND_LIMIT}\n` +
-    `⏭ Skipped (not ICP): ${skipped}\n` +
-    `💾 Saved to Supabase: ${saved}\n` +
-    `🔥 Hot prospects: ${hotLeads.length}\n\n` +
-    (hotLeads.length
-      ? `*Hot leads:*\n` + hotLeads.map(l => `• ${l.name} @ ${l.company} (${l.email})`).join("\n")
-      : "") +
-    `\n\n_${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}_`;
+  console.log(`[Outbound Agent] Found ${prospects.length} prospect(s) to contact.`);
 
-  await sendTelegram(summary);
-  console.log("[Outbound Agent] Run complete.");
-}
+  let emailsSent = 0;
+  let errors = 0;
 
-async function fetchApolloProspects() {
-  const apiKey = process.env.APOLLO_API_KEY;
-
-  // ── STEP 1: Try CSV file first (manual prospects — unlimited and free) ──
-  try {
-    const { readFileSync, existsSync } = await import("fs");
-    const csvPath = decodeURIComponent(new URL("../prospects.csv", import.meta.url).pathname);
-    console.log("[Outbound] Checking CSV at:", csvPath);
-
-    if (existsSync(csvPath)) {
-      const content = readFileSync(csvPath, "utf8").trim();
-      const lines = content.split("\n").filter(line => line.trim());
-
-      if (lines.length > 1) {
-        const headers = lines[0].split(",").map(h => h.trim().toLowerCase());
-        const prospects = lines.slice(1).map(line => {
-          const values = line.split(",").map(v => v.trim());
-          const obj = {};
-          headers.forEach((h, i) => obj[h] = values[i] || "");
-          return {
-            first_name: obj.first_name || obj.name?.split(" ")[0] || "",
-            last_name:  obj.last_name  || obj.name?.split(" ")[1] || "",
-            title:      obj.title || obj.job_title || "Founder",
-            email:      obj.email || "",
-            organization: { name: obj.company || obj.organization || "" },
-            linkedin_url: obj.linkedin || obj.linkedin_url || null,
-          };
-        }).filter(p => p.email && p.email.includes("@"));
-
-        if (prospects.length) {
-          console.log(`[Outbound] ✅ Loaded ${prospects.length} prospects from prospects.csv`);
-          return prospects;
-        }
-      }
-      console.log("[Outbound] CSV exists but no valid prospects found");
-    } else {
-      console.log("[Outbound] No prospects.csv found at", csvPath);
-    }
-  } catch (err) {
-    console.warn("[Outbound] CSV read error:", err.message);
-  }
-
-  // ── STEP 2: Try Apollo API (requires paid plan) ──
-  if (apiKey) {
+  for (const prospect of prospects) {
     try {
-      console.log("[Outbound] Trying Apollo API...");
-      const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Api-Key": apiKey,
-          "Cache-Control": "no-cache",
-        },
-        body: JSON.stringify({
-          q_organization_locations: ["India"],
-          person_titles: TARGET_TITLES,
-          q_keywords: "B2B agency SaaS outbound sales",
-          page: 1,
-          per_page: 50,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.error) {
-        console.warn("[Apollo] API error:", data.error);
-        console.warn("[Apollo] Free plan doesn't include API. Add prospects to agents/src/prospects.csv to send real emails.");
-      } else if (data.people?.length) {
-        console.log(`[Outbound] Loaded ${data.people.length} from Apollo API`);
-        return data.people;
-      }
+      await processProspect(prospect);
+      emailsSent++;
+      await sleep(3000); // 3 second delay between emails
     } catch (err) {
-      console.error("[Apollo] Fetch error:", err.message);
+      console.error(`[Outbound Agent] Error processing ${prospect.name}:`, err.message);
+      errors++;
     }
   }
 
-  // ── STEP 3: Fallback to mock data for testing ──
-  console.log("[Outbound] Using mock data for testing. Add real prospects to prospects.csv");
-  return getMockProspects();
-}
-
-async function getExistingEmails() {
-  const { data } = await supabase.from("leads").select("email");
-  return new Set((data || []).map(r => r.email?.toLowerCase()));
-}
-
-function normalizeLead(prospect) {
-  return {
-    name:    `${prospect.first_name || ""} ${prospect.last_name || ""}`.trim(),
-    company: prospect.organization?.name || prospect.company || "Unknown",
-    email:   prospect.email || "",
-    phone:   prospect.phone_numbers?.[0]?.sanitized_number || null,
-    revenue: null,
-    message: prospect.linkedin_url ? `Title: ${prospect.title || ""} | LinkedIn: ${prospect.linkedin_url}` : `Title: ${prospect.title || ""}`,
-    source:  "outbound_csv",
-    status:  "new",
-    _linkedin: prospect.linkedin_url,
-    _title:    prospect.title || "",
-  };
-}
-
-async function generateFirstLine(lead) {
-  const prompt = `Write a single personalized opening sentence for a cold email to ${lead.name}, ${lead.title} at ${lead.company} (Indian B2B company).
-
-Requirements:
-- Max 20 words
-- Reference their company or role specifically  
-- Make it relevant to outbound sales or lead generation
-- No generic phrases like "I came across your profile"
-- Sound human, not AI-written
-- Output ONLY the sentence, no quotes`;
-
-  try {
-    return await callAI([{ role: "user", content: prompt }], { maxTokens: 40, temperature: 0.9 });
-  } catch {
-    return `Running outbound at ${lead.company} sounds like a complex operation.`;
-  }
-}
-
-function buildSubject(lead, step) {
-  const subjects = {
-    1: [
-      `cut SDR cost 70% — ${lead.company}`,
-      `10 qualified calls/month for ${lead.company}?`,
-      `AI outbound for ${lead.company}`,
-    ],
-    2: [`re: ${lead.company} outbound`],
-    3: [`last one from me`],
-  };
-
-  const options = subjects[step] || subjects[1];
-  return options[Math.floor(Math.random() * options.length)];
-}
-
-function buildColdEmail(lead, firstLine, step) {
-  const founderName = process.env.FOUNDER_NAME || "Anuj";
-  const calendly    = process.env.FOUNDER_CALENDLY || "https://calendly.com/jarvis-prime";
-  const firstName   = lead.name.split(" ")[0];
-
-  const bodies = {
-    1: `
-      <p>Hey ${firstName},</p>
-      <p>${firstLine}</p>
-      <p>Most ${lead.title?.toLowerCase().includes("agency") ? "agencies" : "B2B founders"} I talk to are spending ₹40–80K/month on SDRs getting 5–8 calls/month with inconsistent results.</p>
-      <p>We built an AI system that scrapes, enriches, personalises, and sends outbound automatically — booking 10–20 qualified calls/month for ₹15–35K. Goes live in 7 days. Free pilot week, no commitment.</p>
-      <p>Worth a 15-min chat? <a href="${calendly}">Book here</a></p>
-      <p>— ${founderName}<br/>JARVIS PRIME</p>
-    `,
-    2: `
-      <p>Hey ${firstName} — just wanted to resurface this.</p>
-      <p>One of our clients (Mumbai-based performance agency) went from 3 calls/month to 18 in the first 30 days. No new hires.</p>
-      <p>Happy to show you exactly what we built for them — 15 mins this week? <a href="${calendly}">Book here</a></p>
-      <p>— ${founderName}</p>
-    `,
-    3: `
-      <p>Hey ${firstName},</p>
-      <p>Last one from me — if outbound is still a bottleneck at ${lead.company} and you're spending more than ₹30K/month on it with inconsistent results, we should talk.</p>
-      <p>If not, totally fine — I'll take you off my list.</p>
-      <p>Either way, best of luck.</p>
-      <p>— ${founderName}<br/>JARVIS PRIME</p>
-    `,
-  };
-
-  return `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;line-height:1.7;">
-    ${bodies[step] || bodies[1]}
-    <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
-    <p style="font-size:12px;color:#999;">JARVIS PRIME · AI Outbound Agency<br/>
-    <a href="mailto:${process.env.FOUNDER_EMAIL}" style="color:#999;">Unsubscribe</a></p>
-  </body></html>`;
-}
-
-async function saveLead(lead, icpResult) {
-  // Strip non-DB fields (prefixed with _)
-  const { _linkedin, _title, ...dbLead } = lead;
-  const { error } = await supabase.from("leads").upsert(
-    { ...dbLead, notes: `ICP: ${icpResult.score}/25 | Outbound step 1 sent | ${_title || ""}` },
-    { onConflict: "email" }
+  // Send summary
+  await sendTelegram(
+    `📤 *Outbound Agent Complete*\n\n` +
+    `📧 Emails Sent: ${emailsSent}\n` +
+    `❌ Errors: ${errors}\n` +
+    `📅 ${new Date().toLocaleDateString("en-IN")}`
   );
-  if (error) console.error("[Outbound] Supabase save error:", error.message);
+
+  console.log(`[Outbound Agent] Run complete. Sent: ${emailsSent}, Errors: ${errors}`);
 }
 
-async function logOutreach(lead, subject, body, step) {
-  const { data: leadRow } = await supabase
-    .from("leads").select("id").eq("email", lead.email).single();
+async function processProspect(prospect) {
+  console.log(`\n  → Processing: ${prospect.name} @ ${prospect.company}`);
 
-  if (!leadRow) return;
+  // Check which step they're on
+  const { data: logs } = await supabase
+    .from("outreach_log")
+    .select("step")
+    .eq("lead_id", prospect.id)
+    .order("step", { ascending: false })
+    .limit(1);
 
-  await supabase.from("outreach_log").insert({
-    lead_id: leadRow.id,
-    channel: "email",
-    step,
-    subject,
-    body,
+  const currentStep = logs?.[0]?.step || 0;
+  const nextStep = currentStep + 1;
+
+  if (nextStep > 5) {
+    console.log(`     Skipping — already completed 5-step sequence`);
+    await supabase.from("prospects").update({ status: "sequence_complete" }).eq("id", prospect.id);
+    return;
+  }
+
+  console.log(`     Step ${nextStep} of 5`);
+
+  // Generate email based on step
+  const email = await generateOutboundEmail(prospect, nextStep);
+  
+  // Send email
+  const emailId = await sendEmail({
+    to: prospect.email,
+    subject: email.subject,
+    html: email.body,
   });
+
+  if (!emailId) {
+    throw new Error("Email send failed");
+  }
+
+  // Update prospect status
+  await supabase.from("prospects").update({
+    status: "contacted",
+    updated_at: new Date().toISOString(),
+  }).eq("id", prospect.id);
+
+  // Log outreach
+  await supabase.from("outreach_log").insert({
+    lead_id: prospect.id,
+    channel: "email",
+    step: nextStep,
+    subject: email.subject,
+    body: email.body,
+    email_id: emailId,
+  });
+
+  console.log(`     ✓ Email ${nextStep} sent — ID: ${emailId}`);
 }
 
-function getMockProspects() {
-  return [
-    { first_name: "Rahul", last_name: "Sharma", email: "rahul@pixelforge.in", title: "Founder", organization: { name: "PixelForge Agency" } },
-    { first_name: "Priya", last_name: "Mehta",  email: "priya@growthos.io",   title: "CEO",     organization: { name: "GrowthOS" } },
-  ];
+async function generateOutboundEmail(prospect, step) {
+  const founderName = process.env.FOUNDER_NAME || "Anuj";
+  const calendly = process.env.FOUNDER_CALENDLY || "https://calendly.com/jarvis-prime";
+
+  const stepPrompts = {
+    1: `Write the FIRST cold email to ${prospect.name}, ${prospect.title} at ${prospect.company}.
+        
+        Rules:
+        - Subject line: Short, curiosity-driven, no spam words
+        - Opening: Reference something specific about their company/role
+        - Body: Quick pain point (low leads, manual outreach, inconsistent pipeline)
+        - Social proof: "We helped [similar company] book 18 calls/month"
+        - CTA: Soft ask — "Worth a quick chat to see if this fits?"
+        - Link: ${calendly}
+        - 3-4 short paragraphs max`,
+
+    2: `Write follow-up email #2 (they didn't reply to the first one).
+        
+        Rules:
+        - Subject: "Re: [reference first email topic]" or "Quick follow-up"
+        - Super short — 2-3 sentences
+        - New angle or value prop
+        - No guilt-tripping
+        - Same CTA`,
+
+    3: `Write follow-up email #3.
+        
+        Rules:
+        - Share a quick case study or specific result
+        - "Just helped [company] achieve X"
+        - Make it feel like valuable info, not a pitch
+        - 3 sentences max`,
+
+    4: `Write follow-up email #4.
+        
+        Rules:
+        - Different angle — maybe a question about their goals
+        - "Curious — are you still looking to [solve pain point]?"
+        - Keep it conversational`,
+
+    5: `Write the FINAL follow-up email.
+        
+        Rules:
+        - Breakup email tone
+        - "Totally understand if timing isn't right"
+        - Leave door open
+        - "Reply 'later' if I should check back in a few months"
+        - Graceful close`,
+  };
+
+  const prompt = `You are ${founderName}, founder of JARVIS PRIME — an AI outbound agency for Indian B2B companies.
+
+${stepPrompts[step]}
+
+Prospect info:
+- Name: ${prospect.name}
+- Title: ${prospect.title || "Unknown"}
+- Company: ${prospect.company}
+- Industry: ${prospect.industry || "B2B"}
+- Revenue estimate: ${prospect.revenue_estimate || "Unknown"}
+
+Output format:
+SUBJECT: [subject line]
+---
+[email body HTML]
+
+Sign off as ${founderName}`;
+
+  const response = await callAI([{ role: "user", content: prompt }], {
+    maxTokens: 500,
+    temperature: 0.75,
+  });
+
+  // Parse response
+  const subjectMatch = response.match(/SUBJECT:\s*(.+?)(?:\n|---)/i);
+  const subject = subjectMatch ? subjectMatch[1].trim() : `Quick question for ${prospect.company}`;
+  const body = response.replace(/SUBJECT:\s*.+?\n---\n?/i, "").trim();
+
+  return {
+    subject,
+    body: wrapEmailHTML(body, calendly),
+  };
+}
+
+function wrapEmailHTML(body, calendly) {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:Inter,Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;line-height:1.6;">
+  ${body}
+  <br/>
+  <hr style="border:none;border-top:1px solid #eee;margin:24px 0"/>
+  <p style="font-size:13px;color:#666;">
+    <strong>JARVIS PRIME</strong> — AI Outbound Agency<br/>
+    Book a free strategy call: <a href="${calendly}">${calendly}</a>
+  </p>
+</body>
+</html>`;
 }
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// Run if executed directly
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   runOutboundAgent().catch((err) => {
     console.error("[Outbound Agent] Fatal error:", err.message);
