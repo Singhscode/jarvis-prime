@@ -1,29 +1,21 @@
 {
-  "name": "jarvis-prime-agents",
-  "version": "1.0.0",
-  "description": "JARVIS PRIME AI Outbound Automation Agents",
+  "name": "jarvis-agents",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "main": "src/index.js",
   "scripts": {
-    "inbound": "node src/agents/inbound-agent.js",
-    "outreach": "node src/agents/daily-outreach.js",
-    "prospects": "node src/agents/prospect-builder.js",
-    "scheduler": "node src/scheduler.js",
-    "test": "node src/test-run.js"
+    "start": "node --env-file=.env src/runner.js",
+    "dev": "node --env-file=.env --watch src/runner.js",
+    "inbound": "node --env-file=.env src/agents/inbound-agent.js",
+    "outbound": "node --env-file=.env src/agents/outbound-agent.js",
+    "source": "node --env-file=.env src/agents/prospect-builder.js",
+    "test": "node --env-file=.env src/test-run.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "openai": "^4.24.0",
-    "resend": "^2.1.0",
+    "@supabase/supabase-js": "^2.43.4",
+    "email-existence": "^0.1.6",
     "node-cron": "^3.0.3",
-    "dotenv": "^16.3.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "author": "JARVIS PRIME",
-  "license": "MIT"
+    "nodemailer": "^8.0.8",
+    "openai": "^4.47.1"
+  }
 }

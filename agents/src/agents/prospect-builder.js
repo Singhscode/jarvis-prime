@@ -47,11 +47,15 @@ export async function buildProspectList(criteria) {
       message: `${prospect.title} at ${prospect.company} in ${prospect.industry}`,
     });
 
+    // Skip prospects without a real email — never email blanks/placeholders
+    if (!prospect.email || !prospect.email.includes("@")) continue;
+
     if (icpResult.score >= 12) {
       qualified.push({
         ...prospect,
         icp_score: icpResult.score,
         icp_fit: icpResult.hot ? "perfect" : icpResult.qualified ? "good" : "maybe",
+        status: "ready", // outbound-agent picks up status = ready | contacted
       });
     }
   }
@@ -134,6 +138,7 @@ export async function importFromCSV(csvPath) {
   // Score and insert
   const qualified = [];
   for (const p of prospects) {
+    if (!p.email || !p.email.includes("@")) continue; // never email blanks
     const icpResult = scoreICP({
       name: p.name,
       company: p.company,
@@ -150,6 +155,7 @@ export async function importFromCSV(csvPath) {
       linkedin_url: p.linkedin_url,
       icp_score: icpResult.score,
       icp_fit: icpResult.hot ? "perfect" : icpResult.qualified ? "good" : "maybe",
+      status: "ready",
       source: "csv_import",
     });
   }

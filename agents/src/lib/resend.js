@@ -1,89 +1,73 @@
-/**
- * JARVIS PRIME — Resend Email Client
- * 
- * Sends transactional emails via Resend (great deliverability for cold email).
- * 
- * SETUP:
- * 1. Create account at https://resend.com
- * 2. Verify your domain (e.g., jarvisprime.me)
- * 3. Create API key
- * 4. Add RESEND_API_KEY and RESEND_FROM_EMAIL to .env
- */
+import nodemailer from "nodemailer";
 
-import { Resend } from "resend";
+let gmailTransporter = null;
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getGmailTransporter() {
+  if (gmailTransporter) return gmailTransporter;
 
-/**
- * Send an email via Resend
- * @param {Object} options - to, subject, html, from (optional)
- * @returns {string|null} - Email ID if successful, null if failed
- */
-export async function sendEmail({ to, subject, html, from }) {
-  const fromEmail = from || process.env.RESEND_FROM_EMAIL || "hello@jarvisprime.me";
+  const user = process.env.GMAIL_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD;
 
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("[Resend] Missing RESEND_API_KEY — email not sent");
-    return null;
-  }
+  if (!user || !pass) return null;
 
-  try {
-    const { data, error } = await resend.emails.send({
-      from: `JARVIS PRIME <${fromEmail}>`,
-      to: [to],
-      subject,
-      html,
-    });
+  gmailTransporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+  return gmailTransporter;
+}
 
-    if (error) {
-      console.error("[Resend] Error:", error.message);
+export async function sendEmail({ to, subject, html, replyTo }) {
+  // ── Option 1: Gmail SMTP (preferred when configured) ──
+  const gmail = getGmailTransporter();
+  if (gmail) {
+    try {
+      const founderName = process.env.FOUNDER_NAME || "Anuj Singh";
+      const fromName = `${founderName} | JARVIS PRIME`;
+      const info = await gmail.sendMail({
+        from: `"${fromName}" <${process.env.GMAIL_USER}>`,
+        to: Array.isArray(to) ? to.join(", ") : to,
+        subject,
+        html,
+        replyTo: replyTo || process.env.GMAIL_USER,
+      });
+      console.log(`[Gmail] Email sent → ${to} | Subject: ${subject}`);
+      return info.messageId;
+    } catch (err) {
+      console.error("[Gmail] Send failed:", err.message);
       return null;
     }
+  }
 
-    console.log(`[Resend] Email sent to ${to} — ID: ${data.id}`);
-    return data.id;
-  } catch (error) {
-    console.error("[Resend] Failed:", error.message);
+  // ── Option 2: Resend API fallback ──
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[Email] No GMAIL_APP_PASSWORD or RESEND_API_KEY — skipping email");
     return null;
   }
-}
 
-/**
- * Send bulk emails (with rate limiting)
- * @param {Array} emails - Array of { to, subject, html }
- * @param {number} delayMs - Delay between emails (default: 1000ms)
- */
-export async function sendBulkEmails(emails, delayMs = 1000) {
-  const results = [];
-  
-  for (const email of emails) {
-    const id = await sendEmail(email);
-    results.push({ to: email.to, success: !!id, id });
-    await new Promise(r => setTimeout(r, delayMs));
-  }
-  
-  return results;
-}
-
-/**
- * Send follow-up email (different subject line pattern)
- * @param {Object} lead - Lead data
- * @param {number} followUpNumber - Which follow-up (1, 2, 3, etc.)
- * @param {string} html - Email body
- */
-export async function sendFollowUp(lead, followUpNumber, html) {
-  const subjects = [
-    `Quick follow-up, ${lead.name.split(" ")[0]}`,
-    `Did you see my last note?`,
-    `One more thing — ${lead.company}`,
-    `Last try — worth a quick chat?`,
-  ];
-
-  const subject = subjects[Math.min(followUpNumber - 1, subjects.length - 1)];
-
-  return sendEmail({
-    to: lead.email,
-    subject,
-    html,
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from: process.env.RESEND_FROM_EMAIL || "JARVIS PRIME <hello@jarvis-prime.in>",
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
+      reply_to: replyTo || process.env.FOUNDER_EMAIL,
+    }),
   });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    console.error("[Resend] Send failed:", data);
+    return null;
+  }
+
+  console.log(`[Resend] Email sent → ${to} | Subject: ${subject}`);
+  return data.id;
 }
