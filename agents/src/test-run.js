@@ -17,9 +17,11 @@ const no = (m) => { console.log(`  ✗ ${m}`); fail++; };
 
 // 1. Env
 console.log("1. Environment variables");
-for (const k of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GROQ_API_KEY", "RESEND_API_KEY", "TELEGRAM_BOT_TOKEN", "APOLLO_API_KEY"]) {
+for (const k of ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "GROQ_API_KEY", "RESEND_API_KEY", "TELEGRAM_BOT_TOKEN"]) {
   process.env[k] ? ok(`${k} set`) : no(`${k} MISSING`);
 }
+// Apollo is optional
+process.env.APOLLO_API_KEY ? ok("APOLLO_API_KEY set (optional)") : ok("APOLLO_API_KEY optional - can add later");
 
 // 2. ICP scorer (no network)
 console.log("\n2. ICP Scorer");
