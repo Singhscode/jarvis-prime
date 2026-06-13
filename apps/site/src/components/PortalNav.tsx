@@ -17,7 +17,8 @@ export default function PortalNav() {
                        pathname.includes('/leads') || 
                        pathname.includes('/tasks');
 
-  if (!isPortalPage && pathname !== '/') {
+  // Only show the portal nav on portal pages. The marketing homepage has its own nav.
+  if (!isPortalPage) {
     return null;
   }
 
