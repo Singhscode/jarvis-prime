@@ -113,11 +113,13 @@ export default function Home() {
       <GradientBg />
       <FloatingParticles />
 
-      {/* Navigation */}
-      <motion.nav
-        style={{ opacity }}
-        className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/90 border-b border-white/10 h-16"
-      >
+      {/* Add padding-top to body to account for fixed nav */}
+      <div className="pt-16">
+        {/* Navigation */}
+        <motion.nav
+          style={{ opacity }}
+          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/90 border-b border-white/10 h-16"
+        >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center h-16">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -188,7 +190,7 @@ export default function Home() {
       </motion.nav>
 
       {/* Hero Section */}
-      <Section className="pt-24 md:pt-32 lg:pt-40">
+      <Section className="pt-12 md:pt-20 lg:pt-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Hero Content */}
@@ -928,6 +930,7 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }
