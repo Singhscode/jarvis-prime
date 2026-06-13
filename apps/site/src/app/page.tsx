@@ -104,8 +104,6 @@ const Section = ({ children, className = '', id = '' }: SectionProps) => (
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showCalendly, setShowCalendly] = useState(false);
-  const { scrollY } = useScroll();
-  const opacity = useTransform(scrollY, [0, 300], [1, 0.5]);
 
   return (
     <div className="bg-slate-950 text-white font-inter overflow-x-hidden">
@@ -117,8 +115,7 @@ export default function Home() {
       <div className="pt-16">
         {/* Navigation */}
         <motion.nav
-          style={{ opacity }}
-          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/90 border-b border-white/10 h-16"
+          className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-slate-950/95 border-b border-white/10 h-16 shadow-lg"
         >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center h-16">
           <motion.div
@@ -143,15 +140,15 @@ export default function Home() {
                 {item}
               </motion.a>
             ))}
-            <motion.a
-              href="#contact"
+            <motion.button
+              onClick={() => setShowCalendly(true)}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="px-6 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold hover:shadow-lg hover:shadow-cyan-400/50 transition-all"
+              className="px-6 py-2 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-lg font-semibold text-slate-950 hover:shadow-lg hover:shadow-cyan-400/50 transition-all"
             >
               Book Call
-            </motion.a>
+            </motion.button>
           </div>
 
           {/* Mobile Menu Button */}
