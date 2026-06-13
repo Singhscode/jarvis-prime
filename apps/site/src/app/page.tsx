@@ -163,6 +163,34 @@ export default function Home() {
   const [showCalendly, setShowCalendly] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  // Booking form state
+  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', message: '' });
+  const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [formError, setFormError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormStatus('submitting');
+    setFormError('');
+    try {
+      const res = await fetch('/api/book', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || 'Something went wrong. Please try again.');
+        setFormStatus('error');
+        return;
+      }
+      setFormStatus('success');
+    } catch {
+      setFormError('Network error. Please try again.');
+      setFormStatus('error');
+    }
+  };
+
   const { scrollY } = useScroll();
   const heroY = useTransform(scrollY, [0, 600], [0, 120]);
 
@@ -726,14 +754,17 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* ===================== CALENDLY MODAL ===================== */}
+      {/* ===================== BOOKING MODAL ===================== */}
       <AnimatePresence>
         {showCalendly && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowCalendly(false)}
+            onClick={() => {
+              setShowCalendly(false);
+              setFormStatus('idle');
+            }}
             className="fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
           >
             <motion.div
@@ -745,27 +776,100 @@ export default function Home() {
               className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0B1020] p-8"
             >
               <button
-                onClick={() => setShowCalendly(false)}
+                onClick={() => {
+                  setShowCalendly(false);
+                  setFormStatus('idle');
+                }}
                 className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-lg text-gray-400 hover:bg-white/5 hover:text-white"
                 aria-label="Close"
               >
                 ✕
               </button>
-              <div className="mb-2 text-2xl font-bold">Book your free call</div>
-              <p className="mb-6 text-sm text-gray-400">
-                Pick a time that works for you. We&apos;ll audit your outbound and show you exactly how to 3x pipeline.
-              </p>
-              <a
-                href="https://calendly.com/your-link"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 py-3 text-center font-semibold text-slate-950 transition-all hover:shadow-lg hover:shadow-cyan-400/30"
-              >
-                Open Calendly →
-              </a>
-              <p className="mt-3 text-center text-xs text-gray-500">
-                Replace the link above with your real Calendly URL.
-              </p>
+
+              {formStatus === 'success' ? (
+                <div className="py-6 text-center">
+                  <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-cyan-400/15 text-3xl">
+                    ✓
+                  </div>
+                  <div className="text-2xl font-bold">You&apos;re in!</div>
+                  <p className="mt-2 text-sm text-gray-400">
+                    Thanks {form.name.split(' ')[0] || 'there'} — we&apos;ve got your request and will reach
+                    out within 24 hours to lock in a time.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowCalendly(false);
+                      setFormStatus('idle');
+                    }}
+                    className="mt-6 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 py-3 font-semibold text-slate-950"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-1 text-2xl font-bold">Book your free call</div>
+                  <p className="mb-6 text-sm text-gray-400">
+                    Tell us a bit about you. We&apos;ll reach out within 24 hours to schedule your
+                    30-minute strategy session.
+                  </p>
+
+                  <form onSubmit={handleSubmit} className="space-y-3">
+                    <input
+                      required
+                      type="text"
+                      placeholder="Your name *"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
+                    />
+                    <input
+                      required
+                      type="email"
+                      placeholder="Work email *"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Company"
+                      value={form.company}
+                      onChange={(e) => setForm({ ...form, company: e.target.value })}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Phone (optional)"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
+                    />
+                    <textarea
+                      placeholder="What are you hoping to achieve? (optional)"
+                      rows={3}
+                      value={form.message}
+                      onChange={(e) => setForm({ ...form, message: e.target.value })}
+                      className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
+                    />
+
+                    {formStatus === 'error' && (
+                      <p className="text-sm text-red-400">{formError}</p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={formStatus === 'submitting'}
+                      className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 py-3 font-semibold text-slate-950 transition-all hover:shadow-lg hover:shadow-cyan-400/30 disabled:opacity-60"
+                    >
+                      {formStatus === 'submitting' ? 'Sending…' : 'Request my call'}
+                    </button>
+                  </form>
+                  <p className="mt-3 text-center text-xs text-gray-500">
+                    No spam. We&apos;ll only use this to schedule your call.
+                  </p>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
