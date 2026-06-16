@@ -116,22 +116,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center text-white font-bold text-xl">
-                  ✓
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">Money-Back Guarantee</h3>
-                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                    Our Promise
-                  </span>
-                </div>
-                <p className="text-gray-600"><span className="font-semibold">8+ qualified meetings in 60 days</span> or we work for free until you do. No risk.</p>
-              </div>
-            </div>
+
           </div>
         </div>
       </section>
