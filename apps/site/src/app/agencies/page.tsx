@@ -368,7 +368,7 @@ export default function AgenciesPage() {
               <ArrowRight className="w-5 h-5" />
             </a>
             <p className="text-white/40 text-sm mt-6">
-              Takes 5 minutes. No credit card. Free $5K pipeline report included.
+              Takes 5 minutes. No credit card. Free ₹4,15,000 pipeline report included.
             </p>
           </div>
         </div>
