@@ -176,72 +176,209 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ROI Section */}
+      <section className="relative z-10 py-16 px-4 bg-gradient-to-r from-blue-900 to-blue-800">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            One Client Can Pay For The Entire System
+          </h2>
+          <p className="text-lg text-blue-100 max-w-2xl mx-auto">
+            A single high-ticket client often generates more revenue than the monthly investment in JARVIS PRIME. Your pipeline becomes your competitive advantage.
+          </p>
+        </div>
+      </section>
+
       {/* Pricing Section */}
-      <section id="pricing" className="relative z-10 py-20 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
+      <section id="pricing" className="relative z-10 py-24 px-4 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Simple Pricing
+              Predictable Pipeline Growth
             </h2>
-            <p className="text-xl text-gray-600">
-              One price. No surprises. No negotiation.
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Choose your plan. Scale your results. Cancel anytime.
             </p>
           </div>
 
-          <div className="p-8 rounded-xl border-2 border-blue-600 bg-gradient-to-br from-white to-blue-50 shadow-2xl">
-            <div className="text-center">
-              <h3 className="font-bold text-2xl text-gray-900 mb-2">Meetings Package</h3>
-              <p className="text-lg text-gray-600 mb-8">For marketing agencies 10-50 people</p>
-              
-              <div className="mb-8">
-                <div className="text-6xl font-bold text-blue-600 mb-2">₹79,999</div>
-                <div className="text-xl text-gray-600">/month</div>
-                <div className="text-sm text-gray-500 mt-2">Less than ₹1L/year • 50% cheaper than local SDR</div>
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
+            {/* STARTER PLAN */}
+            <div className="relative group rounded-2xl p-8 bg-white border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-xl hover:-translate-y-1">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">STARTER</h3>
+                <p className="text-sm text-gray-600 mb-4">Best for freelancers, small agencies & early-stage B2B</p>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-4xl font-bold text-gray-900">₹24,999</span>
+                  <span className="text-gray-600">/month</span>
+                </div>
+                <p className="text-sm text-blue-600 font-semibold">3-5 Qualified Meetings/Month</p>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
-                <p className="text-green-900 font-semibold">
-                  ✓ 8+ qualified meetings in 60 days or your first month is free
-                </p>
+              <div className="mb-8 pb-8 border-b border-gray-200">
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Lead Research & Prospect Building</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">500 Prospects Monthly</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">AI Personalized Outreach</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Automated Follow-Ups</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Email Campaign Setup</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Monthly Performance Report</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Email Support</span>
+                  </li>
+                </ul>
               </div>
 
-              <ul className="text-left space-y-3 mb-8 max-w-md mx-auto">
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Prospect research and list building</span>
-                </li>
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Personalized cold email outreach</span>
-                </li>
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Follow-up sequences and qualification</span>
-                </li>
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Meeting booking and calendar management</span>
-                </li>
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Weekly performance reports</span>
-                </li>
-                <li className="text-sm flex items-start gap-2 text-gray-700">
-                  <span className="text-blue-600 font-bold">✓</span>
-                  <span>Month-to-month (cancel anytime)</span>
-                </li>
-              </ul>
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-semibold text-center border-2 border-blue-600 text-blue-600 hover:bg-blue-50 transition-all">
+                Book Free Strategy Call
+              </a>
+            </div>
 
-              <a href="/book-call" className="w-full py-4 px-8 rounded-lg font-semibold transition-all text-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl">
-                Schedule Your Demo Call
+            {/* GROWTH PLAN - FEATURED */}
+            <div className="relative group rounded-2xl p-8 bg-gradient-to-br from-blue-600 to-blue-700 text-white border-2 border-blue-600 shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all md:scale-105">
+              <div className="absolute -top-4 right-6 bg-yellow-400 text-blue-900 px-4 py-1 rounded-full font-bold text-xs">
+                MOST POPULAR
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-2">GROWTH</h3>
+                <p className="text-sm text-blue-100 mb-4">Best for marketing, dev & recruiting agencies</p>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-5xl font-bold">₹49,999</span>
+                  <span className="text-blue-200">/month</span>
+                </div>
+                <p className="text-sm text-yellow-200 font-semibold">8-15 Qualified Meetings/Month</p>
+              </div>
+
+              <div className="mb-8 pb-8 border-b border-blue-500">
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">Everything in Starter +</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">2,000 Prospects Monthly</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">LinkedIn Outreach</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">Multi-Channel Campaigns</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">CRM Integration</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">Weekly Optimization</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">Advanced Analytics</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-yellow-300 font-bold text-lg">✓</span>
+                    <span className="text-blue-50">Priority Support</span>
+                  </li>
+                </ul>
+              </div>
+
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-bold text-center bg-yellow-400 text-blue-900 hover:bg-yellow-300 transition-all">
+                Scale My Pipeline
+              </a>
+            </div>
+
+            {/* SCALE PLAN */}
+            <div className="relative group rounded-2xl p-8 bg-white border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-xl hover:-translate-y-1">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">SCALE</h3>
+                <p className="text-sm text-gray-600 mb-4">Best for established agencies & SaaS companies</p>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-4xl font-bold text-gray-900">₹99,999</span>
+                  <span className="text-gray-600">/month</span>
+                </div>
+                <p className="text-sm text-blue-600 font-semibold">15-30 Qualified Meetings/Month</p>
+              </div>
+
+              <div className="mb-8 pb-8 border-b border-gray-200">
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Everything in Growth +</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">5,000+ Prospects Monthly</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Dedicated Campaign Manager</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">AI Lead Scoring</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Custom Outbound Strategy</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Advanced Reporting Dashboard</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">Unlimited Campaign Optimization</span>
+                  </li>
+                  <li className="flex items-start gap-3 text-sm">
+                    <span className="text-blue-500 font-bold text-lg">✓</span>
+                    <span className="text-gray-700">VIP Support</span>
+                  </li>
+                </ul>
+              </div>
+
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-semibold text-center bg-blue-600 text-white hover:bg-blue-700 transition-all">
+                Book Growth Consultation
               </a>
             </div>
           </div>
 
-          <div className="text-center mt-12">
-            <p className="text-gray-600">
-              Have questions? <a href="mailto:hello@jarvisprime.me" className="text-blue-600 hover:text-blue-700 font-semibold">Email us</a> or <a href="tel:+918810500723" className="text-blue-600 hover:text-blue-700 font-semibold">call +91 88105 00723</a>
+          {/* Guarantee Section */}
+          <div className="max-w-3xl mx-auto bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-8 text-center">
+            <h3 className="text-2xl font-bold text-green-900 mb-3">
+              Built For Predictable Pipeline Growth
+            </h3>
+            <p className="text-green-800">
+              Our AI-driven outbound system continuously finds, qualifies, and engages prospects so your team can focus on closing deals. No hiring, no training, no management overhead.
             </p>
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-gray-600 mb-2">
+              <a href="mailto:hello@jarvisprime.me" className="text-blue-600 hover:text-blue-700 font-semibold">Email us</a> or <a href="tel:+918810500723" className="text-blue-600 hover:text-blue-700 font-semibold">call +91 88105 00723</a>
+            </p>
+            <p className="text-sm text-gray-500">All plans include month-to-month flexibility. Cancel anytime.</p>
           </div>
         </div>
       </section>
@@ -251,38 +388,46 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Questions?
+              Common Questions
             </h2>
             <p className="text-xl text-gray-600">
-              Here's what we hear most
+              Everything you need to know about JARVIS PRIME
             </p>
           </div>
 
           <div className="space-y-4">
             {[
               {
-                q: 'What if we don\'t get 8 meetings in 60 days?',
-                a: 'We work for free until you do. That\'s the guarantee. If we don\'t deliver, you don\'t pay. We only win when you win.'
+                q: 'How quickly can campaigns launch?',
+                a: 'We can launch your first campaign within 7-10 days of onboarding. You\'ll see initial outreach results within 2-3 weeks, and first qualified meetings typically appear within 3-4 weeks.'
               },
               {
-                q: 'How much do you actually need from us?',
-                a: 'You give us 30 minutes for an onboarding call to understand your business, ideal clients, and what success looks like. Then we handle everything else.'
+                q: 'Do you work with agencies?',
+                a: 'Yes, agencies are our specialty. We work with marketing agencies, development agencies, recruiting firms, and B2B consultancies. Our system is optimized for service-based businesses with high-ticket offerings.'
               },
               {
-                q: 'What types of agencies do you work with?',
-                a: 'Marketing agencies with 10-50 people are the sweet spot. Web dev agencies, AI agencies, and consulting firms also work well. We specialize in businesses that sell services, not products.'
+                q: 'Do you provide leads or just the system?',
+                a: 'We provide everything—research, prospect targeting, personalized outreach, follow-ups, and meeting bookings. You get qualified prospects delivered to your calendar. It\'s done-for-you, not DIY.'
+              },
+              {
+                q: 'Is there a long-term contract?',
+                a: 'No. All plans are month-to-month. No setup fees, no long-term commitment. If we\'re not delivering results, you can cancel anytime. We\'re confident in our results.'
+              },
+              {
+                q: 'How are meetings qualified?',
+                a: 'We use AI lead scoring to qualify prospects based on your ICP (Ideal Customer Profile). Each person we book has been pre-qualified for relevance, budget authority, and buying timeline before they hit your calendar.'
               },
               {
                 q: 'How is this different from hiring an SDR?',
-                a: 'Hiring an SDR costs ₹1,50,000-2,00,000/month, takes 2-3 months to ramp, and you handle all management. With us, just ₹79,999/month gets you a proven process and guaranteed results. You\'re paying 50% less with better outcomes and zero hiring headaches.'
+                a: 'Hiring an SDR costs ₹1.5L-2L/month, takes 2-3 months to ramp, and requires management overhead. JARVIS PRIME is predictable, instant, and done-for-you at a fraction of the cost. Plus, we guarantee results.'
               },
               {
-                q: 'Can I cancel anytime?',
-                a: 'Yes. Month-to-month only. If we\'re not delivering meetings, cancel. But we\'re confident you\'ll stay.'
+                q: 'Can I upgrade or downgrade my plan?',
+                a: 'Absolutely. Change your plan anytime. Pro-rated billing ensures you only pay for what you use. Many clients start with Starter and scale to Growth as they see results.'
               },
               {
-                q: 'How soon can we start?',
-                a: 'Schedule a demo call and we can kickoff within a week. First meetings typically show up within 2-3 weeks.'
+                q: 'What if campaigns don\'t work for my business?',
+                a: 'We optimize continuously. Our team reviews campaign performance weekly (Growth/Scale plans) and makes adjustments to improve response rates, meeting bookings, and ROI.'
               }
             ].map((faq, idx) => (
               <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
