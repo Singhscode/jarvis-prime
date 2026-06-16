@@ -1,0 +1,19 @@
+<svg width="300" height="64" viewBox="0 0 300 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JARVIS PRIME">
+  <defs>
+    <linearGradient id="jpGradFull" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#1E40AF"/>
+    </linearGradient>
+  </defs>
+  <!-- Mark -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#jpGradFull)"/>
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="1"/>
+  <path d="M38 16 V38 a12 12 0 0 1 -12 12 a12 12 0 0 1 -12 -12 h7 a5 5 0 0 0 5 5 a5 5 0 0 0 5 -5 V16 z" fill="#FFFFFF"/>
+  <circle cx="46" cy="20" r="5" fill="#FFFFFF"/>
+  <circle cx="46" cy="20" r="2.2" fill="#1E40AF"/>
+  <path d="M38 16 L43 18" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-opacity="0.7"/>
+  <!-- Wordmark -->
+  <text x="78" y="40" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="0.5" fill="#111827">JARVIS</text>
+  <text x="196" y="40" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="26" font-weight="800" letter-spacing="0.5" fill="#2563EB">PRIME</text>
+  <text x="79" y="55" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="9" font-weight="600" letter-spacing="3.5" fill="#6B7280">AI OUTBOUND AUTOMATION</text>
+</svg>

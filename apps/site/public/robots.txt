@@ -1,0 +1,11 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /portal-auth
+Disallow: /leads
+Disallow: /tasks
+
+Sitemap: https://www.jarvisprime.me/sitemap.xml

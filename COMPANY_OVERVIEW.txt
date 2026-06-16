@@ -1,0 +1,523 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   JARVIS PRIME — QUICK COMPANY OVERVIEW                                     ║
+║   What They Do | How It Works | What They Built                             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT IS JARVIS PRIME?
+═══════════════════════════════════════════════════════════════════════════════
+
+AI-powered outbound sales automation platform that helps agencies and B2B 
+companies book qualified sales meetings without hiring SDRs.
+
+Simple version: "We send cold emails and book meetings for you automatically."
+
+
+═══════════════════════════════════════════════════════════════════════════════
+COMPANY STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+JARVIS PRIME (Main Structure)
+│
+├─ FRONTEND (Next.js Website)
+│  ├─ Homepage (sales & positioning)
+│  ├─ Lead Generation service page
+│  ├─ Booking page (Calendly integration)
+│  ├─ Navigation & header
+│  └─ Footer with contact info
+│
+├─ BACKEND (Node.js Agents & Services)
+│  ├─ Prospect sourcing (Apollo.io + Hunter.io)
+│  ├─ Email outreach automation
+│  ├─ LinkedIn automation
+│  ├─ ICP scoring & lead qualification
+│  └─ Inbound lead handling
+│
+└─ INFRASTRUCTURE & INTEGRATIONS
+   ├─ Supabase (database)
+   ├─ Apollo.io (prospect data sourcing)
+   ├─ Hunter.io (email finding)
+   ├─ Groq AI (LLM for personalization)
+   ├─ Resend/Gmail (email sending)
+   ├─ Telegram (alerts)
+   └─ Calendly (booking)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+CORE SERVICES (3 MAIN OFFERINGS)
+═══════════════════════════════════════════════════════════════════════════════
+
+SERVICE 1: AI APPOINTMENT SETTING
+What it does:
+  • Finds qualified prospects matching your ideal customer profile
+  • Sends personalized cold email sequences
+  • Sends personalized LinkedIn messages
+  • Tracks opens, clicks, replies
+  • Books meetings directly on your calendar
+  • Alerts founder via Telegram when meeting booked
+
+Cost: $1,200-2,000/month
+Results: 10-20 qualified meetings per month
+
+
+SERVICE 2: AI VOICE AGENTS
+What it does:
+  • Handles inbound phone calls (qualify leads)
+  • Makes outbound calls (appointment setting)
+  • Transcribes conversations
+  • Updates CRM automatically
+  • 24/7 availability
+
+Cost: Included in Professional & Enterprise tiers
+Results: Automated call handling, higher contact rate
+
+
+SERVICE 3: WORKFLOW AUTOMATION
+What it does:
+  • CRM integration (HubSpot, Salesforce)
+  • Automatic data syncing
+  • Lead scoring (0-30 scale)
+  • Lead routing to sales team
+  • Performance dashboards
+  • Reporting automation
+
+Cost: Included in Professional & Enterprise tiers
+Results: Eliminates manual data entry, faster sales cycle
+
+
+═══════════════════════════════════════════════════════════════════════════════
+PRICING TIERS
+═══════════════════════════════════════════════════════════════════════════════
+
+TIER 1: STARTER
+  Cost: $500/month
+  Meetings/Month: ~5-8
+  Includes:
+    • 500 leads per month
+    • Basic ICP scoring
+    • Email automation only
+    • Dashboard access
+    • Email support
+
+TIER 2: PROFESSIONAL (Most Popular)
+  Cost: $1,200/month + $80 per meeting booked
+  Meetings/Month: 10-20
+  Includes:
+    • 2,000 leads per month
+    • Advanced ICP scoring
+    • Multi-channel (Email + LinkedIn)
+    • Onboarding strategy call
+    • Weekly optimization
+    • Real-time Telegram alerts
+    • Priority support
+
+TIER 3: ENTERPRISE
+  Cost: $2,000/month + $120 per meeting booked
+  Meetings/Month: 20+
+  Includes:
+    • 5,000+ leads per month
+    • Custom ICP workshop
+    • Multi-client support (5+)
+    • White-label option
+    • Dedicated strategist
+    • All channels (Email + LinkedIn + Voice)
+    • 24/7 support
+
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT THEY BUILT (TECHNICAL)
+═══════════════════════════════════════════════════════════════════════════════
+
+FRONTEND (/apps/site)
+  Files:
+    • page.tsx — Main homepage with all sections
+    • lead-generation/page.tsx — Premium service page
+    • book-call/page.tsx — Booking page
+    • Header.tsx — Navigation component
+    • Layout.tsx — Metadata & structure
+  
+  Features:
+    • Clean, professional design (blue theme)
+    • Mobile responsive
+    • SEO optimized
+    • Calendly embed for booking
+    • Pricing calculator
+    • FAQ section
+    • Service descriptions
+    • Results/metrics display
+
+
+BACKEND (/agents/src)
+  Core Files:
+    • prospect-finder.js
+      - Searches Apollo.io for prospects
+      - Falls back to Hunter.io
+      - Exports to CSV
+      - ~50+ prospects per search
+    
+    • outbound-agent.js
+      - Sends cold email sequences
+      - Personalized per prospect
+      - Multi-touch follow-up
+      - Tracks opens/clicks
+    
+    • inbound-agent.js
+      - Receives inbound leads
+      - Qualifies them
+      - Scores against ICP
+      - Routes to CRM
+    
+    • icp-scorer.js
+      - Scores leads 0-30 points
+      - Company size scoring
+      - Tech stack analysis
+      - LinkedIn verification
+      - Apollo.io enrichment
+    
+    • apollo.js (NEW - Recently Added)
+      - Apollo.io API client
+      - Search people/companies
+      - Enrichment by email
+      - Export contacts
+      - Technology stack detection
+
+
+INTEGRATIONS (/agents/src/lib)
+  • supabase.js — Database for storing customers, leads, prospects
+  • ai.js — Groq AI for generating personalized messages
+  • resend.js — Sending emails at scale
+  • telegram.js — Sending alerts to founder
+  • email-verifier.js — Validates email addresses
+
+
+═══════════════════════════════════════════════════════════════════════════════
+KEY INTEGRATIONS & APIS
+═══════════════════════════════════════════════════════════════════════════════
+
+APOLLO.IO
+  What: Prospect database (275+ million contacts)
+  Used for: Finding leads, enrichment, company data, tech stack
+  Cost: $49+/month (free plan available)
+  Setup: Added June 2026
+
+HUNTER.IO
+  What: Email finder by domain
+  Used for: Finding verified email addresses
+  Cost: Free to $99+/month
+  Status: Already integrated
+
+SUPABASE
+  What: PostgreSQL database (Firebase alternative)
+  Used for: Store customers, prospects, leads, campaign data
+  Cost: Generous free tier
+
+GROQ AI
+  What: Fast LLM (better than ChatGPT in some ways)
+  Used for: Generate personalized cold email copy
+  Cost: Free to $10/month
+
+RESEND / GMAIL
+  What: Email sending service
+  Used for: Send outreach emails at scale
+  Cost: Included or via Gmail SMTP
+
+CALENDLY
+  What: Meeting scheduler
+  Used for: Let prospects book meetings on customer's calendar
+  Cost: Free tier available
+
+TELEGRAM
+  What: Messaging app
+  Used for: Alert founder when meeting is booked
+  Cost: Free
+
+
+═══════════════════════════════════════════════════════════════════════════════
+HOW IT WORKS (CUSTOMER JOURNEY)
+═══════════════════════════════════════════════════════════════════════════════
+
+WEEK 1: DISCOVERY & RESEARCH
+  ✓ Customer signs up for Professional ($1,200/month)
+  ✓ Strategy call to understand ICP (Ideal Customer Profile)
+  ✓ Team builds prospect list (500-2,000 people matching ICP)
+  ✓ Prospects scored on Apollo.io data (company size, tech stack, etc)
+
+WEEK 2: AI PERSONALIZATION & CAMPAIGN SETUP
+  ✓ AI generates personalized email templates
+  ✓ AI generates LinkedIn message templates
+  ✓ Campaign sequencing created (3-5 touch emails over 10 days)
+  ✓ LinkedIn follow-up planned
+
+WEEK 3: MULTI-CHANNEL LAUNCH
+  ✓ Email campaign launches to 2,000 prospects
+  ✓ LinkedIn outreach begins (connections + messages)
+  ✓ Responses tracked in real-time
+  ✓ Hot leads identified and scored
+
+WEEK 4+: MEETING BOOKING & QUALIFICATION
+  ✓ Qualified replies get follow-up call (voice agent or human)
+  ✓ Meetings booked directly on customer's Calendly
+  ✓ Founder alerted via Telegram (instant notification)
+  ✓ Lead data synced to CRM (HubSpot/Salesforce)
+  ✓ Weekly optimization based on performance
+
+ONGOING:
+  ✓ Weekly performance reviews
+  ✓ Campaign refinement
+  ✓ A/B testing of messages
+  ✓ Continuous optimization
+
+
+═══════════════════════════════════════════════════════════════════════════════
+CLAIMED RESULTS & METRICS
+═══════════════════════════════════════════════════════════════════════════════
+
+MEETINGS & OPPORTUNITIES:
+  • 10-20 qualified meetings per month (typical)
+  • 200+ total meetings booked (historical claim)
+  • 2-4 weeks to first meeting (typical timeline)
+
+EMAIL PERFORMANCE:
+  • 35-50% email open rate (claimed)
+    ⚠️ Note: Industry average is 20-30% (claims seem high)
+  • 5-10% reply rate (claimed)
+    ⚠️ Note: Industry average is 2-5% (claims seem high)
+
+PIPELINE:
+  • $2M+ pipeline generated (historical claim)
+  • Average deal size varies by customer
+
+RESPONSE TIME:
+  • 45% average response rate (claim)
+  • Same-day alerts for booked meetings
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TARGET CUSTOMERS (WHO BUYS)
+═══════════════════════════════════════════════════════════════════════════════
+
+PERFECT FIT:
+  • Marketing agencies (10-50 people)
+  • B2B SaaS companies (5-50 employees)
+  • Digital marketing agencies
+  • Growth-stage startups ($1M-10M ARR)
+  • Tech consulting firms
+  • Web development agencies
+
+WORST FIT:
+  • Solo founders (budget too low: $500/month max)
+  • Large enterprises (want white-glove service, not DIY)
+  • E-commerce / D2C brands (outbound doesn't work)
+  • Consumer products (not B2B)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+UNIQUE VALUE PROPOSITION
+═══════════════════════════════════════════════════════════════════════════════
+
+"Book 10-20 qualified sales meetings per month without hiring expensive SDRs."
+
+Key selling points:
+  • No SDR hiring ($80K-150K per SDR per year)
+  • 2-3 weeks to first meeting
+  • AI handles personalization at scale
+  • Multi-channel (email + LinkedIn + phone)
+  • Guaranteed results (or work for free)
+  • CRM integration (automatic data sync)
+  • Full transparency (real-time dashboards)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+COMPETITIVE LANDSCAPE
+═══════════════════════════════════════════════════════════════════════════════
+
+DIRECT COMPETITORS:
+
+Apollo.io
+  • 275M contact database
+  • Email finding tool
+  • Limited outbound automation
+  • Strength: Data quality
+
+Lemlist
+  • Cold email platform
+  • AI personalization
+  • LinkedIn automation
+  • Strength: Email focus
+
+Clay
+  • Data enrichment + outbound
+  • Automation builder
+  • Community-driven
+  • Strength: Customization
+
+Hyperise
+  • Visual cold outreach
+  • Personalized landing pages
+  • Strength: Brand builders
+
+TRADITIONAL AGENCIES:
+  • Seventh Signal, Gild, etc.
+  • $3K-10K/month
+  • Full-service outbound
+  • Strength: Human expertise
+
+
+JARVIS PRIME POSITIONING:
+  • Positioned as: AI-powered full-service agency (not just a tool)
+  • Price: Middle ground ($1,200-2,000/month)
+  • Advantage: AI-powered + multi-channel + affordable
+  • Disadvantage: Unknown founder, no case studies yet
+
+
+═══════════════════════════════════════════════════════════════════════════════
+CURRENT STATUS & READINESS
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT'S COMPLETE:
+  ✓ Website (professional, modern design)
+  ✓ Backend infrastructure (agents, APIs, integrations)
+  ✓ Apollo.io integration (prospect sourcing)
+  ✓ Email automation (Resend)
+  ✓ ICP scoring system (0-30 points)
+  ✓ CRM integrations planned
+  ✓ Pricing tiers set up
+  ✓ Calendly booking integration
+
+WHAT'S MISSING:
+  ✗ Paying customers (likely 0-2)
+  ✗ Case studies (CRITICAL)
+  ✗ Founder visibility (no personal branding)
+  ✗ Social proof (no testimonials)
+  ✗ Track record (no proven results)
+  ✗ Founder credibility (unknown founder)
+
+READINESS ASSESSMENT:
+  Website Quality:        8/10 ✓ Good
+  Infrastructure:         8/10 ✓ Good
+  Product-Market Fit:     5/10 ? Unknown
+  Founder Visibility:     2/10 ✗ Critical issue
+  Social Proof:           1/10 ✗ Critical issue
+  Sales Process:          3/10 ✗ Weak
+
+READY TO CHARGE $2K+/MONTH?
+  Answer: NO — Not yet
+  Why: No proof of concept, no founder visibility
+  Timeline: 6-12 months with execution
+
+
+═══════════════════════════════════════════════════════════════════════════════
+KEY METRICS & DASHBOARD
+═══════════════════════════════════════════════════════════════════════════════
+
+BUSINESS METRICS:
+  Current customers:          Unknown (likely 0-2)
+  Current MRR:               Unknown (likely $0-2,000)
+  Target pricing:            $1,200-2,000/month
+  Target customers/month:    5-10 new per month
+  Target annual MRR:         $100,000-500,000
+
+PRODUCT METRICS:
+  Leads found per campaign:  500-2,000
+  Email open rate:           35-50% (claimed)
+  Reply rate:                5-10% (claimed)
+  Meetings booked:           10-20 per month
+  Average deal value:        Unknown
+
+TEAM:
+  Founder: Anuj Singh (based in Gurgaon, India)
+  Team size: 1 (solo founder) — Probably outsourcing or contracting
+  Support: Email + Telegram alerts
+
+
+═══════════════════════════════════════════════════════════════════════════════
+WHAT NEEDS TO HAPPEN NEXT (CRITICAL PATH)
+═══════════════════════════════════════════════════════════════════════════════
+
+IMMEDIATE (THIS WEEK):
+  1. Add founder photo + bio to homepage
+  2. Add founder's LinkedIn link
+  3. Narrow positioning to ONE niche (pick either Agencies OR SaaS)
+  4. Create pre-qualification form on booking page
+  5. Fix suspicious claims (lower metrics to realistic levels)
+
+SHORT-TERM (30 DAYS):
+  1. Get first paying customer (any price, any terms)
+  2. Document results over 30 days
+  3. Create detailed case study
+  4. Get video testimonial
+  5. Publish case study on website
+
+MEDIUM-TERM (3-6 MONTHS):
+  1. Get 3-5 more customers
+  2. Build case study portfolio (5+ case studies)
+  3. Publish 2-3 LinkedIn articles
+  4. Appear on 3-5 podcasts
+  5. Raise pricing to $1,500-2,000/month
+
+LONG-TERM (6-12 MONTHS):
+  1. Build to 10,000+ LinkedIn followers
+  2. Only take high-fit customers
+  3. $50,000+ MRR with 20-30 customers
+  4. Hire team members
+  5. Raise capital (if desired)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+QUICK SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+WHAT THEY DO:
+  Automate outbound sales prospecting → Send personalized emails/LinkedIn 
+  messages → Book qualified meetings on your calendar (all automated via AI)
+
+HOW:
+  1. Find prospects via Apollo.io database
+  2. Score them against your Ideal Customer Profile
+  3. Personalize emails/LinkedIn with AI
+  4. Send sequences over 2-4 weeks
+  5. Qualify responses with AI scoring
+  6. Book meetings directly on your Calendly
+  7. Alert founder via Telegram
+
+WHO USES IT:
+  Marketing agencies, B2B SaaS, tech companies that need sales meetings
+
+PRICE:
+  $500-2,000/month depending on tier
+
+RESULTS THEY PROMISE:
+  10-20 qualified meetings per month within 4 weeks
+
+REALITY CHECK:
+  Website & infrastructure: Professional ✓
+  Proof of concept: Missing ✗
+  Founder credibility: Missing ✗
+  Competitive advantage: Unclear (lots of competitors)
+  Ready for $2K+ pricing: NO — Need 6-12 months
+
+
+═══════════════════════════════════════════════════════════════════════════════
+BOTTOM LINE
+═══════════════════════════════════════════════════════════════════════════════
+
+JARVIS PRIME is a well-built B2B sales automation company with solid 
+infrastructure and real market demand.
+
+THE PROBLEM:
+  • Zero founder visibility (nobody knows who Anuj Singh is)
+  • Zero social proof (no case studies, testimonials, or proven results)
+  • Unproven claims (metrics seem too good to be true)
+  • No customers (or very few)
+
+THE OPPORTUNITY:
+  Get 1 paying customer → Document results → Publish case study → Build founder 
+  brand → Scale to $50K+ MRR within 12 months
+
+CURRENT SCORE: 4.2/10 (Not ready for premium pricing)
+POTENTIAL SCORE: 8.5/10 (After fixing credibility)
+
+═══════════════════════════════════════════════════════════════════════════════

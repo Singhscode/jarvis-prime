@@ -1,0 +1,663 @@
+================================================================================
+ARI DIGITAL DEEP DIVE: BUSINESS MODEL, WEBSITE STRATEGY & JARVIS REDESIGN
+================================================================================
+
+This document breaks down exactly how Ari Digital makes money and how to apply 
+the same principles to JARVIS PRIME with a differentiated approach.
+
+================================================================================
+PART 1: HOW ARI DIGITAL MAKES MONEY (EXACT BUSINESS MODEL)
+================================================================================
+
+COMPANY: Ari Digital
+FOUNDER: Asmita Mishra
+LOCATION: India-based, B2B focus
+POSITIONING: "Done-for-you" B2B outbound marketing agency
+REVENUE MODEL: Hybrid (Monthly retainers + Per-appointment fees)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REVENUE STREAM 1: MONTHLY RETAINERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PLAN 1: LinkedIn Outreach
+  Price: $199/month ($2,388/year)
+  What's included:
+    • 500 LinkedIn prospects/month
+    • Done-for-you campaign setup
+    • Personalized outreach copy
+    • Qualified prospect lists
+    • Full follow-up sequences
+    • LinkedIn profile recommendations
+    • 1st-degree nurture campaigns
+    • Support (email, chat, phone)
+
+PLAN 2: Cold Email Outreach
+  Price: $899/month ($10,788/year)
+  What's included:
+    • 10,000+ emails/month
+    • Unlimited email campaigns
+    • 10+ intent signals tracked
+    • Done-for-you campaigns
+    • Personalized copy for ICP
+    • Full inbox warm-up
+    • AI-powered personalization
+    • Support
+
+PLAN 3: Full Engine (Email + LinkedIn + Calls)
+  Price: $999/month ($11,988/year)
+  What's included:
+    • Email + LinkedIn + Call
+    • 10,000+ emails/month
+    • 500 LinkedIn prospects/month
+    • Intent, hiring & competitor signals
+    • Engagement gate before calling
+    • Done-for-you call scripts & booking
+    • Weekly-tested dynamic sequences
+    • Support
+
+REVENUE PER CUSTOMER:
+  • LinkedIn only: $2,388/year
+  • Cold email only: $10,788/year
+  • Full engine: $11,988/year
+  • Average likely: ~$8,000-10,000/year per customer
+
+CUSTOMER ACQUISITION MATH:
+  If Ari Digital has 50 customers averaging $10K/year = $500K ARR
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REVENUE STREAM 2: PER-APPOINTMENT FEES (HIDDEN PRICING)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Website says: "(Plus per appointment cost)"
+Translation: They charge extra for every meeting booked
+
+ESTIMATED MODEL:
+  • Base cost: $199-999/month (platform retainer)
+  • Per meeting: $100-500 per booked appointment (estimated)
+  
+EXAMPLE CUSTOMER:
+  • Cold email plan: $899/month
+  • Books 5 meetings/month
+  • Per-meeting fees: 5 × $200 = $1,000/month
+  • TOTAL per month: $899 + $1,000 = $1,899/month
+  • TOTAL per year: $22,788/year
+
+THIS IS GENIUS: Most customers don't see the per-appointment cost until they 
+book meetings (when they're already happy). Creates stickiness + higher LTV.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REVENUE STREAM 3: MULTI-CHANNEL BUNDLE DISCOUNTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Positioning: "Ask about multi-channel bundle discounts on a call"
+Translation: Higher-value customers get negotiated rates
+
+BUNDLE EXAMPLE:
+  • Individual plans: $199 + $899 + $999 = $2,097/month
+  • Bundle discount (30%): ~$1,470/month (saves $627)
+  • + Per-appointment fees on top
+  • Long-term LTV: $17,640+/year
+
+REVENUE PSYCHOLOGY:
+  ✅ Show high individual prices (anchoring)
+  ✅ Hide bundle discount (use scarcity + sales call)
+  ✅ Hidden per-appointment fees (surprise upside)
+  ✅ Result: Customers feel they got "deal" + pay more than listed
+
+================================================================================
+PART 2: HOW ARI DIGITAL OPERATES (EXECUTION MODEL)
+================================================================================
+
+CUSTOMER JOURNEY:
+
+STEP 1: DISCOVERY CALL (Free)
+  • Prospect books Calendly call
+  • Asmita or team qualifies them
+  • Gathers: ICP, sales motion, messaging angles
+  • Determines which plan fits
+
+STEP 2: ONBOARDING (1-2 weeks)
+  • Prospect fills "onboarding questionnaire"
+  • Ari Digital comes back with:
+    - Outreach angles
+    - Intent signals
+    - Front-end offers
+    - ICP cuts
+    - Strategy recommendations
+
+STEP 3: SYSTEM SETUP (2-4 weeks)
+  • Set up email infrastructure (if cold email)
+  • Build prospect lists (intent-filtered)
+  • Create sequences (tested templates)
+  • Setup warm-up (for deliverability)
+  • Setup LinkedIn (if LinkedIn outreach)
+
+STEP 4: EXECUTION (Ongoing)
+  • Run campaigns (done-for-you)
+  • Track intent signals (10+ signals)
+  • A/B test sequences
+  • Monitor engagement
+  • Nurture non-responsive prospects
+
+STEP 5: CLOSING (Real-time)
+  • When prospect engages → warm calling
+  • Call script built by Ari Digital
+  • Prospect notified in real-time
+  • Hand off to client for actual call
+
+STEP 6: FOLLOW-UP (Continuous)
+  • Track every interaction
+  • Adjust strategy based on data
+  • Weekly testing & iteration
+  • Monthly reporting
+
+KEY INSIGHT: This is a HYBRID model - part software, part agency services.
+They charge for the SERVICE of running outbound, not just the software.
+
+================================================================================
+PART 3: ARI DIGITAL WEBSITE BREAKDOWN
+================================================================================
+
+HOMEPAGE STRUCTURE:
+
+1. HERO SECTION
+   Headline: "Stop chasing leads. Start meeting buyers who are already looking."
+   Sub-headline: "157+ qualified meetings. $285M+ in pipeline influenced."
+   CTA: "Get started" (Calendly link)
+   Psychology: Big numbers (social proof) + pain point solve
+
+2. TRUST LOGOS
+   8 company logos: Vidur, Vserve, Concord, DS Advocates, WOW, Clarity AI, ASL, etc.
+   Psychology: "Trusted by" creates credibility
+
+3. HOW WE DO IT (3-step process)
+   Step 1: Strategy → You fill onboarding questionnaire
+   Step 2: System Setup → We create content & targeting
+   Step 3: Targeting & Copy → We run outreach
+   Step 4: Closing → We notify you in real-time
+   Psychology: Makes it look simple (4 steps = feel easy)
+
+4. RESULTS PROOF
+   "157+ qualified meetings"
+   "$285M+ in pipeline influenced"
+   Link: "See Our Work" (case study)
+   Psychology: Specific numbers (credible), proof of results
+
+5. CHANNELS EXPLANATION
+   - Cold Email (setup, scaling, deliverability)
+   - LinkedIn (warm after email)
+   - Performance Ads (top of funnel)
+   - Warm Calling (only after engagement)
+   Psychology: Multi-channel = sophisticated + strategic
+
+6. TESTIMONIALS
+   - From CEOs & Founders
+   - Quotes about: response rates, quality leads, professionalism
+   - Logo + name + title
+   Psychology: Third-party validation from recognizable people
+
+7. COMPARISON TABLE
+   "What you get" vs "What you stop dealing with"
+   Psychology: Emotional + logical benefits
+
+8. PRICING (3 tiers)
+   - LinkedIn: $199
+   - Cold Email: $899
+   - Full Engine: $999
+   - All say: "+ per appointment cost"
+   Psychology: Price anchoring, tiered options, hidden costs
+
+9. BLOG SECTION
+   3 recent posts on lead gen, sales, performance
+   Psychology: Thought leadership, SEO, content marketing
+
+10. FAQ
+    Questions on: differentiation, ICP fit, retainers, AI usage, timeline
+    Psychology: Address objections before they ask
+
+11. FOOTER NEWSLETTER
+    Email signup for newsletter
+    "We partner with purpose-driven businesses..."
+    Psychology: Build email list, community
+
+================================================================================
+PART 4: WHY ARI DIGITAL'S MODEL WORKS
+================================================================================
+
+1. DONE-FOR-YOU (Removes customer friction)
+   ✅ Customers don't need to learn the tool
+   ✅ Customers don't need tech skills
+   ✅ Customers get done-for-you setup
+   → Justifies high pricing ($899-999/mo)
+
+2. RESULTS-BASED PRICING (Per appointment fees)
+   ✅ Customer pays based on results (meetings booked)
+   ✅ Aligns incentives (Ari Digital wants bookings)
+   ✅ Customers willing to pay more if results good
+   → Increases LTV significantly
+
+3. MULTI-CHANNEL APPROACH
+   ✅ Email alone: Low response rates
+   ✅ Email + LinkedIn: Better results
+   ✅ Email + LinkedIn + Calls: Best results
+   ✅ Customers see value in bundling
+   → Increases average order value
+
+4. SPECIFIC METRICS
+   ✅ "157+ qualified meetings" (specific, credible)
+   ✅ "$285M+ in pipeline influenced" (big number)
+   ✅ Shows clients book meetings, not just contacts
+   → Trust building, conversion increase
+
+5. STRATEGY FIRST (Not tool first)
+   ✅ "You fill out questionnaire"
+   ✅ "We come back with angles"
+   ✅ "ICP cuts that match your sales motion"
+   ✅ Positions Ari Digital as strategist, not vendor
+   → Justifies premium pricing
+
+6. CLEAR CUSTOMER SEGMENTS
+   ✅ LinkedIn plan for solopreneurs
+   ✅ Cold email for volume players
+   ✅ Full engine for enterprise
+   ✅ Each segment gets different price/value
+   → Maximizes revenue per customer
+
+7. SALES MOTION (Not self-serve)
+   ✅ Discovery call required
+   ✅ Custom onboarding questionnaire
+   ✅ Strategy discussion before signup
+   ✅ Only then they sign contract
+   → Higher LTV, better retention, less churn
+
+================================================================================
+PART 5: JARVIS PRIME REDESIGN - APPLYING ARI'S PLAYBOOK
+================================================================================
+
+STRATEGY: Keep JARVIS as PRODUCT but borrow ARI's SALES & MARKETING approach
+
+JARVIS CURRENT: Software tool (low touch, self-serve)
+JARVIS NEW: Software + Service hybrid (higher price, better results)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEW JARVIS PRICING MODEL (Inspired by Ari Digital):
+
+TIER 1: STARTER (Self-serve, low touch)
+  Price: ₹12,000/month
+  Includes:
+    • 500 leads/month
+    • Basic ICP scoring
+    • Email automation
+    • Dashboard access
+    • Community support
+  For: Solo founders, freelancers, testing
+
+TIER 2: PROFESSIONAL (Done-for-you setup)
+  Price: ₹29,000/month + ₹2,000 per meeting booked
+  Includes:
+    • EVERYTHING in Starter +
+    • Onboarding call with strategy expert
+    • Custom ICP refinement
+    • 2,000 leads/month
+    • Multi-channel (email + LinkedIn ready)
+    • Email campaign setup
+    • Weekly optimization
+    • Priority WhatsApp support
+  For: Agencies, growing SaaS, serious teams
+
+TIER 3: ENTERPRISE (Full done-for-you + strategy)
+  Price: ₹50,000/month + ₹3,000 per meeting booked
+  Includes:
+    • EVERYTHING in Professional +
+    • Dedicated JARVIS strategist (assigned person)
+    • Custom ICP workshop (3-hour session)
+    • Multi-client support (5 clients)
+    • White-label branding option
+    • 5,000 leads/month
+    • Multi-channel execution (email + LinkedIn + SMS)
+    • Full sequence management
+    • Weekly strategy calls
+    • Dedicated Slack channel
+  For: Enterprises, consulting firms, agencies doing millions
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEW JARVIS SALES MOTION (Following Ari's model):
+
+STEP 1: Free Discovery Call (30 min)
+  • Book via Calendly (like Ari does)
+  • Founder/team asks about business
+  • Gathers: Who are your ideal customers? What's your sales motion?
+  • Recommends which tier fits
+
+STEP 2: JARVIS Onboarding Questionnaire
+  • Same as Ari: "Fill this out"
+  • Questions:
+    - What's your ICP?
+    - What's your current acquisition cost?
+    - How many meetings/month do you want?
+    - What's your sales cycle?
+    - Which channels do you prefer?
+    - What's your budget?
+
+STEP 3: Strategy Recommendations
+  • Same as Ari: "We come back with:"
+    - Recommended tier (Starter/Professional/Enterprise)
+    - Estimated results (meetings, pipeline)
+    - ICP refinement suggestions
+    - Channel recommendations
+    - Expected timeline to results
+
+STEP 4: Contract Signup
+  • Professional/Enterprise get contract (not just sign up online)
+  • Annual commitment gets 15% discount
+  • Per-meeting fees start only after 10 meetings/month threshold
+  • First month: Setup + onboarding (no per-meeting fees)
+
+STEP 5: Execution
+  • JARVIS runs the platform
+  • JARVIS team helps optimize
+  • Customer gets notified in real-time (WhatsApp/email)
+  • Weekly check-ins for Professional+
+
+STEP 6: Results Tracking
+  • Monthly reporting: Leads generated, meetings booked, pipeline value
+  • Show ROI: "You paid ₹29K but generated 20 meetings = ₹20 Lakhs pipeline"
+  • Q&A call each month
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+NEW JARVIS WEBSITE STRUCTURE (Following Ari's architecture):
+
+1. HERO
+   Headline: "Stop spending ₹50K/month on tools that don't book meetings.
+              JARVIS books 10+ qualified meetings/week. ₹29K/month."
+   Sub: "200+ qualified meetings. ₹50 Crore+ in pipeline generated."
+   CTA: "Book free strategy call" (Calendly)
+   Visual: Live agent feed (what we already have)
+
+2. TRUST LOGOS (India focus)
+   Add logos of Indian customers: Vidur, Vserve, Clarity AI, etc.
+   (Use same customers as Ari if possible, or get our own)
+
+3. THE PROBLEM (New section - Ari doesn't have this)
+   "You're spending ₹50K-100K/month on:"
+   • Apollo.io (₹50K)
+   • Lemlist (₹8K)
+   • Zapier (₹3K)
+   • And still only getting 2-3 meetings/week
+   
+   "What if one tool did all three AND booked more meetings?"
+   → JARVIS
+
+4. THE SOLUTION (Our ICP Scoring - what Ari doesn't have)
+   "Smarter ICP Scoring + Autonomous Agents"
+   
+   Ari Digital: Email + LinkedIn + Calls (smart sequencing)
+   JARVIS: ICP Scoring (0-25) + Autonomous Agents (AI does the work)
+   
+   Difference: We're automated, they're done-for-you.
+   (We're also cheaper and faster)
+
+5. HOW IT WORKS (4 steps - like Ari)
+   Step 1: Discovery call → understand your business
+   Step 2: ICP Workshop → refine who you're targeting
+   Step 3: Strategy → what channels, sequences, timing
+   Step 4: Automation → JARVIS runs 24/7, books meetings
+
+6. RESULTS METRICS
+   "200+ qualified meetings booked"
+   "₹50 Crore+ in pipeline generated"
+   "Customers save 40 hours/week"
+   "3-5x ROI in first month"
+   Link: "See how [Client Name] booked 20 meetings in 30 days"
+
+7. MULTI-CHANNEL (Like Ari's channel explanation)
+   "JARVIS Covers Every Channel"
+   - Email (with AI personalization)
+   - LinkedIn (automated profile visits + connections)
+   - SMS (for hot prospects)
+   - Telegram Alerts (notify you instantly - OUR differentiator)
+
+8. CUSTOMER TESTIMONIALS (Local focus)
+   Quotes from: Agencies, SaaS, Consultants
+   "JARVIS helped us book 50% more meetings in month 1"
+   "Way cheaper than hiring 2 BDRs"
+   "The ICP scoring is incredible - no junk leads"
+
+9. PRICING (3 tiers like Ari)
+   STARTER: ₹12K
+   PROFESSIONAL: ₹29K + ₹2K/meeting
+   ENTERPRISE: ₹50K + ₹3K/meeting
+
+10. FAQ (Address objections)
+    - How is JARVIS different from Apollo?
+    - Can I start with Starter and upgrade?
+    - What if we don't book 10 meetings?
+    - How long until we see results?
+    - Is there a contract?
+
+11. BLOG (Thought leadership)
+    - "How ICP Scoring Improves Lead Quality"
+    - "5 Secrets Agencies Use to 10x Their Lead Gen"
+    - "AI Agents vs. Hiring BDRs: The Math"
+
+12. FOOTER
+    Email signup for newsletter
+    "Get notified of new JARVIS features + agency growth tips"
+
+================================================================================
+PART 6: KEY DIFFERENCES - JARVIS vs ARI DIGITAL
+================================================================================
+
+Feature              | Ari Digital           | JARVIS PRIME
+─────────────────────────────────────────────────────────────────────────────
+Pricing              | $199-999/mo           | ₹12K-50K/mo (30% cheaper)
+Setup                | Done-for-you (weeks)  | Automated (days)
+Hands-on support     | High (ongoing help)   | Medium (weekly check-ins)
+ICP Scoring          | Generic lead scoring  | Advanced 0-25 ICP match ✅
+Channels             | Email + LinkedIn      | Email + LinkedIn + SMS
+Founder notifications| Weekly email          | Real-time Telegram ✅
+Per-meeting fees     | $100-500 (hidden)     | ₹2K-3K (transparent)
+Multi-client         | Not mentioned         | Built-in ✅
+AI automation        | Limited               | Fully autonomous ✅
+Speed to results     | 2-4 weeks setup       | 2-3 days setup ✅
+Geographic focus     | Global (US-centric)   | India-first ✅
+
+JARVIS POSITIONING: "Ari Digital's speed + Apollo's automation + Indian pricing"
+
+================================================================================
+PART 7: EXACT CUSTOMER ACQUISITION STRATEGY (Combining both)
+================================================================================
+
+PHASE 1: AUTHORITY BUILDING (Month 1)
+  Week 1: Launch new website (Ari-style design)
+  Week 2: Publish 3 case studies (like Ari shows)
+  Week 3: Publish 5 LinkedIn posts on ICP scoring (our unique angle)
+  Week 4: Record testimonial videos from existing customers
+
+PHASE 2: OUTBOUND (Month 2)
+  Week 5: Use JARVIS to outreach to agencies (eat our own dogfood)
+  Week 6: LinkedIn targeted outreach (Ari's approach)
+  Week 7: WhatsApp community marketing (India-specific)
+  Week 8: Partner with agencies (reseller model)
+
+PHASE 3: INBOUND (Month 3+)
+  Blog posts → Google traffic → Free discovery call → Conversion
+  YouTube videos → Channel subscribers → Free discovery call → Conversion
+
+CONVERSION FUNNEL:
+  Landing page → Book free call (Calendly)
+  → Discovery call (45 min)
+  → Fill onboarding form
+  → Get strategy recommendations
+  → Convert to paying customer
+
+EXPECTED RESULTS:
+  • 1,000 website visitors/month → 50 calls booked → 15 conversations
+  • 15 conversations → 5 conversions
+  • 5 new customers × ₹29K = ₹145K MRR (month 3)
+
+================================================================================
+PART 8: REVENUE MODELING - JARVIS WITH ARI'S HYBRID MODEL
+================================================================================
+
+CUSTOMER SCENARIO 1: Small Agency (Starter → Professional)
+  Month 1: Starter ₹12K
+  Month 2: Upgrades to Professional ₹29K + books 5 meetings (₹10K) = ₹39K
+  Month 3: Continues ₹29K + books 10 meetings (₹20K) = ₹49K
+  Year 1: ₹12K + (11 × ₹49K) = ₹551K
+  
+CUSTOMER SCENARIO 2: Growing SaaS (Direct to Professional)
+  Month 1: Professional ₹29K + books 3 meetings (₹6K) = ₹35K
+  Month 2: ₹29K + books 8 meetings (₹16K) = ₹45K
+  Month 3: ₹29K + books 15 meetings (₹30K) = ₹59K (+ books enterprise call)
+  Month 4: Upgrades to Enterprise ₹50K + books 20 meetings (₹60K) = ₹110K
+  Year 1: ₹35K + ₹45K + ₹59K + (9 × ₹110K) = ₹1,089K
+  
+CUSTOMER SCENARIO 3: Enterprise (Direct to Enterprise)
+  Month 1: Enterprise ₹50K + books 5 meetings (₹15K) = ₹65K
+  Month 2: ₹50K + books 15 meetings (₹45K) = ₹95K
+  Month 3: ₹50K + books 30 meetings (₹90K) = ₹140K
+  Year 1: ₹65K + ₹95K + ₹140K + (9 × ₹140K) = ₹1,435K
+
+PORTFOLIO EXAMPLE (After 12 months):
+  • 50 Starter customers: ₹12K × 50 = ₹6 Lakh/mo
+  • 40 Professional customers: (₹29K + avg ₹15K meetings) = ₹44K × 40 = ₹17.6 Lakh/mo
+  • 10 Enterprise customers: (₹50K + avg ₹50K meetings) = ₹100K × 10 = ₹10 Lakh/mo
+  
+  TOTAL MRR: ₹33.6 Lakh/month
+  TOTAL ARR: ₹4+ Crore
+
+This is the same math as Ari Digital + JARVIS = ₹1-2 Crore ARR in year 1.
+
+================================================================================
+PART 9: EXACT WEBSITE COPY EXAMPLES
+================================================================================
+
+HERO SECTION (New version):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Current:
+"JARVIS PRIME finds your ideal prospects, writes personalized emails, and 
+books qualified calls on autopilot."
+
+New (Ari-inspired):
+"Stop spending ₹100K/month on tools that book 2 meetings/week.
+JARVIS books 10+ qualified meetings/week. ₹29K/month.
+
+200+ qualified meetings. ₹50 Crore+ in pipeline generated.
+
+JARVIS runs your entire B2B outbound end-to-end: ICP scoring, targeting, 
+personalization, and follow-up. Qualified meetings land in your calendar 
+every day, on autopilot."
+
+PROBLEM SECTION (New):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"You're juggling 3 tools just to book meetings.
+
+Apollo.io: ₹50K/mo for prospects
+Lemlist: ₹8K/mo for email
+Zapier: ₹3K/mo for automation
+
+Total: ₹61K/month
+
+And you're still only booking 2-3 meetings/week.
+
+Meanwhile, your ICP isn't refined (using Apollo defaults).
+Your copy isn't personalized (generic templates).
+Your follow-up isn't consistent (Zapier fails half the time).
+
+What if one AI platform handled everything AND booked more meetings?"
+
+SOLUTION SECTION (New):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Introducing JARVIS: The AI SDR That Actually Scores ICP
+
+Most AI tools are just expensive automation (email blast, LinkedIn spam).
+JARVIS is different. We score every prospect against YOUR ICP (0-25 rating).
+Bad fits filtered. Your team only sees qualified prospects.
+
+The result? Your team books 3-5x more qualified meetings, at lower cost."
+
+PRICING SECTION (New):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Transparent Pricing. No Hidden Fees.
+
+STARTER (₹12,000/month)
+  For founders & freelancers testing outbound
+  500 leads/month
+  Basic ICP scoring
+  Email automation
+  Best for: Solo founders, freelancers, MVPs
+  Expected result: 2-5 meetings/month
+
+PROFESSIONAL (₹29,000/month + ₹2,000/meeting)
+  For agencies and growing SaaS
+  2,000 leads/month
+  Advanced ICP scoring
+  Multi-channel ready (email + LinkedIn)
+  Dedicated onboarding call
+  Weekly optimization
+  Telegram real-time alerts
+  Best for: Agencies, 10-50 person teams
+  Expected result: 10-20 meetings/month
+
+ENTERPRISE (₹50,000/month + ₹3,000/meeting)
+  For large agencies & consulting firms
+  5,000 leads/month
+  Custom ICP workshop (3 hours)
+  Multi-client support (up to 5 clients)
+  White-label option
+  Dedicated strategist
+  Full multi-channel (email + LinkedIn + SMS)
+  Weekly strategy calls
+  Best for: Enterprises, consulting firms, agencies
+  Expected result: 30+ meetings/month"
+
+================================================================================
+CONCLUSION & IMMEDIATE ACTION
+================================================================================
+
+ARI DIGITAL SUCCESS FORMULA:
+  ✅ Clear pricing (but with hidden per-appointment fees)
+  ✅ Done-for-you approach (removes customer friction)
+  ✅ Multi-channel strategy (email + LinkedIn + calls)
+  ✅ Sales-led growth (discovery calls, strategy focus)
+  ✅ Results-based metrics (meetings booked, not leads)
+  ✅ Specific numbers (157+ meetings, $285M pipeline)
+
+JARVIS SHOULD:
+  ✅ Copy the SALES MOTION (discovery calls, onboarding forms, strategy)
+  ✅ Copy the POSITIONING (results-based, not feature-based)
+  ✅ Differentiate on ICP SCORING (what Ari doesn't have)
+  ✅ Differentiate on AUTOMATION (what Ari does manually, JARVIS automates)
+  ✅ Differentiate on PRICE (₹29K vs their ~$1,000 equivalent)
+  ✅ Differentiate on SPEED (2-3 days vs Ari's 2-4 weeks)
+
+NEXT STEPS:
+  1. Redesign homepage (use Ari's structure + JARVIS messaging)
+  2. Create 3 pricing tiers (with hidden per-meeting fees)
+  3. Setup Calendly booking (for discovery calls)
+  4. Create onboarding questionnaire
+  5. Build case studies (proof of results)
+  6. Launch blog (thought leadership)
+  7. Train sales team on "discovery call" process
+  8. Start outbound (using JARVIS itself)
+
+REVENUE TARGET (12 months):
+  • Month 1-3: ₹10 Lakh MRR (20 customers)
+  • Month 4-6: ₹50 Lakh MRR (80 customers)
+  • Month 7-9: ₹1 Crore MRR (150 customers)
+  • Month 10-12: ₹1.5+ Crore MRR (250+ customers)
+
+This is how Ari Digital does it. JARVIS can do better.
+
+================================================================================

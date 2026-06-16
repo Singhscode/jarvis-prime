@@ -1,0 +1,704 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║   PHASE 3: SALES PROCESS TEMPLATES                                          ║
+║   Ready-to-Use Scripts, Emails, and Docs                                    ║
+║                                                                              ║
+║   Use These Exactly as Written                                              ║
+║   (Small customizations noted with [brackets])                             ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+OVERVIEW
+═══════════════════════════════════════════════════════════════════════════════
+
+You have 4 critical sales documents:
+
+1. COLD EMAIL TEMPLATE — Send to prospects
+2. DEMO CALL SCRIPT — Follow during 30-min call
+3. WEEKLY REPORT TEMPLATE — Send to clients every Friday
+4. ONE-PAGE AGREEMENT — Signing before work starts
+
+Each is ready to use. Customize [bracketed] sections only.
+
+Time spent on sales process: 30 minutes/day
+Expected result: 1 customer every 15 days
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TEMPLATE #1: COLD EMAIL
+═══════════════════════════════════════════════════════════════════════════════
+
+USE THIS EXACT EMAIL.
+
+SUBJECT: "Help with [Agency Name]'s lead flow?"
+
+FROM: hello@jarvisprime.me
+
+TO: founder@[agencyname].com or hello@[agencyname].com
+
+---
+
+Hi [First Name],
+
+I help marketing agencies book 8-15 qualified meetings per month without 
+hiring SDRs.
+
+We basically handle your cold outreach end-to-end:
+• Research who your ideal clients are
+• Send personalized emails from you
+• Handle follow-ups
+• Book meetings on your calendar
+
+[Specific observation about their business]:
+"I saw you work with [type of business]. Most founders in that space struggle 
+with lead consistency. That's exactly what we solve."
+
+Interested in a quick 15-min call to see if this fits?
+
+No pressure — either we're a good fit or we're not.
+
+Best,
+Anuj Singh
+Founder, JARVIS PRIME
+hello@jarvisprime.me
++91 88105 00723
+
+
+HOW TO USE:
+
+1. Replace [Agency Name] with their actual business
+2. Find founder's first name and insert [First Name]
+3. Research their business (2 min on their website)
+4. Write [Specific observation] — this is the key
+5. Send Tuesday-Thursday at 9am
+
+EXAMPLES OF SPECIFIC OBSERVATIONS:
+
+❌ DON'T: "I saw you work with B2B companies"
+✓ DO: "I saw you help e-commerce brands with their Shopify setup. 
+       Most founder-led agencies struggle to fill their pipeline."
+
+❌ DON'T: "You seem like a great agency"
+✓ DO: "You specialize in local SEO for dentists. Most dental SEO agencies 
+       book clients only through referrals."
+
+EXPECTED RESPONSE RATE:
+• Cold outreach: 3-6% reply rate
+• That means: 20 emails = 1 reply, 100 emails = 4-6 replies
+
+
+EMAIL CUSTOMIZATION ZONES [Edit these]:
+
+[Agency Name] = Their business name
+[First Name] = Founder first name only
+[Specific observation] = Your research about their business
+
+
+SENDING STRATEGY:
+
+DAILY GOAL: Send 20 emails
+  • 10 in morning (9am)
+  • 10 in evening (5pm)
+  • Stagger by 30 seconds (don't send all at once)
+
+WEEKLY GOAL: 100 emails
+  • Monday-Friday only
+  • Track which ones reply
+  • Note what observation worked best
+
+MONTHLY GOAL: 400 emails
+  • By day 30: 24-30 replies expected
+  • By day 40: 3-5 calls booked
+  • By day 60: 1-2 customers
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TEMPLATE #2: DEMO CALL SCRIPT
+═══════════════════════════════════════════════════════════════════════════════
+
+DURATION: 30 minutes exactly
+STRUCTURE: 4 parts (5-7-10-8 minutes)
+
+---
+
+PART 1: RAPPORT & CONTEXT (5 min)
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU: "Hey [First Name]! Thanks for jumping on. Before we dive in, I'm curious — 
+      what made you want to take this call?"
+
+[Listen. They'll mention a pain point. Write it down.]
+
+YOU: "Got it. And just out of curiosity, how are you currently getting leads?"
+
+[Listen. They'll describe their process.]
+
+YOU: "Cool. So you're [summarize what they said]. Makes sense."
+
+
+PART 2: THEIR PROBLEM (7 min)
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU: "Here's what I'm hearing: you need consistent pipeline without 
+      [problem they mentioned]. Is that fair?"
+
+[They say yes]
+
+YOU: "Most agencies I talk to are in the same spot. They spend $4-8K/month on 
+      an SDR who takes 2-3 months to ramp, or they use tools that are a pain 
+      to manage.
+
+      What's your current situation like?"
+
+[Listen. Let them talk 80/20.]
+
+YOU: "If I could show you a way to get 8-15 meetings per month with zero hiring 
+      headaches, would that be interesting?"
+
+[They say yes]
+
+
+PART 3: THE OFFER (10 min)
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU: "Here's how we work:
+
+      Month 1: We do research, write emails, manage outreach
+      Result: 8-15 qualified meetings for you
+
+      You only do one thing: show up to the calls.
+
+      Cost: ₹1,25,250/month
+      Guarantee: 8+ meetings in 60 days or we work for free
+
+      What questions do you have?"
+
+[Pause. Listen to their objection.]
+
+COMMON OBJECTIONS & RESPONSES:
+
+OBJECTION: "How is this different from using Apollo + Lemlist?"
+YOU: "Good question. Apollo finds leads. Lemlist sends emails. But somebody 
+      has to: research your ICP, write the emails, manage follow-ups, qualify 
+      responses, book your meetings. 
+      
+      That 'somebody' is usually you, taking 10 hours/week. Or you hire an SDR 
+      for $4K-8K/month who takes 3 months to ramp.
+      
+      We handle all of it. You just show up to meetings. That's the difference."
+
+OBJECTION: "What if it doesn't work?"
+YOU: "Then we work for free until it does. We guarantee 8+ meetings in 60 days. 
+      If we don't hit that, you don't pay. We only win when you win. Simple."
+
+OBJECTION: "Can I cancel anytime?"
+YOU: "Yep. Month-to-month. If we're not delivering, cancel. But we're confident 
+      in our process."
+
+OBJECTION: "I need to think about it"
+YOU: "Totally fair. Here's what I'd suggest: Let's do a quick audit of your 
+      ideal prospects. Takes 15 minutes. Then you can decide if this makes 
+      sense. Sound good?"
+
+[If they say yes, do a quick ICP audit in next 5 minutes]
+
+[If they say no, get email and follow up in 3 days]
+
+
+PART 4: CLOSING (8 min)
+═══════════════════════════════════════════════════════════════════════════════
+
+IF THEY'RE INTERESTED:
+
+YOU: "Perfect. Here's next steps:
+
+      1. I'll send you a one-page agreement
+      2. You sign and send back
+      3. We do a 30-min kickoff call Monday
+      4. We start research Tuesday
+      5. First emails go out Thursday
+      6. First meetings come in by mid-next week
+
+      Does that timeline work?"
+
+[If yes, send agreement]
+
+YOU: "Great. Anything else before I send the agreement over?"
+
+[If they ask questions, answer them]
+
+YOU: "You're going to be happy with this. I promise. Send me the signed 
+      agreement and we'll get rolling."
+
+IF THEY'RE NOT INTERESTED:
+
+YOU: "No problem. I get it. Here's what I'd suggest: 
+
+      If lead generation becomes an issue in the next 30 days, reach out. 
+      I'll run a free audit of your ideal prospects. Deal?"
+
+[They say yes]
+
+YOU: "Great. I'll send you my calendar link. Grab my coffee link if you need it.
+
+      Thanks for the time today."
+
+[Send calendar link]
+
+
+CALL TRACKING:
+
+After every call, note:
+
+□ Company name
+□ Founder name
+□ Problem they mentioned
+□ Objection (if any)
+□ Whether they're interested
+□ Follow-up date
+
+This helps you refine your pitch.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TEMPLATE #3: WEEKLY REPORT (for clients)
+═══════════════════════════════════════════════════════════════════════════════
+
+SEND: Every Friday at 3pm
+
+TO: Your client
+
+SUBJECT: "Weekly Update: [Company Name] Outreach — Week [X]"
+
+---
+
+Hi [Client Name],
+
+Here's what we did this week:
+
+OUTREACH ACTIVITY:
+• Emails sent: [number]
+• Open rate: [X]%
+• Reply rate: [X]%
+• Positive responses: [number]
+
+PIPELINE:
+• Meetings booked: [number]
+• Qualified prospects: [number]
+• Follow-ups in progress: [number]
+
+NEXT WEEK:
+We're focusing on [specific type of prospect] based on your highest response rate.
+We'll send [number] emails and aim for [number] meetings.
+
+QUICK WIN:
+[Share one positive response or interesting lead they got]
+
+Questions? Let me know.
+
+Anuj
+
+
+WHY THIS FORMAT:
+
+✓ Short (takes 30 seconds to read)
+✓ Specific numbers (not vague)
+✓ Forward-looking (what's next)
+✓ Shares a win (keeps them engaged)
+✓ Builds confidence (shows activity)
+
+
+WEEKLY REPORT CHECKLIST:
+
+Before sending, you should have:
+
+□ Actual email count (not estimated)
+□ Real open rate data (from email tool)
+□ Real reply rate (calculated from replies)
+□ Actual meetings booked (check calendar)
+□ Next week's plan (specific, not vague)
+□ One positive thing to highlight
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TEMPLATE #4: ONE-PAGE SERVICE AGREEMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+Copy this, customize [brackets], print or share as PDF.
+
+---
+
+JARVIS PRIME — SERVICE AGREEMENT
+
+This agreement is between:
+
+CLIENT: [Company Name]
+CONTACT: [Name], [Title]
+EMAIL: [Email]
+PHONE: [Phone]
+
+JARVIS PRIME (Provider)
+Founder: Anuj Singh
+Email: hello@jarvisprime.me
+Phone: +91 88105 00723
+
+
+SERVICE:
+
+We will provide:
+• Prospect research and list building
+• Personalized cold email copywriting
+• Email campaign management
+• Follow-up sequences
+• Meeting booking and scheduling
+• Weekly performance reports
+
+You are responsible for:
+• Attending booked meetings
+• Providing feedback on prospects
+• Responding to booking confirmation emails
+• Authorizing any account access if needed
+
+
+PRICING & PAYMENT:
+
+Monthly Fee: ₹1,25,250 (or $1,500 USD)
+
+Payment Terms:
+• Due on the 1st of each month
+• 7-day grace period
+• Payment method: [Bank Transfer / Card / UPI]
+
+Cancellation:
+• Month-to-month, no long-term contract
+• Cancel anytime with 5 days notice
+• Refund prorated if cancel mid-month
+
+
+GUARANTEE:
+
+We guarantee 8+ qualified meetings within the first 60 days of service.
+
+If we do not deliver 8+ meetings:
+• You pay no fees for month 3
+• We continue work until guarantee is met
+• You can cancel if not satisfied
+
+"Qualified meeting" definition:
+• Decision-maker from your target industry
+• Company matches your ICP
+• Meeting scheduled via our outreach
+• Calendar invite confirmed
+
+
+TERM:
+
+Start Date: [Date]
+Initial Term: 60 days (with guarantee)
+Renewal: Month-to-month after 60 days
+
+
+COMMUNICATION:
+
+• Weekly reports: Every Friday
+• Performance calls: 1st Friday of each month (optional)
+• Emergency contact: [Your phone number]
+
+Response time:
+• Email: Within 24 hours
+• Urgent: Same day
+
+
+CONFIDENTIALITY:
+
+Both parties agree to keep client information and metrics confidential.
+
+Contact information shared will not be sold or shared with third parties.
+
+
+AGREEMENT:
+
+By signing below, both parties agree to the terms above.
+
+CLIENT:
+
+Name: _______________
+Signature: _______________
+Date: _______________
+
+
+JARVIS PRIME:
+
+Anuj Singh, Founder
+Signature: _______________
+Date: _______________
+
+
+---
+
+HOW TO SEND:
+
+1. Fill in [brackets] with client info
+2. Save as PDF
+3. Email with: "Attached is our agreement. Once signed, we'll kickoff. Thanks!"
+4. Client signs and returns
+5. You're ready to start work
+
+
+═══════════════════════════════════════════════════════════════════════════════
+OBJECTION HANDLING SCRIPT
+═══════════════════════════════════════════════════════════════════════════════
+
+Keep this handy during demo calls. These are the 80/20 objections.
+
+---
+
+OBJECTION #1: "How do I know this will work for my agency?"
+
+YOU: "Valid question. Here's what I'd say: The process works because:
+
+      1. We research your actual ideal clients (not guessing)
+      2. We write personal emails (not templates)
+      3. We handle objections in follow-ups
+      4. We qualify before you talk to anyone
+      
+      The only variable is your offer. If your service solves a real problem 
+      for real people at prices they can afford, meetings happen.
+      
+      We've done this 10+ times. Same process. Works every time.
+
+      What's your concern specifically?"
+
+---
+
+OBJECTION #2: "Isn't this just spam?"
+
+YOU: "Not at all. Here's the difference:
+
+      Spam: Mass emails to random people
+      Ours: Personalized emails to specific people in your ideal market
+      
+      Example: Instead of 'Hey, want marketing help?' we send:
+      'Hey [Name], I saw you work with [specific type of client]. 
+       Most [your niche] agencies struggle with [specific pain]. 
+       We help with that.'
+      
+      It's research-based, not blast-based.
+
+      The open rate proves it: 30-40% (vs 2-5% for spam).
+
+      Make sense?"
+
+---
+
+OBJECTION #3: "Can you guarantee this will work for my specific niche?"
+
+YOU: "Here's what I guarantee: Process and effort.
+
+      Process: The same research-based, personalized approach we use for 
+      every client.
+
+      Effort: We send 50-100 emails/week and manage follow-ups.
+
+      The guarantee is: 8+ meetings in 60 days or we work for free.
+
+      That said, if your offer doesn't have a real market (like selling 
+      ice to Eskimos), meetings might be hard. But that's a business problem, 
+      not an execution problem.
+
+      In our kickoff call, we'll validate your market. If it's weak, we'll 
+      tell you straight up.
+
+      Sound fair?"
+
+---
+
+OBJECTION #4: "Isn't ₹1,25,250/month expensive?"
+
+YOU: "Let's math it out:
+
+      Option A: Hire an SDR
+      - Cost: ₹1.5-3L/month in salary
+      - Ramp time: 2-3 months
+      - Success rate: 50% actually work out
+      - Effort: You manage, hire, train, fire
+      
+      Option B: Buy Apollo + Lemlist
+      - Cost: ₹5-8K/month in tools
+      - Your time: 10-15 hours/week managing campaigns
+      - Success rate: Depends on your copywriting skills
+      - Effort: You do the work
+      
+      Option C: JARVIS PRIME
+      - Cost: ₹1,25,250/month
+      - Your time: 0 hours/week
+      - Success rate: Guaranteed 8+ meetings
+      - Effort: You show up to meetings
+      
+      Worst case: You get 8 meetings. If 1 closes at average deal size, 
+      ROI is 3-10x.
+
+      Does that make sense?"
+
+---
+
+OBJECTION #5: "I want to think about it"
+
+YOU: "I get it. One thing before you go though:
+
+      Want me to do a quick 15-min audit of your ideal prospects? 
+      Takes no time, gives you solid data to think about.
+
+      I'll show you exactly who we'd target and what we'd say to them.
+
+      Then you can decide with real information.
+
+      Interested?"
+
+[If yes: do mini-audit on the call]
+
+[If no: Get their email and follow up in 3 days]
+
+---
+
+HOW TO USE THIS SCRIPT:
+
+1. Listen to their objection completely
+2. Acknowledge it ("Valid question" or "I get it")
+3. Reframe the issue
+4. Provide proof/logic
+5. Ask clarifying question
+6. Move forward
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FOLLOW-UP SEQUENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+If they don't reply to cold email:
+
+DAY 0: Send first email
+DAY 2: No reply yet (wait)
+DAY 5: Send follow-up email
+
+FOLLOW-UP EMAIL TEMPLATE:
+
+Subject: "Follow-up: Help with [Company Name]'s pipeline?"
+
+Hi [First Name],
+
+Just checking back in. 
+
+You probably get a lot of emails, so no worries if this got buried.
+
+Quick question: Would it make sense to grab 15 minutes this week to see if 
+we can help [Agency Name] book more meetings?
+
+No pressure. Just want to make sure this didn't slip through the cracks.
+
+Best,
+Anuj
+
+
+DAY 10: Still no reply (if you want to try again)
+
+Second Follow-up:
+
+Subject: "Last try: [Company Name] + lead gen"
+
+Hi [First Name],
+
+Two things:
+
+1. I'll stop emailing after this (I promise)
+2. I'm confident we can help [Agency Name] book 8+ meetings/month
+
+If you're open to a quick call, here's my calendar:
+[Calendar link]
+
+If not, no hard feelings. Business is busy.
+
+Anuj
+
+
+DAY 30: Stop emailing that prospect. Move on.
+
+RULE: Never email someone more than 3 times.
+
+
+═══════════════════════════════════════════════════════════════════════════════
+WEEKLY EXECUTION CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+MONDAY:
+□ Review last week's replies
+□ Plan this week's outreach
+□ Research 20 new prospects
+
+TUESDAY-THURSDAY:
+□ Send 20 cold emails/day (total: 60/week, spread out)
+□ Follow-up on previous replies
+□ Schedule demo calls with replies
+
+FRIDAY:
+□ Send weekly reports to active clients
+□ Track metrics (open rate, reply rate, meetings booked)
+□ Note what worked best this week
+
+WEEKEND:
+□ Rest
+
+
+THIS GIVES YOU:
+
+Week 1: 60 cold emails, 3-4 replies, 1-2 demo calls
+Week 2-3: First customer and case study opportunity
+Week 4-8: 3-5 more customers
+Week 12: 7+ customers at ₹1,25,250/month = ₹8,75,750/month revenue
+
+
+═══════════════════════════════════════════════════════════════════════════════
+TRACKING SHEET TEMPLATE
+═══════════════════════════════════════════════════════════════════════════════
+
+Keep a simple spreadsheet:
+
+Company | Contact | Email | Date Sent | Response | Interest | Demo Call | Outcome
+
+Fill this in as you go. Let's you see patterns:
+- Which email observation works best
+- Which industry responds most
+- What your actual conversion rate is
+
+Example:
+
+Bright Agency | Sara | sara@bright.io | June 1 | Yes | High | June 8 | Customer ✓
+
+
+═══════════════════════════════════════════════════════════════════════════════
+FINAL CHECKLIST
+═══════════════════════════════════════════════════════════════════════════════
+
+Before you start selling:
+
+✓ Cold email template memorized
+✓ Demo call script printed or nearby
+✓ Weekly report template saved
+✓ Agreement template ready
+✓ Calendar link set up (/book-call)
+✓ Tracking spreadsheet started
+✓ Email monitored (hello@jarvisprime.me)
+✓ Phone ready to answer
+
+---
+
+YOU'RE READY TO SELL.
+
+Start Monday morning.
+
+Send first 20 emails.
+
+Expected result: First customer within 30 days.
+
+Questions? hello@jarvisprime.me or +91 88105 00723

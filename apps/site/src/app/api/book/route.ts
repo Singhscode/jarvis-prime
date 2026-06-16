@@ -19,14 +19,30 @@ import { createClient } from '@supabase/supabase-js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Simple HTML sanitization
+function sanitizeInput(input: string, maxLength: number = 500): string {
+  return input
+    .replace(/<[^>]*>/g, '') // Strip HTML tags
+    .replace(/[<>]/g, '') // Remove angle brackets
+    .trim()
+    .slice(0, maxLength);
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const name = (body.name || '').toString().trim();
-    const email = (body.email || '').toString().trim();
-    const company = (body.company || '').toString().trim();
-    const phone = (body.phone || '').toString().trim();
-    const message = (body.message || '').toString().trim();
+    
+    // Sanitize inputs
+    const name = sanitizeInput((body.name || '').toString(), 100);
+    const email = sanitizeInput((body.email || '').toString(), 100);
+    const company = sanitizeInput((body.company || '').toString(), 100);
+    const phone = sanitizeInput((body.phone || '').toString(), 30);
+    const message = sanitizeInput((body.message || '').toString(), 1000);
+
+    // Honeypot field (bot detection)
+    if (body.website) {
+      return NextResponse.json({ ok: true }); // Fake success for bots
+    }
 
     // Validation
     if (!name || name.length < 2) {

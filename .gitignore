@@ -15,8 +15,30 @@ dist/
 # Misc
 .DS_Store
 *.log
+*.log.*
+
+# Backup files
+*.backup
+*.backup.*
+*-backup.*
+*.old
+*.bak
+*-old.*
+*.tmp
+
+# IDE
+.vscode/
+.idea/
 
 # Local Netlify folder
 .netlify
 .vercel
 .env*.local
+
+# Documentation (keep in docs/ folder)
+/*-COMPLETE.txt
+/*-ADDED.txt
+/*-LIVE.txt
+/*_REPORT.txt
+/*_PLAN.txt
+CLEANUP_PLAN.txt

@@ -14,29 +14,18 @@ export default function PortalAuth() {
     setError('');
     setLoading(true);
 
-    // Simple client-side check (for basic protection)
-    // The real password is set as an env var
+    // Password check (default: jarvis2026)
     const correctPassword = process.env.NEXT_PUBLIC_PORTAL_PASSWORD || 'jarvis2026';
 
     if (password === correctPassword) {
-      // Set auth flag + cookie via API
-      fetch('/api/portal-auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      })
-        .then((res) => {
-          if (res.ok) {
-            router.push('/dashboard');
-          } else {
-            setError('Authentication failed. Please try again.');
-            setLoading(false);
-          }
-        })
-        .catch(() => {
-          setError('Network error. Please try again.');
-          setLoading(false);
-        });
+      // Store auth in localStorage AND cookie
+      localStorage.setItem('portal_authenticated', 'true');
+      document.cookie = 'portal_authenticated=true; path=/; max-age=604800'; // 7 days
+      
+      // Redirect after a brief delay to ensure cookie is set
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 300);
     } else {
       setError('Incorrect password. Try again.');
       setLoading(false);
@@ -67,6 +56,7 @@ export default function PortalAuth() {
                 placeholder="Enter password"
                 className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
                 autoFocus
+                disabled={loading}
               />
             </div>
 

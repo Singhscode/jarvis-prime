@@ -26,9 +26,9 @@ export default function PortalNav() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-slate-900/95 to-slate-900/0 backdrop-blur-lg border-b border-slate-600/30">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold text-white hover:text-cyan-400 transition">
-          <span className="text-2xl">🤖</span>
-          <span>JARVIS PRIME</span>
+        <Link href="/" className="flex items-center hover:opacity-80 transition" aria-label="JARVIS PRIME home">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-8 w-auto" />
         </Link>
 
         {/* Nav Links */}
