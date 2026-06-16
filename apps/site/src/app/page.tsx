@@ -2,381 +2,346 @@
 
 import { useState } from 'react';
 import Header from '@/components/Header';
+import { ArrowRight, CheckCircle2, TrendingUp, Users, Zap, BarChart3, Lock } from 'lucide-react';
 
 export default function HomePage() {
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
 
   return (
-    <div className="relative w-full overflow-x-hidden bg-white">
+    <div className="relative w-full overflow-x-hidden bg-slate-950">
       <Header />
       
-      {/* Hero Section */}
-      <section className="relative z-10 pt-32 pb-20 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full mb-6">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-sm font-semibold text-green-900">For Marketing Agencies Only</span>
+      {/* Hero Section - Premium Dark */}
+      <section className="relative z-10 pt-40 pb-32 px-4 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse" style={{animationDelay: '2s'}}></div>
+        </div>
+
+        <div className="max-w-5xl mx-auto text-center relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full mb-8">
+            <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+            <span className="text-sm font-semibold text-blue-300">AI-Powered Outbound</span>
           </div>
 
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
-            8-15 Qualified Meetings <span className="text-blue-600">in 60 Days</span>
+          <h1 className="text-6xl md:text-7xl lg:text-8xl font-black mb-8 leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-200 to-cyan-200">
+            Scale Your Pipeline Without Hiring
           </h1>
 
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
-            We find your clients and book your meetings. If you don't get 8+ qualified meetings in your first 60 days, <span className="font-semibold text-gray-900">your first month is free.</span>
+          <p className="text-xl md:text-2xl text-slate-300 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
+            JARVIS PRIME automates lead research, personalized outreach, and meeting booking. Stop burning out on manual prospecting. Get 8-30 qualified calls/month on autopilot.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <a href="/book-call" className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-lg shadow-lg hover:shadow-xl">
-              Schedule Demo Call →
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+            <a href="/book-call" className="group px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold text-lg rounded-lg hover:shadow-2xl hover:shadow-blue-500/50 transition-all flex items-center gap-2">
+              Get Started Free
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
-            <a href="#guarantee" className="px-8 py-4 border-2 border-gray-300 text-gray-900 rounded-lg hover:border-blue-600 hover:text-blue-600 transition-all font-semibold text-lg">
+            <a href="#how" className="px-8 py-4 border-2 border-slate-600 text-slate-300 hover:border-blue-500 hover:text-blue-300 rounded-lg font-semibold transition-all">
               See How It Works
             </a>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-8 items-center text-sm mt-12">
-            <div className="flex items-center gap-2">
-              <span className="text-green-600 font-bold text-lg">✓</span>
-              <span className="text-gray-600">Done-for-you outbound</span>
+          <div className="grid grid-cols-3 gap-4 max-w-2xl mx-auto">
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <div className="text-3xl font-bold text-cyan-400 mb-1">8-30</div>
+              <div className="text-sm text-slate-400">Qualified Meetings/Mo</div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-green-600 font-bold text-lg">✓</span>
-              <span className="text-gray-600">Money-back guarantee</span>
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <div className="text-3xl font-bold text-cyan-400 mb-1">50%</div>
+              <div className="text-sm text-slate-400">Cost of Hiring SDR</div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-green-600 font-bold text-lg">✓</span>
-              <span className="text-gray-600">No setup fees</span>
+            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+              <div className="text-3xl font-bold text-cyan-400 mb-1">7 Days</div>
+              <div className="text-sm text-slate-400">To First Outreach</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* How It Works Section */}
-      <section id="guarantee" className="relative z-10 py-20 px-4 bg-gray-50 border-y border-gray-200">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              How We Get You Meetings
+      <section id="how" className="relative z-10 py-32 px-4 bg-slate-900">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
+              How JARVIS PRIME Works
             </h2>
-            <p className="text-xl text-gray-600">
-              Simple process. Guaranteed results.
+            <p className="text-xl text-slate-400">
+              Done-for-you outbound that actually converts
             </p>
           </div>
 
-          <div className="space-y-8">
-            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
-                  01
+          <div className="space-y-6">
+            {[
+              {
+                num: '01',
+                title: 'Strategic Research',
+                desc: 'We build your ideal customer profile and identify high-intent prospects in your target market.',
+                icon: Users
+              },
+              {
+                num: '02',
+                title: 'AI-Powered Outreach',
+                desc: 'Personalized emails and LinkedIn campaigns crafted specifically for decision-makers.',
+                icon: Zap
+              },
+              {
+                num: '03',
+                title: 'Intelligent Follow-Up',
+                desc: 'Automated sequences that nurture relationships and move prospects toward conversations.',
+                icon: TrendingUp
+              },
+              {
+                num: '04',
+                title: 'Meeting Booking',
+                desc: 'Qualified prospects are qualified, time-zone aligned, and booked directly on your calendar.',
+                icon: CheckCircle2
+              }
+            ].map((step, idx) => {
+              const Icon = step.icon;
+              return (
+                <div key={idx} className="group">
+                  <div className="bg-gradient-to-r from-slate-800 to-slate-800/50 border border-slate-700 hover:border-blue-500/50 rounded-xl p-8 transition-all hover:shadow-lg hover:shadow-blue-500/10">
+                    <div className="flex gap-8 items-start">
+                      <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center h-16 w-16 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-600">
+                          <Icon className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-bold text-white mb-2">{step.title}</h3>
+                        <p className="text-slate-400 text-lg">{step.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {idx < 3 && (
+                    <div className="flex justify-end pr-8 py-4">
+                      <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-transparent"></div>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">We Find Your Clients</h3>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                    Week 1
-                  </span>
-                </div>
-                <p className="text-gray-600">We research and identify marketing agencies that match your ideal customer profile. No guessing.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
-                  02
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">We Send Personalized Emails</h3>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                    Week 2-3
-                  </span>
-                </div>
-                <p className="text-gray-600">We send compelling cold emails directly from you. Personal. Authentic. No bots.</p>
-              </div>
-            </div>
-
-            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
-              <div className="flex-shrink-0">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
-                  03
-                </div>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">We Book the Meetings</h3>
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                    Week 4+
-                  </span>
-                </div>
-                <p className="text-gray-600">When they respond, we qualify them and book them directly on your calendar. You just show up.</p>
-              </div>
-            </div>
-
-
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Results Section */}
-      <section id="results" className="relative z-10 py-20 px-4">
+      {/* Results/Metrics Section */}
+      <section className="relative z-10 py-32 px-4 bg-slate-950">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              What Agencies Get
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
+              Enterprise-Grade Results
             </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Real results from real outbound
+            <p className="text-xl text-slate-400">
+              Real metrics from real outbound campaigns
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
-              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">8-15</div>
-              <div className="text-sm font-semibold text-gray-900 mb-3">Qualified Meetings/Month</div>
-              <p className="text-sm text-gray-600">Decision-makers who actually want to talk to you.</p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
-              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">30-40%</div>
-              <div className="text-sm font-semibold text-gray-900 mb-3">Email Open Rate</div>
-              <p className="text-sm text-gray-600">Personal emails get opened. Generic templates don't.</p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
-              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">3-6%</div>
-              <div className="text-sm font-semibold text-gray-900 mb-3">Reply Rate</div>
-              <p className="text-sm text-gray-600">Actual responses from decision-makers. Not vanity metrics.</p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
-              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">14-30</div>
-              <div className="text-sm font-semibold text-gray-900 mb-3">Days to First Meeting</div>
-              <p className="text-sm text-gray-600">Results you can see and measure in real time.</p>
-            </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { metric: '8-30', label: 'Qualified Calls/Month', icon: BarChart3 },
+              { metric: '35-45%', label: 'Email Open Rate', icon: TrendingUp },
+              { metric: '5-8%', label: 'Reply Rate', icon: CheckCircle2 },
+              { metric: '7-14', label: 'Days to 1st Meeting', icon: Zap }
+            ].map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <div key={idx} className="group bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 hover:border-blue-500/50 rounded-xl p-8 text-center transition-all hover:shadow-lg hover:shadow-blue-500/10">
+                  <Icon className="w-10 h-10 text-cyan-400 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                  <div className="text-4xl font-black text-white mb-2">{item.metric}</div>
+                  <div className="text-slate-400 font-medium">{item.label}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ROI Section */}
-      <section className="relative z-10 py-16 px-4 bg-gradient-to-r from-blue-900 to-blue-800">
+      <section className="relative z-10 py-20 px-4 bg-gradient-to-r from-blue-950/50 to-cyan-950/50 border-y border-slate-700">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            One Client Can Pay For The Entire System
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-4">
+            ROI You Can Measure Immediately
           </h2>
-          <p className="text-lg text-blue-100 max-w-2xl mx-auto">
-            A single high-ticket client often generates more revenue than the monthly investment in JARVIS PRIME. Your pipeline becomes your competitive advantage.
+          <p className="text-lg text-slate-300">
+            One qualified deal typically pays for 6+ months of JARVIS PRIME. Your cost per meeting drops by 70% vs hiring an SDR.
           </p>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="relative z-10 py-24 px-4 bg-white">
+      {/* Premium Pricing Section */}
+      <section id="pricing" className="relative z-10 py-32 px-4 bg-slate-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Predictable Pipeline Growth
+            <h2 className="text-5xl md:text-6xl font-black mb-6 text-white">
+              Enterprise Pricing
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Choose your plan. Scale your results. Cancel anytime.
+            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
+              Choose your scale. Pay only for results. Cancel anytime.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-16">
-            {/* STARTER PLAN */}
-            <div className="relative group rounded-2xl p-8 bg-white border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">STARTER</h3>
-                <p className="text-sm text-gray-600 mb-4">Best for freelancers, small agencies & early-stage B2B</p>
+            {/* STARTER */}
+            <div className="relative group rounded-2xl p-8 bg-slate-800 border border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all hover:-translate-y-2">
+              <div className="mb-8">
+                <h3 className="text-2xl font-black text-white mb-2">STARTER</h3>
+                <p className="text-sm text-slate-400 mb-6">Perfect for testing. Freelancers & small teams.</p>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-4xl font-bold text-gray-900">₹24,999</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-5xl font-black text-white">₹24,999</span>
+                  <span className="text-slate-400">/month</span>
                 </div>
-                <p className="text-sm text-blue-600 font-semibold">3-5 Qualified Meetings/Month</p>
+                <p className="text-sm text-cyan-400 font-semibold">3-5 Meetings/Month Expected</p>
               </div>
 
-              <div className="mb-8 pb-8 border-b border-gray-200">
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Lead Research & Prospect Building</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">500 Prospects Monthly</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">AI Personalized Outreach</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Automated Follow-Ups</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Email Campaign Setup</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Monthly Performance Report</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Email Support</span>
-                  </li>
-                </ul>
+              <div className="space-y-3 mb-8">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">500 prospects monthly</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">AI personalized outreach</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Email campaigns</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Auto follow-ups</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Monthly reports</span>
+                </div>
               </div>
 
-              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-semibold text-center border-2 border-blue-600 text-blue-600 hover:bg-blue-50 transition-all">
-                Book Free Strategy Call
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-bold text-center border-2 border-slate-600 text-white hover:border-cyan-500 hover:bg-slate-700 transition-all">
+                Start Free Trial
               </a>
             </div>
 
-            {/* GROWTH PLAN - FEATURED */}
-            <div className="relative group rounded-2xl p-8 bg-gradient-to-br from-blue-600 to-blue-700 text-white border-2 border-blue-600 shadow-2xl hover:shadow-3xl hover:-translate-y-2 transition-all md:scale-105">
-              <div className="absolute -top-4 right-6 bg-yellow-400 text-blue-900 px-4 py-1 rounded-full font-bold text-xs">
+            {/* GROWTH - FEATURED */}
+            <div className="relative group rounded-2xl p-8 bg-gradient-to-br from-blue-600 to-cyan-600 border-2 border-blue-500 shadow-2xl hover:shadow-3xl hover:-translate-y-4 transition-all md:scale-105">
+              <div className="absolute -top-5 right-6 bg-white text-blue-600 px-4 py-1 rounded-full font-black text-sm">
                 MOST POPULAR
               </div>
 
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold mb-2">GROWTH</h3>
-                <p className="text-sm text-blue-100 mb-4">Best for marketing, dev & recruiting agencies</p>
+              <div className="mb-8">
+                <h3 className="text-2xl font-black text-white mb-2">GROWTH</h3>
+                <p className="text-sm text-blue-100 mb-6">Best for scaling. Agencies & consulting.</p>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-5xl font-bold">₹49,999</span>
-                  <span className="text-blue-200">/month</span>
+                  <span className="text-5xl font-black text-white">₹49,999</span>
+                  <span className="text-blue-100">/month</span>
                 </div>
-                <p className="text-sm text-yellow-200 font-semibold">8-15 Qualified Meetings/Month</p>
+                <p className="text-sm text-blue-50 font-semibold">8-15 Meetings/Month Expected</p>
               </div>
 
-              <div className="mb-8 pb-8 border-b border-blue-500">
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">Everything in Starter +</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">2,000 Prospects Monthly</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">LinkedIn Outreach</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">Multi-Channel Campaigns</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">CRM Integration</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">Weekly Optimization</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">Advanced Analytics</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-yellow-300 font-bold text-lg">✓</span>
-                    <span className="text-blue-50">Priority Support</span>
-                  </li>
-                </ul>
+              <div className="space-y-3 mb-8">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">Everything in Starter +</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">2,000 prospects monthly</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">LinkedIn outreach</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">Multi-channel campaigns</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">CRM integration</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">Weekly optimization</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0 mt-0.5" />
+                  <span className="text-blue-50">Priority support</span>
+                </div>
               </div>
 
-              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-bold text-center bg-yellow-400 text-blue-900 hover:bg-yellow-300 transition-all">
-                Scale My Pipeline
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-bold text-center bg-white text-blue-600 hover:bg-slate-100 transition-all">
+                Scale Your Pipeline
               </a>
             </div>
 
-            {/* SCALE PLAN */}
-            <div className="relative group rounded-2xl p-8 bg-white border-2 border-gray-200 hover:border-blue-400 transition-all hover:shadow-xl hover:-translate-y-1">
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">SCALE</h3>
-                <p className="text-sm text-gray-600 mb-4">Best for established agencies & SaaS companies</p>
+            {/* SCALE */}
+            <div className="relative group rounded-2xl p-8 bg-slate-800 border border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all hover:-translate-y-2">
+              <div className="mb-8">
+                <h3 className="text-2xl font-black text-white mb-2">SCALE</h3>
+                <p className="text-sm text-slate-400 mb-6">Enterprise growth. Maximum results.</p>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-4xl font-bold text-gray-900">₹99,999</span>
-                  <span className="text-gray-600">/month</span>
+                  <span className="text-5xl font-black text-white">₹99,999</span>
+                  <span className="text-slate-400">/month</span>
                 </div>
-                <p className="text-sm text-blue-600 font-semibold">15-30 Qualified Meetings/Month</p>
+                <p className="text-sm text-cyan-400 font-semibold">15-30 Meetings/Month Expected</p>
               </div>
 
-              <div className="mb-8 pb-8 border-b border-gray-200">
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Everything in Growth +</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">5,000+ Prospects Monthly</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Dedicated Campaign Manager</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">AI Lead Scoring</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Custom Outbound Strategy</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Advanced Reporting Dashboard</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">Unlimited Campaign Optimization</span>
-                  </li>
-                  <li className="flex items-start gap-3 text-sm">
-                    <span className="text-blue-500 font-bold text-lg">✓</span>
-                    <span className="text-gray-700">VIP Support</span>
-                  </li>
-                </ul>
+              <div className="space-y-3 mb-8">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Everything in Growth +</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">5,000+ prospects monthly</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Dedicated campaign manager</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">AI lead scoring</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Custom strategy</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">Advanced analytics</span>
+                </div>
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-slate-300">VIP support</span>
+                </div>
               </div>
 
-              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-semibold text-center bg-blue-600 text-white hover:bg-blue-700 transition-all">
-                Book Growth Consultation
+              <a href="/book-call" className="w-full py-3 px-6 rounded-lg font-bold text-center bg-gradient-to-r from-blue-600 to-cyan-600 text-white hover:shadow-lg transition-all">
+                Enterprise Access
               </a>
             </div>
           </div>
 
-          {/* Guarantee Section */}
-          <div className="max-w-3xl mx-auto bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-8 text-center">
-            <h3 className="text-2xl font-bold text-green-900 mb-3">
-              Built For Predictable Pipeline Growth
-            </h3>
-            <p className="text-green-800">
-              Our AI-driven outbound system continuously finds, qualifies, and engages prospects so your team can focus on closing deals. No hiring, no training, no management overhead.
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 text-center max-w-2xl mx-auto">
+            <Lock className="w-8 h-8 text-cyan-400 mx-auto mb-4" />
+            <p className="text-slate-300">
+              <span className="font-bold text-white">No long-term contracts.</span> Month-to-month billing. Cancel anytime. We focus on results, not lock-in.
             </p>
-          </div>
-
-          <div className="text-center mt-12">
-            <p className="text-gray-600 mb-2">
-              <a href="mailto:hello@jarvisprime.me" className="text-blue-600 hover:text-blue-700 font-semibold">Email us</a> or <a href="tel:+918810500723" className="text-blue-600 hover:text-blue-700 font-semibold">call +91 88105 00723</a>
-            </p>
-            <p className="text-sm text-gray-500">All plans include month-to-month flexibility. Cancel anytime.</p>
           </div>
         </div>
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="relative z-10 py-20 px-4 bg-gray-50 border-y border-gray-200">
+      <section id="faq" className="relative z-10 py-32 px-4 bg-slate-900 border-t border-slate-700">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Common Questions
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
+              Frequently Asked
             </h2>
-            <p className="text-xl text-gray-600">
-              Everything you need to know about JARVIS PRIME
+            <p className="text-xl text-slate-400">
+              Everything you need to know
             </p>
           </div>
 
@@ -405,86 +370,89 @@ export default function HomePage() {
               {
                 q: 'How is this different from hiring an SDR?',
                 a: 'Hiring an SDR costs ₹1.5L-2L/month, takes 2-3 months to ramp, and requires management overhead. JARVIS PRIME is predictable, instant, and done-for-you at a fraction of the cost. Plus, we guarantee results.'
-              },
-              {
-                q: 'Can I upgrade or downgrade my plan?',
-                a: 'Absolutely. Change your plan anytime. Pro-rated billing ensures you only pay for what you use. Many clients start with Starter and scale to Growth as they see results.'
-              },
-              {
-                q: 'What if campaigns don\'t work for my business?',
-                a: 'We optimize continuously. Our team reviews campaign performance weekly (Growth/Scale plans) and makes adjustments to improve response rates, meeting bookings, and ROI.'
               }
             ].map((faq, idx) => (
-              <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+              <div key={idx} className="border border-slate-700 rounded-xl overflow-hidden bg-slate-800/50 hover:bg-slate-800 transition-all">
                 <button
                   onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
-                  className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
+                  className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-slate-700/50 transition-colors"
                 >
-                  <span className="font-semibold text-gray-900">{faq.q}</span>
-                  <span className="text-2xl text-gray-400">{faqOpen === idx ? '−' : '+'}</span>
+                  <span className="font-bold text-white text-lg">{faq.q}</span>
+                  <span className="text-2xl text-cyan-400">{faqOpen === idx ? '−' : '+'}</span>
                 </button>
                 {faqOpen === idx && (
-                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                    <p className="text-gray-700 leading-relaxed">{faq.a}</p>
+                  <div className="px-6 py-4 bg-slate-900/50 border-t border-slate-700">
+                    <p className="text-slate-300 leading-relaxed">{faq.a}</p>
                   </div>
                 )}
               </div>
             ))}
           </div>
+
+          <div className="mt-16 text-center">
+            <p className="text-slate-400 mb-4">Still have questions?</p>
+            <a href="tel:+918810500723" className="inline-flex items-center gap-2 text-cyan-400 hover:text-cyan-300 font-semibold text-lg">
+              <ArrowRight className="w-5 h-5" />
+              Schedule a call
+            </a>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 bg-gray-900 text-gray-300 py-12 px-4">
-        <div className="max-w-6xl mx-auto text-center">
-          <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-10 w-auto mx-auto mb-6" />
-          <p className="text-gray-400 mb-6">
-            AI-powered outbound and appointment-setting for agencies and B2B companies
-          </p>
-          <div className="space-y-2 mb-6">
-            <p>
-              <a href="mailto:hello@jarvisprime.me" className="hover:text-white transition-colors">
-                hello@jarvisprime.me
-              </a>
-            </p>
-            <p>
-              <a href="tel:+918810500723" className="hover:text-white transition-colors">
-                +91 88105 00723
-              </a>
-            </p>
-            <p className="text-gray-400">
-              Gurgaon, Haryana, India
-            </p>
-          </div>
-          
-          {/* Social Links */}
-          <div className="flex justify-center gap-4 mb-8">
-            <a 
-              href="https://www.linkedin.com/company/jarvis-prime-ai" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-10 h-10 rounded-full bg-gray-800 hover:bg-blue-600 flex items-center justify-center transition-all"
-              aria-label="Follow us on LinkedIn"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-              </svg>
-            </a>
-            <a 
-              href="https://x.com/jarvisprime_ai" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="w-10 h-10 rounded-full bg-gray-800 hover:bg-black flex items-center justify-center transition-all"
-              aria-label="Follow us on X (Twitter)"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-            </a>
+      <footer className="relative z-10 bg-slate-950 border-t border-slate-800 py-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
+            <div>
+              <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-8 w-auto mb-4" />
+              <p className="text-slate-400 text-sm">
+                AI-powered outbound automation for B2B companies that scale.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-bold text-white mb-4">Product</h3>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li><a href="#pricing" className="hover:text-cyan-400 transition-colors">Pricing</a></li>
+                <li><a href="#how" className="hover:text-cyan-400 transition-colors">How It Works</a></li>
+                <li><a href="#faq" className="hover:text-cyan-400 transition-colors">FAQ</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-bold text-white mb-4">Company</h3>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li><a href="mailto:hello@jarvisprime.me" className="hover:text-cyan-400 transition-colors">Contact</a></li>
+                <li><a href="tel:+918810500723" className="hover:text-cyan-400 transition-colors">Call Us</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-bold text-white mb-4">Connect</h3>
+              <div className="flex gap-3">
+                <a 
+                  href="https://www.linkedin.com/company/jarvis-prime-ai" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-blue-600 flex items-center justify-center transition-all"
+                >
+                  <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  </svg>
+                </a>
+                <a 
+                  href="https://x.com/jarvisprime_ai" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-black flex items-center justify-center transition-all"
+                >
+                  <svg className="w-5 h-5 text-slate-400 hover:text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </a>
+              </div>
+            </div>
           </div>
 
-          <div className="border-t border-gray-800 pt-8 text-sm text-gray-500">
-            <p>&copy; 2026 JARVIS PRIME. All rights reserved.</p>
+          <div className="border-t border-slate-800 pt-8 text-center text-sm text-slate-500">
+            <p>&copy; 2026 JARVIS PRIME. Enterprise AI Outbound System.</p>
           </div>
         </div>
       </footer>
