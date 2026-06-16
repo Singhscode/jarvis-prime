@@ -1,879 +1,363 @@
 'use client';
 
-import { motion, useScroll, useTransform, AnimatePresence, useSpring } from 'framer-motion';
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
+import Header from '@/components/Header';
 
-/* ----------------------------------------------------------------------------
-   Scroll progress bar (top of page)
----------------------------------------------------------------------------- */
-const ScrollProgress = () => {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 });
-  return (
-    <motion.div
-      style={{ scaleX }}
-      className="fixed top-0 left-0 right-0 h-0.5 origin-left z-[60] bg-gradient-to-r from-cyan-400 via-purple-500 to-cyan-400"
-    />
-  );
-};
-
-/* ----------------------------------------------------------------------------
-   Ambient animated background (aurora glow + grid)
----------------------------------------------------------------------------- */
-const AmbientBackground = () => (
-  <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-    {/* base */}
-    <div className="absolute inset-0 bg-[#070A14]" />
-    {/* subtle grid */}
-    <div
-      className="absolute inset-0 opacity-[0.04]"
-      style={{
-        backgroundImage:
-          'linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)',
-        backgroundSize: '64px 64px',
-      }}
-    />
-    {/* aurora blobs */}
-    <motion.div
-      className="absolute -top-40 left-1/4 w-[40rem] h-[40rem] rounded-full blur-[120px]"
-      style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.25), transparent 60%)' }}
-      animate={{ x: [0, 80, 0], y: [0, 40, 0] }}
-      transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-    />
-    <motion.div
-      className="absolute top-1/3 right-1/5 w-[36rem] h-[36rem] rounded-full blur-[120px]"
-      style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.25), transparent 60%)' }}
-      animate={{ x: [0, -60, 0], y: [0, 60, 0] }}
-      transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-    />
-    {/* top vignette so nav stays readable */}
-    <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#070A14] to-transparent" />
-  </div>
-);
-
-/* ----------------------------------------------------------------------------
-   Reveal-on-scroll helper
----------------------------------------------------------------------------- */
-const Reveal = ({
-  children,
-  delay = 0,
-  y = 28,
-  className = '',
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  y?: number;
-  className?: string;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y }}
-    whileInView={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.7, delay, ease: [0.21, 0.47, 0.32, 0.98] }}
-    viewport={{ once: true, margin: '-80px' }}
-    className={className}
-  >
-    {children}
-  </motion.div>
-);
-
-/* ----------------------------------------------------------------------------
-   Glass card with spotlight hover
----------------------------------------------------------------------------- */
-const SpotlightCard = ({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ x: -200, y: -200 });
-
-  const handleMove = (e: React.MouseEvent) => {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    setPos({ x: e.clientX - r.left, y: e.clientY - r.top });
-  };
+export default function HomePage() {
+  const [faqOpen, setFaqOpen] = useState<number | null>(null);
 
   return (
-    <div
-      ref={ref}
-      onMouseMove={handleMove}
-      onMouseLeave={() => setPos({ x: -200, y: -200 })}
-      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-xl transition-colors duration-300 hover:border-white/20 ${className}`}
-    >
-      <div
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background: `radial-gradient(420px circle at ${pos.x}px ${pos.y}px, rgba(0,229,255,0.10), transparent 45%)`,
-        }}
-      />
-      <div className="relative z-10">{children}</div>
-    </div>
-  );
-};
-
-/* ----------------------------------------------------------------------------
-   Animated counter
----------------------------------------------------------------------------- */
-const Counter = ({ to, suffix = '', prefix = '' }: { to: number; suffix?: string; prefix?: string }) => {
-  const [val, setVal] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const [started, setStarted] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started) {
-          setStarted(true);
-          const duration = 1400;
-          const start = performance.now();
-          const tick = (now: number) => {
-            const p = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - p, 3);
-            setVal(Math.round(eased * to));
-            if (p < 1) requestAnimationFrame(tick);
-          };
-          requestAnimationFrame(tick);
-        }
-      },
-      { threshold: 0.4 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [to, started]);
-
-  return (
-    <span ref={ref}>
-      {prefix}
-      {val}
-      {suffix}
-    </span>
-  );
-};
-
-/* ----------------------------------------------------------------------------
-   Page
----------------------------------------------------------------------------- */
-export default function Home() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [showCalendly, setShowCalendly] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-
-  // Booking form state
-  const [form, setForm] = useState({ name: '', email: '', company: '', phone: '', message: '' });
-  const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
-  const [formError, setFormError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormStatus('submitting');
-    setFormError('');
-    try {
-      const res = await fetch('/api/book', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || 'Something went wrong. Please try again.');
-        setFormStatus('error');
-        return;
-      }
-      setFormStatus('success');
-    } catch {
-      setFormError('Network error. Please try again.');
-      setFormStatus('error');
-    }
-  };
-
-  const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 600], [0, 120]);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const navLinks = ['Problem', 'Solution', 'Results', 'Pricing'];
-
-  return (
-    <div className="relative min-h-screen bg-[#070A14] text-white antialiased overflow-x-hidden">
-      <ScrollProgress />
-      <AmbientBackground />
-
-      {/* ===================== NAV ===================== */}
-      <header
-        className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-          scrolled
-            ? 'border-b border-white/10 bg-[#070A14]/80 backdrop-blur-xl'
-            : 'border-b border-transparent bg-transparent'
-        }`}
-      >
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-cyan-400 to-purple-500 text-sm font-black text-slate-950">
-              J
-            </span>
-            <span className="text-lg font-bold tracking-tight">
-              JARVIS <span className="text-gradient">PRIME</span>
-            </span>
-          </Link>
-
-          <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map((item) => (
-              <a
-                key={item}
-                href={`#${item.toLowerCase()}`}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:bg-white/5 hover:text-white"
-              >
-                {item}
-              </a>
-            ))}
+    <div className="relative w-full overflow-x-hidden bg-white">
+      <Header />
+      
+      {/* Hero Section */}
+      <section className="relative z-10 pt-32 pb-20 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full mb-6">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="text-sm font-semibold text-green-900">For Marketing Agencies Only</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="hidden rounded-lg px-4 py-2 text-sm font-medium text-gray-300 transition-colors hover:text-white sm:block"
-            >
-              Portal
-            </Link>
-            <button
-              onClick={() => setShowCalendly(true)}
-              className="group relative hidden overflow-hidden rounded-lg bg-gradient-to-r from-cyan-400 to-purple-500 px-5 py-2 text-sm font-semibold text-slate-950 transition-all hover:shadow-lg hover:shadow-cyan-400/30 md:block"
-            >
-              Book a Call
-            </button>
-            <button
-              onClick={() => setMobileMenuOpen((s) => !s)}
-              className="grid h-10 w-10 place-items-center rounded-lg text-cyan-400 hover:bg-white/5 md:hidden"
-              aria-label="Toggle menu"
-            >
-              ☰
-            </button>
-          </div>
-        </nav>
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-gray-900 mb-6 leading-tight">
+            8-15 Qualified Meetings <span className="text-blue-600">in 60 Days</span>
+          </h1>
 
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden border-t border-white/10 bg-[#070A14]/95 backdrop-blur-xl md:hidden"
-            >
-              <div className="space-y-1 px-4 py-4">
-                {navLinks.map((item) => (
-                  <a
-                    key={item}
-                    href={`#${item.toLowerCase()}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block rounded-lg px-3 py-2 text-gray-300 hover:bg-white/5 hover:text-white"
-                  >
-                    {item}
-                  </a>
-                ))}
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-gray-300 hover:bg-white/5 hover:text-white"
-                >
-                  Operations Portal
-                </Link>
-                <button
-                  onClick={() => {
-                    setShowCalendly(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="mt-2 w-full rounded-lg bg-gradient-to-r from-cyan-400 to-purple-500 px-4 py-2.5 font-semibold text-slate-950"
-                >
-                  Book a Call
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </header>
-
-      {/* ===================== HERO ===================== */}
-      <section className="relative z-10 mx-auto max-w-7xl px-4 pb-24 pt-32 sm:px-6 md:pt-40 lg:px-8">
-        <div className="grid items-center gap-16 lg:grid-cols-[1.1fr_0.9fr]">
-          <motion.div style={{ y: heroY }}>
-            <Reveal>
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-gray-300 backdrop-blur-xl">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-400" />
-                </span>
-                AI agents live & generating pipeline 24/7
-              </div>
-            </Reveal>
-
-            <Reveal delay={0.05}>
-              <h1 className="text-balance text-5xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                Your outbound,
-                <br />
-                <span className="text-gradient">fully automated.</span>
-              </h1>
-            </Reveal>
-
-            <Reveal delay={0.12}>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-gray-400">
-                JARVIS PRIME finds your ideal prospects, writes personalized emails, and books
-                qualified calls on autopilot. 50–100 leads a month. Zero manual work.
-              </p>
-            </Reveal>
-
-            <Reveal delay={0.18}>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-                <button
-                  onClick={() => setShowCalendly(true)}
-                  className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 px-8 py-4 font-semibold text-slate-950 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-cyan-400/30 active:scale-95"
-                >
-                  <span className="relative z-10">Book Free Strategy Call</span>
-                  <span className="absolute inset-0 -translate-x-full bg-white/30 transition-transform duration-500 group-hover:translate-x-full" />
-                </button>
-                <Link
-                  href="/dashboard"
-                  className="rounded-xl border border-white/15 bg-white/5 px-8 py-4 text-center font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:border-cyan-400/40 hover:bg-white/10"
-                >
-                  View Live Dashboard
-                </Link>
-              </div>
-            </Reveal>
-
-            <Reveal delay={0.26}>
-              <div className="mt-12 flex flex-wrap items-center gap-x-8 gap-y-3 text-sm text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> 50+ agencies onboarded
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> $10M+ pipeline generated
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-cyan-400">✓</span> 38% avg. open rate
-                </div>
-              </div>
-            </Reveal>
-          </motion.div>
-
-          {/* Hero visual: live activity panel */}
-          <Reveal delay={0.2} y={40}>
-            <div className="relative">
-              <div className="absolute -inset-4 rounded-3xl bg-gradient-to-br from-cyan-400/20 to-purple-500/20 blur-2xl" />
-              <SpotlightCard className="relative p-6 sm:p-8">
-                <div className="mb-6 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-full bg-red-400/80" />
-                    <div className="h-3 w-3 rounded-full bg-yellow-400/80" />
-                    <div className="h-3 w-3 rounded-full bg-green-400/80" />
-                  </div>
-                  <span className="font-mono text-xs text-gray-500">live · agent feed</span>
-                </div>
-
-                <div className="space-y-3">
-                  {[
-                    { icon: '🎯', label: 'New prospect sourced', sub: 'Founder · SaaS · 25 ICP', tone: 'cyan' },
-                    { icon: '✉️', label: 'Personalized email sent', sub: 'Sequence step 2 of 5', tone: 'purple' },
-                    { icon: '🔥', label: 'Hot reply detected', sub: 'Score 23/25 · alert sent', tone: 'cyan' },
-                    { icon: '📅', label: 'Discovery call booked', sub: 'Tomorrow · 3:00 PM IST', tone: 'purple' },
-                  ].map((row, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0, x: 20 }}
-                      whileInView={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + i * 0.15 }}
-                      viewport={{ once: true }}
-                      className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3"
-                    >
-                      <div
-                        className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-lg text-lg ${
-                          row.tone === 'cyan' ? 'bg-cyan-400/10' : 'bg-purple-500/10'
-                        }`}
-                      >
-                        {row.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-medium text-white">{row.label}</div>
-                        <div className="truncate text-xs text-gray-500">{row.sub}</div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/10 pt-6 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">
-                      <Counter to={1000} suffix="+" />
-                    </div>
-                    <div className="text-[11px] text-gray-500">emails/mo</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">
-                      <Counter to={40} suffix="+" />
-                    </div>
-                    <div className="text-[11px] text-gray-500">replies/mo</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-gradient">
-                      <Counter to={12} />
-                    </div>
-                    <div className="text-[11px] text-gray-500">calls/mo</div>
-                  </div>
-                </div>
-              </SpotlightCard>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ===================== LOGO STRIP ===================== */}
-      <section className="relative z-10 border-y border-white/5 bg-white/[0.02]">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <Reveal>
-            <p className="mb-6 text-center text-xs font-medium uppercase tracking-widest text-gray-500">
-              Trusted by modern revenue teams
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 opacity-60">
-              {['Crescendo', 'NorthPeak', 'Vantage', 'BlueOrbit', 'Helix', 'Marlin'].map((b) => (
-                <span key={b} className="text-lg font-semibold tracking-tight text-gray-400">
-                  {b}
-                </span>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* ===================== PROBLEM ===================== */}
-      <section id="problem" className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 md:py-32 lg:px-8">
-        <Reveal className="mx-auto mb-16 max-w-2xl text-center">
-          <span className="text-sm font-semibold uppercase tracking-widest text-cyan-400">The problem</span>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Growth shouldn&apos;t be this fragile</h2>
-          <p className="mt-4 text-lg text-gray-400">
-            Inconsistent pipeline, burned-out reps, and a rising cost of acquisition. Sound familiar?
+          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-4xl mx-auto leading-relaxed">
+            We find your clients and book your meetings. If you don't get 8+ qualified meetings in your first 60 days, <span className="font-semibold text-gray-900">your first month is free.</span>
           </p>
-        </Reveal>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {[
-            { icon: '📉', title: 'Unpredictable pipeline', desc: '30 leads one month, 5 the next. Impossible to forecast or plan around.' },
-            { icon: '😮‍💨', title: 'Burned-out SDRs', desc: 'Manual research and copy-paste outreach drives churn and inconsistency.' },
-            { icon: '💸', title: 'Rising CAC', desc: 'SDRs cost ₹35L+/yr and ad costs keep climbing while returns shrink.' },
-          ].map((c, i) => (
-            <Reveal key={c.title} delay={i * 0.1}>
-              <SpotlightCard className="h-full p-8">
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl bg-white/5 text-2xl">{c.icon}</div>
-                <h3 className="mb-2 text-xl font-semibold">{c.title}</h3>
-                <p className="text-gray-400">{c.desc}</p>
-              </SpotlightCard>
-            </Reveal>
-          ))}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
+            <a href="/book-call" className="px-8 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all font-semibold text-lg shadow-lg hover:shadow-xl">
+              Schedule Demo Call →
+            </a>
+            <a href="#guarantee" className="px-8 py-4 border-2 border-gray-300 text-gray-900 rounded-lg hover:border-blue-600 hover:text-blue-600 transition-all font-semibold text-lg">
+              See How It Works
+            </a>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-8 items-center text-sm mt-12">
+            <div className="flex items-center gap-2">
+              <span className="text-green-600 font-bold text-lg">✓</span>
+              <span className="text-gray-600">Done-for-you outbound</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-green-600 font-bold text-lg">✓</span>
+              <span className="text-gray-600">Money-back guarantee</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-green-600 font-bold text-lg">✓</span>
+              <span className="text-gray-600">No setup fees</span>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ===================== SOLUTION ===================== */}
-      <section id="solution" className="relative z-10 border-y border-white/5 bg-white/[0.02]">
-        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 md:py-32 lg:px-8">
-          <Reveal className="mx-auto mb-16 max-w-2xl text-center">
-            <span className="text-sm font-semibold uppercase tracking-widest text-purple-400">The solution</span>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">One system. The entire funnel.</h2>
-            <p className="mt-4 text-lg text-gray-400">
-              JARVIS PRIME runs sourcing, personalization, outreach, and routing — end to end.
+      {/* How It Works Section */}
+      <section id="guarantee" className="relative z-10 py-20 px-4 bg-gray-50 border-y border-gray-200">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              How We Get You Meetings
+            </h2>
+            <p className="text-xl text-gray-600">
+              Simple process. Guaranteed results.
             </p>
-          </Reveal>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { icon: '🎯', title: 'ICP Scoring', desc: 'Every prospect scored 0–25 against your ideal profile.' },
-              { icon: '✍️', title: 'AI Personalization', desc: 'Research-backed emails written for each contact.' },
-              { icon: '⚡', title: '24/7 Automation', desc: 'Sequences run around the clock with zero input.' },
-              { icon: '📊', title: 'Live Analytics', desc: 'Track opens, replies and meetings in real time.' },
-            ].map((c, i) => (
-              <Reveal key={c.title} delay={i * 0.08}>
-                <SpotlightCard className="h-full p-7">
-                  <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/15 to-purple-500/15 text-2xl">
-                    {c.icon}
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold">{c.title}</h3>
-                  <p className="text-sm text-gray-400">{c.desc}</p>
-                </SpotlightCard>
-              </Reveal>
-            ))}
           </div>
 
-          {/* How it works steps */}
-          <div className="mt-20">
-            <Reveal className="mb-12 text-center">
-              <h3 className="text-2xl font-bold sm:text-3xl">How it works</h3>
-            </Reveal>
-            <div className="relative grid gap-8 md:grid-cols-4">
-              {[
-                { step: '01', title: 'Define ICP', desc: 'We workshop your ideal customer profile.' },
-                { step: '02', title: 'Build list', desc: '500+ qualified prospects identified.' },
-                { step: '03', title: 'Run campaigns', desc: 'Personalized sequences at scale.' },
-                { step: '04', title: 'Close deals', desc: 'Hot leads routed straight to sales.' },
-              ].map((s, i) => (
-                <Reveal key={s.step} delay={i * 0.1}>
-                  <div className="relative">
-                    <div className="mb-4 font-mono text-5xl font-bold text-gradient">{s.step}</div>
-                    <h4 className="mb-2 text-lg font-semibold">{s.title}</h4>
-                    <p className="text-sm text-gray-400">{s.desc}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ===================== RESULTS ===================== */}
-      <section id="results" className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 md:py-32 lg:px-8">
-        <Reveal className="mx-auto mb-16 max-w-2xl text-center">
-          <span className="text-sm font-semibold uppercase tracking-widest text-cyan-400">The results</span>
-          <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Numbers that compound</h2>
-          <p className="mt-4 text-lg text-gray-400">Real data from Crescendo Ventures over 90 days.</p>
-        </Reveal>
-
-        <div className="mb-10 grid gap-6 sm:grid-cols-3">
-          {[
-            { value: <Counter to={3} suffix="x" />, label: 'Pipeline growth' },
-            { value: <><span>₹</span><Counter to={120} suffix="K" /></>, label: 'New MRR added' },
-            { value: <Counter to={5} suffix=" mo" />, label: 'Payback period' },
-          ].map((s, i) => (
-            <Reveal key={i} delay={i * 0.1}>
-              <SpotlightCard className="p-10 text-center">
-                <div className="text-5xl font-extrabold text-gradient sm:text-6xl">{s.value}</div>
-                <p className="mt-3 text-gray-400">{s.label}</p>
-              </SpotlightCard>
-            </Reveal>
-          ))}
-        </div>
-
-        <Reveal>
-          <SpotlightCard className="p-8 sm:p-12">
-            <div className="grid gap-12 md:grid-cols-2">
-              <div>
-                <h3 className="mb-6 text-xl font-semibold text-cyan-400">Email performance</h3>
-                <div className="space-y-4">
-                  {[
-                    ['Open rate', '38%'],
-                    ['Click rate', '7.2%'],
-                    ['Reply rate', '4.1%'],
-                    ['Meeting conversion', '2.9%'],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0">
-                      <span className="text-gray-400">{k}</span>
-                      <span className="text-lg font-bold text-white">{v}</span>
-                    </div>
-                  ))}
+          <div className="space-y-8">
+            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
+                  01
                 </div>
               </div>
-              <div>
-                <h3 className="mb-6 text-xl font-semibold text-purple-400">Sales impact</h3>
-                <div className="space-y-4">
-                  {[
-                    ['Meetings / month', '11–13'],
-                    ['Close rate', '26%'],
-                    ['Deals / month', '2–3'],
-                    ['Cost per lead', '₹750'],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between border-b border-white/10 pb-3 last:border-0">
-                      <span className="text-gray-400">{k}</span>
-                      <span className="text-lg font-bold text-white">{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </SpotlightCard>
-        </Reveal>
-
-        {/* testimonials */}
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          {[
-            { quote: 'We went from 15 to 150 leads a month in 90 days. No new hires. Same team, far better results.', author: 'Priya Sharma', role: 'CEO, Crescendo Ventures', tag: '10x growth' },
-            { quote: 'Close rate jumped 40% because every lead was actually a fit. The ICP scoring is the magic.', author: 'Vikram Patel', role: 'VP Sales, Crescendo Ventures', tag: '+40% close rate' },
-          ].map((t, i) => (
-            <Reveal key={i} delay={i * 0.12}>
-              <SpotlightCard className="flex h-full flex-col p-8">
-                <div className="mb-4 text-3xl text-cyan-400">&ldquo;</div>
-                <p className="flex-grow text-lg italic text-gray-200">{t.quote}</p>
-                <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-5">
-                  <div>
-                    <div className="font-semibold">{t.author}</div>
-                    <div className="text-sm text-gray-500">{t.role}</div>
-                  </div>
-                  <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-400">
-                    {t.tag}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xl font-bold text-gray-900">We Find Your Clients</h3>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    Week 1
                   </span>
                 </div>
-              </SpotlightCard>
-            </Reveal>
-          ))}
-        </div>
-      </section>
+                <p className="text-gray-600">We research and identify marketing agencies that match your ideal customer profile. No guessing.</p>
+              </div>
+            </div>
 
-      {/* ===================== PRICING ===================== */}
-      <section id="pricing" className="relative z-10 border-y border-white/5 bg-white/[0.02]">
-        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 md:py-32 lg:px-8">
-          <Reveal className="mx-auto mb-16 max-w-2xl text-center">
-            <span className="text-sm font-semibold uppercase tracking-widest text-purple-400">Pricing</span>
-            <h2 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Simple, transparent plans</h2>
-            <p className="mt-4 text-lg text-gray-400">No setup fees. No long contracts. Cancel anytime.</p>
-          </Reveal>
-
-          <div className="grid items-stretch gap-6 md:grid-cols-3">
-            {[
-              { name: 'Starter', price: '₹12,000', period: '/mo', features: ['1,000 emails/month', 'Basic ICP scoring', 'Lead routing', 'Weekly optimization'], highlighted: false },
-              { name: 'Professional', price: '₹29,000', period: '/mo', features: ['5,000 emails/month', 'Advanced ICP', 'LinkedIn + email', 'Bi-weekly strategy calls', 'Advanced analytics'], highlighted: true },
-              { name: 'Enterprise', price: 'Custom', period: '', features: ['Unlimited emails', 'Full CRM sync', 'Phone automation', 'Dedicated manager', 'Custom sequences'], highlighted: false },
-            ].map((plan, i) => (
-              <Reveal key={plan.name} delay={i * 0.1}>
-                <div className={`relative h-full ${plan.highlighted ? 'md:-mt-4 md:mb-4' : ''}`}>
-                  {plan.highlighted && (
-                    <div className="absolute -top-3 left-1/2 z-20 -translate-x-1/2 rounded-full bg-gradient-to-r from-cyan-400 to-purple-500 px-4 py-1 text-xs font-bold text-slate-950">
-                      MOST POPULAR
-                    </div>
-                  )}
-                  <SpotlightCard
-                    className={`flex h-full flex-col p-8 ${
-                      plan.highlighted ? 'border-cyan-400/40 bg-cyan-400/[0.04]' : ''
-                    }`}
-                  >
-                    <h3 className="text-xl font-bold">{plan.name}</h3>
-                    <div className="mt-4 mb-8">
-                      <span className="text-4xl font-extrabold sm:text-5xl">{plan.price}</span>
-                      <span className="text-sm text-gray-500">{plan.period}</span>
-                    </div>
-                    <ul className="mb-8 flex-grow space-y-3">
-                      {plan.features.map((f) => (
-                        <li key={f} className="flex items-start gap-3 text-sm text-gray-300">
-                          <span className="mt-0.5 text-cyan-400">✓</span>
-                          {f}
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      onClick={() => setShowCalendly(true)}
-                      className={`w-full rounded-xl py-3 font-semibold transition-all ${
-                        plan.highlighted
-                          ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-slate-950 hover:shadow-lg hover:shadow-cyan-400/30'
-                          : 'border border-white/15 text-white hover:border-cyan-400/40 hover:bg-white/5'
-                      }`}
-                    >
-                      Get started
-                    </button>
-                  </SpotlightCard>
+            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
+                  02
                 </div>
-              </Reveal>
-            ))}
-          </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xl font-bold text-gray-900">We Send Personalized Emails</h3>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    Week 2-3
+                  </span>
+                </div>
+                <p className="text-gray-600">We send compelling cold emails directly from you. Personal. Authentic. No bots.</p>
+              </div>
+            </div>
 
-          <Reveal className="mt-10 text-center">
-            <p className="text-gray-400">
-              Try it for 90 days free.{' '}
-              <span className="font-semibold text-cyan-400">No credit card required.</span>
-            </p>
-          </Reveal>
+            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center text-white font-bold text-xl">
+                  03
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xl font-bold text-gray-900">We Book the Meetings</h3>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+                    Week 4+
+                  </span>
+                </div>
+                <p className="text-gray-600">When they respond, we qualify them and book them directly on your calendar. You just show up.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-6 items-start p-6 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-400 transition-all">
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-600 to-green-700 flex items-center justify-center text-white font-bold text-xl">
+                  ✓
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xl font-bold text-gray-900">Money-Back Guarantee</h3>
+                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                    Our Promise
+                  </span>
+                </div>
+                <p className="text-gray-600"><span className="font-semibold">8+ qualified meetings in 60 days</span> or we work for free until you do. No risk.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* ===================== FINAL CTA ===================== */}
-      <section className="relative z-10 mx-auto max-w-7xl px-4 py-24 sm:px-6 md:py-32 lg:px-8">
-        <Reveal>
-          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-400/10 to-purple-500/10 p-12 text-center backdrop-blur-xl sm:p-16">
-            <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-cyan-400/20 blur-3xl" />
-            <div className="absolute -bottom-20 -left-20 h-60 w-60 rounded-full bg-purple-500/20 blur-3xl" />
-            <div className="relative">
-              <h2 className="mx-auto max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl">
-                Ready to scale your outbound?
-              </h2>
-              <p className="mx-auto mt-4 max-w-xl text-lg text-gray-300">
-                Book a free 30-minute strategy call. We&apos;ll audit your funnel and map your path to 3x pipeline.
-              </p>
-              <button
-                onClick={() => setShowCalendly(true)}
-                className="mt-8 inline-block rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 px-10 py-4 font-semibold text-slate-950 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-cyan-400/30 active:scale-95"
-              >
-                Book Your Free Call
-              </button>
+      {/* Results Section */}
+      <section id="results" className="relative z-10 py-20 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              What Agencies Get
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Real results from real outbound
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">8-15</div>
+              <div className="text-sm font-semibold text-gray-900 mb-3">Qualified Meetings/Month</div>
+              <p className="text-sm text-gray-600">Decision-makers who actually want to talk to you.</p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">30-40%</div>
+              <div className="text-sm font-semibold text-gray-900 mb-3">Email Open Rate</div>
+              <p className="text-sm text-gray-600">Personal emails get opened. Generic templates don't.</p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">3-6%</div>
+              <div className="text-sm font-semibold text-gray-900 mb-3">Reply Rate</div>
+              <p className="text-sm text-gray-600">Actual responses from decision-makers. Not vanity metrics.</p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border border-blue-100">
+              <div className="text-4xl md:text-5xl font-bold text-blue-600 mb-2">14-30</div>
+              <div className="text-sm font-semibold text-gray-900 mb-3">Days to First Meeting</div>
+              <p className="text-sm text-gray-600">Results you can see and measure in real time.</p>
             </div>
           </div>
-        </Reveal>
+        </div>
       </section>
 
-      {/* ===================== FOOTER ===================== */}
-      <footer className="relative z-10 border-t border-white/10 bg-white/[0.02]">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid gap-10 md:grid-cols-4">
-            <div className="md:col-span-1">
-              <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-cyan-400 to-purple-500 text-sm font-black text-slate-950">
-                  J
-                </span>
-                <span className="text-lg font-bold">JARVIS PRIME</span>
+      {/* Pricing Section */}
+      <section id="pricing" className="relative z-10 py-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Simple Pricing
+            </h2>
+            <p className="text-xl text-gray-600">
+              One price. No surprises. No negotiation.
+            </p>
+          </div>
+
+          <div className="p-8 rounded-xl border-2 border-blue-600 bg-gradient-to-br from-white to-blue-50 shadow-2xl">
+            <div className="text-center">
+              <h3 className="font-bold text-2xl text-gray-900 mb-2">Meetings Package</h3>
+              <p className="text-lg text-gray-600 mb-8">For marketing agencies 10-50 people</p>
+              
+              <div className="mb-8">
+                <div className="text-6xl font-bold text-blue-600 mb-2">₹79,999</div>
+                <div className="text-xl text-gray-600">/month</div>
+                <div className="text-sm text-gray-500 mt-2">Less than ₹1L/year • 50% cheaper than local SDR</div>
               </div>
-              <p className="mt-4 max-w-xs text-sm text-gray-500">
-                AI-powered outbound automation for modern revenue teams.
-              </p>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-8">
+                <p className="text-green-900 font-semibold">
+                  ✓ 8+ qualified meetings in 60 days or your first month is free
+                </p>
+              </div>
+
+              <ul className="text-left space-y-3 mb-8 max-w-md mx-auto">
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Prospect research and list building</span>
+                </li>
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Personalized cold email outreach</span>
+                </li>
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Follow-up sequences and qualification</span>
+                </li>
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Meeting booking and calendar management</span>
+                </li>
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Weekly performance reports</span>
+                </li>
+                <li className="text-sm flex items-start gap-2 text-gray-700">
+                  <span className="text-blue-600 font-bold">✓</span>
+                  <span>Month-to-month (cancel anytime)</span>
+                </li>
+              </ul>
+
+              <a href="/book-call" className="w-full py-4 px-8 rounded-lg font-semibold transition-all text-lg bg-blue-600 text-white hover:bg-blue-700 shadow-lg hover:shadow-xl">
+                Schedule Your Demo Call
+              </a>
             </div>
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-gray-600">
+              Have questions? <a href="mailto:hello@jarvisprime.me" className="text-blue-600 hover:text-blue-700 font-semibold">Email us</a> or <a href="tel:+918810500723" className="text-blue-600 hover:text-blue-700 font-semibold">call +91 88105 00723</a>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="relative z-10 py-20 px-4 bg-gray-50 border-y border-gray-200">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+              Questions?
+            </h2>
+            <p className="text-xl text-gray-600">
+              Here's what we hear most
+            </p>
+          </div>
+
+          <div className="space-y-4">
             {[
-              { h: 'Product', items: ['Features', 'Pricing', 'Enterprise', 'Dashboard'] },
-              { h: 'Company', items: ['About', 'Blog', 'Careers', 'Contact'] },
-              { h: 'Legal', items: ['Privacy', 'Terms', 'Security', 'DPA'] },
-            ].map((col) => (
-              <div key={col.h}>
-                <h4 className="mb-4 text-sm font-semibold text-white">{col.h}</h4>
-                <ul className="space-y-2.5">
-                  {col.items.map((it) => (
-                    <li key={it}>
-                      <a href="#" className="text-sm text-gray-500 transition-colors hover:text-cyan-400">
-                        {it}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+              {
+                q: 'What if we don\'t get 8 meetings in 60 days?',
+                a: 'We work for free until you do. That\'s the guarantee. If we don\'t deliver, you don\'t pay. We only win when you win.'
+              },
+              {
+                q: 'How much do you actually need from us?',
+                a: 'You give us 30 minutes for an onboarding call to understand your business, ideal clients, and what success looks like. Then we handle everything else.'
+              },
+              {
+                q: 'What types of agencies do you work with?',
+                a: 'Marketing agencies with 10-50 people are the sweet spot. Web dev agencies, AI agencies, and consulting firms also work well. We specialize in businesses that sell services, not products.'
+              },
+              {
+                q: 'How is this different from hiring an SDR?',
+                a: 'Hiring an SDR costs ₹1,50,000-2,00,000/month, takes 2-3 months to ramp, and you handle all management. With us, just ₹79,999/month gets you a proven process and guaranteed results. You\'re paying 50% less with better outcomes and zero hiring headaches.'
+              },
+              {
+                q: 'Can I cancel anytime?',
+                a: 'Yes. Month-to-month only. If we\'re not delivering meetings, cancel. But we\'re confident you\'ll stay.'
+              },
+              {
+                q: 'How soon can we start?',
+                a: 'Schedule a demo call and we can kickoff within a week. First meetings typically show up within 2-3 weeks.'
+              }
+            ].map((faq, idx) => (
+              <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <button
+                  onClick={() => setFaqOpen(faqOpen === idx ? null : idx)}
+                  className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50 transition-colors"
+                >
+                  <span className="font-semibold text-gray-900">{faq.q}</span>
+                  <span className="text-2xl text-gray-400">{faqOpen === idx ? '−' : '+'}</span>
+                </button>
+                {faqOpen === idx && (
+                  <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                    <p className="text-gray-700 leading-relaxed">{faq.a}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
-          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
-            <p className="text-sm text-gray-500">© 2026 JARVIS PRIME. All rights reserved.</p>
-            <div className="flex gap-4 text-sm text-gray-500">
-              <a href="#" className="hover:text-cyan-400">Twitter</a>
-              <a href="#" className="hover:text-cyan-400">LinkedIn</a>
-              <a href="#" className="hover:text-cyan-400">GitHub</a>
-            </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="relative z-10 bg-gray-900 text-gray-300 py-12 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-10 w-auto mx-auto mb-6" />
+          <p className="text-gray-400 mb-6">
+            AI-powered outbound and appointment-setting for agencies and B2B companies
+          </p>
+          <div className="space-y-2 mb-6">
+            <p>
+              <a href="mailto:hello@jarvisprime.me" className="hover:text-white transition-colors">
+                hello@jarvisprime.me
+              </a>
+            </p>
+            <p>
+              <a href="tel:+918810500723" className="hover:text-white transition-colors">
+                +91 88105 00723
+              </a>
+            </p>
+            <p className="text-gray-400">
+              Gurgaon, Haryana, India
+            </p>
+          </div>
+          
+          {/* Social Links */}
+          <div className="flex justify-center gap-4 mb-8">
+            <a 
+              href="https://www.linkedin.com/company/jarvis-prime-ai" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-gray-800 hover:bg-blue-600 flex items-center justify-center transition-all"
+              aria-label="Follow us on LinkedIn"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              </svg>
+            </a>
+            <a 
+              href="https://x.com/jarvisprime_ai" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="w-10 h-10 rounded-full bg-gray-800 hover:bg-black flex items-center justify-center transition-all"
+              aria-label="Follow us on X (Twitter)"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </a>
+          </div>
+
+          <div className="border-t border-gray-800 pt-8 text-sm text-gray-500">
+            <p>&copy; 2026 JARVIS PRIME. All rights reserved.</p>
           </div>
         </div>
       </footer>
-
-      {/* ===================== BOOKING MODAL ===================== */}
-      <AnimatePresence>
-        {showCalendly && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => {
-              setShowCalendly(false);
-              setFormStatus('idle');
-            }}
-            className="fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 20 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-              onClick={(e) => e.stopPropagation()}
-              className="relative w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#0B1020] p-8"
-            >
-              <button
-                onClick={() => {
-                  setShowCalendly(false);
-                  setFormStatus('idle');
-                }}
-                className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-lg text-gray-400 hover:bg-white/5 hover:text-white"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-
-              {formStatus === 'success' ? (
-                <div className="py-6 text-center">
-                  <div className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-full bg-cyan-400/15 text-3xl">
-                    ✓
-                  </div>
-                  <div className="text-2xl font-bold">You&apos;re in!</div>
-                  <p className="mt-2 text-sm text-gray-400">
-                    Thanks {form.name.split(' ')[0] || 'there'} — we&apos;ve got your request and will reach
-                    out within 24 hours to lock in a time.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowCalendly(false);
-                      setFormStatus('idle');
-                    }}
-                    className="mt-6 w-full rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 py-3 font-semibold text-slate-950"
-                  >
-                    Done
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="mb-1 text-2xl font-bold">Book your free call</div>
-                  <p className="mb-6 text-sm text-gray-400">
-                    Tell us a bit about you. We&apos;ll reach out within 24 hours to schedule your
-                    30-minute strategy session.
-                  </p>
-
-                  <form onSubmit={handleSubmit} className="space-y-3">
-                    <input
-                      required
-                      type="text"
-                      placeholder="Your name *"
-                      value={form.name}
-                      onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
-                    />
-                    <input
-                      required
-                      type="email"
-                      placeholder="Work email *"
-                      value={form.email}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Company"
-                      value={form.company}
-                      onChange={(e) => setForm({ ...form, company: e.target.value })}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Phone (optional)"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
-                    />
-                    <textarea
-                      placeholder="What are you hoping to achieve? (optional)"
-                      rows={3}
-                      value={form.message}
-                      onChange={(e) => setForm({ ...form, message: e.target.value })}
-                      className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-gray-500 outline-none transition-colors focus:border-cyan-400/50"
-                    />
-
-                    {formStatus === 'error' && (
-                      <p className="text-sm text-red-400">{formError}</p>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={formStatus === 'submitting'}
-                      className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-purple-500 py-3 font-semibold text-slate-950 transition-all hover:shadow-lg hover:shadow-cyan-400/30 disabled:opacity-60"
-                    >
-                      {formStatus === 'submitting' ? 'Sending…' : 'Request my call'}
-                    </button>
-                  </form>
-                  <p className="mt-3 text-center text-xs text-gray-500">
-                    No spam. We&apos;ll only use this to schedule your call.
-                  </p>
-                </>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
