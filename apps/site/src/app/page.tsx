@@ -127,7 +127,7 @@ export default function HomePage() {
       </section>
 
       {/* Results/Metrics Section */}
-      <section className="relative z-10 py-32 px-4 bg-slate-950">
+      <section id="results" className="relative z-10 py-32 px-4 bg-slate-950">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
