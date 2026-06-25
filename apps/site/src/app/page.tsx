@@ -399,6 +399,127 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Testimonials Section */}
+      <section className="relative z-10 py-32 px-4 bg-slate-900 border-y border-slate-800">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
+              Trusted by Industry Leaders
+            </h2>
+            <p className="text-xl text-slate-400">
+              Join companies scaling their outbound pipeline
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                name: "Sarah Chen",
+                role: "Founder, GrowthOS",
+                text: "JARVIS PRIME booked 34 qualified meetings in our first 60 days. This replaced 2 full-time SDRs."
+              },
+              {
+                name: "Marcus Johnson",
+                role: "CEO, CloudScale Consulting",
+                text: "The ROI is undeniable. We're booking 15+ meetings monthly and our cost per meeting dropped by 70%."
+              },
+              {
+                name: "Priya Kapoor",
+                role: "Head of Sales, TechVenture Agency",
+                text: "Best investment we've made. Freed up our team to focus on closing deals instead of prospecting."
+              }
+            ].map((testimonial, idx) => (
+              <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 hover:border-blue-500/50 transition-all hover:shadow-lg hover:shadow-blue-500/10">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className="text-cyan-400">★</span>
+                  ))}
+                </div>
+                <p className="text-slate-300 mb-6 leading-relaxed italic">"{testimonial.text}"</p>
+                <div className="border-t border-slate-700 pt-4">
+                  <p className="font-bold text-white">{testimonial.name}</p>
+                  <p className="text-sm text-slate-400">{testimonial.role}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features Deep Dive */}
+      <section className="relative z-10 py-32 px-4 bg-slate-950">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-5xl md:text-6xl font-black mb-4 text-white">
+              Enterprise-Grade Features
+            </h2>
+            <p className="text-xl text-slate-400">
+              Everything you need to run done-for-you outbound
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-12">
+            {[
+              {
+                icon: Users,
+                title: "Intelligent Prospect Research",
+                desc: "AI finds your ideal customers based on your ICP. We research 5,000+ prospects monthly with intent signals."
+              },
+              {
+                icon: Zap,
+                title: "Personalized at Scale",
+                desc: "Every email is personalized by AI. No templates. No spam. Real conversations that convert."
+              },
+              {
+                icon: TrendingUp,
+                title: "Multi-Channel Campaigns",
+                desc: "Email + LinkedIn + follow-ups. We orchestrate across channels to maximize response rates."
+              },
+              {
+                icon: BarChart3,
+                title: "Real-Time Analytics",
+                desc: "Track opens, replies, meeting bookings. See what's working and optimize continuously."
+              },
+              {
+                icon: CheckCircle2,
+                title: "Automated Qualification",
+                desc: "AI qualifies leads before they hit your calendar. Only decision-makers. Only prospects with intent."
+              },
+              {
+                icon: Lock,
+                title: "White-Label Ready",
+                desc: "Campaigns come from your domain. Your brand. Your relationships. Full control."
+              }
+            ].map((feature, idx) => {
+              const Icon = feature.icon;
+              return (
+                <div key={idx} className="bg-slate-800/30 border border-slate-700 rounded-xl p-8 hover:border-cyan-500/50 hover:bg-slate-800/50 transition-all">
+                  <Icon className="w-12 h-12 text-cyan-400 mb-4" />
+                  <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
+                  <p className="text-slate-400 leading-relaxed">{feature.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="relative z-10 py-32 px-4 bg-gradient-to-r from-blue-950/50 to-cyan-950/50 border-t border-slate-800">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-5xl md:text-6xl font-black mb-6 text-white">
+            Ready to Scale?
+          </h2>
+          <p className="text-xl text-slate-300 mb-12 max-w-2xl mx-auto">
+            Start your free strategy call. We'll show you exactly how JARVIS PRIME can transform your pipeline in the next 60 days.
+          </p>
+          <a href="/book-call" className="inline-flex items-center gap-2 px-10 py-5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-bold text-lg rounded-lg hover:shadow-2xl hover:shadow-cyan-500/50 transition-all">
+            Book Your Free Call
+            <ArrowRight className="w-6 h-6" />
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="relative z-10 bg-slate-950 border-t border-slate-800 py-16 px-4">
         <div className="max-w-6xl mx-auto">
