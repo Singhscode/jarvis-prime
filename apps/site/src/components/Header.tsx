@@ -61,7 +61,7 @@ export default function Header() {
             {/* CTA */}
             <a
               href="/book-call"
-              className="hidden items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/20 md:inline-flex"
+              className="hidden items-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:bg-cyan-600 md:inline-flex"
             >
               Book Free Call
             </a>
@@ -102,7 +102,7 @@ export default function Header() {
 
       {/* Mobile menu panel */}
       <div
-        className={`fixed right-0 top-0 z-50 h-full w-72 transform border-l border-white/[0.06] bg-surface-50/95 backdrop-blur-xl transition-transform duration-300 md:hidden ${
+        className={`fixed right-0 top-0 z-50 h-full w-72 transform border-l border-white/[0.06] bg-[#0a0f1e]/95 backdrop-blur-xl transition-transform duration-300 md:hidden ${
           mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -131,7 +131,7 @@ export default function Header() {
           <div className="mt-4 border-t border-white/[0.06] pt-4">
             <a
               href="/book-call"
-              className="block rounded-lg bg-gradient-to-r from-cyan-500 to-violet-500 px-6 py-3 text-center font-semibold text-white transition-all hover:shadow-lg"
+              className="block rounded-lg bg-cyan-500 px-6 py-3 text-center font-semibold text-white transition-all hover:bg-cyan-600"
             >
               Book Free Call
             </a>

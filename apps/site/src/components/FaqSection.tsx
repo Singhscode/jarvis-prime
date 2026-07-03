@@ -40,10 +40,10 @@ export default function FaqSection() {
         return (
           <div
             key={idx}
-            className={`group glass-card overflow-hidden rounded-xl transition-all duration-300 ${
+            className={`group overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] transition-all duration-300 ${
               isOpen
-                ? 'border-cyan-500/20 shadow-lg shadow-cyan-500/5'
-                : 'hover:border-white/[0.08]'
+                ? 'border-cyan-500/20 bg-white/[0.04]'
+                : 'hover:border-white/[0.12]'
             }`}
           >
             <button
