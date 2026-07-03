@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown } from 'lucide-react';
 
 const FAQS = [
   {
@@ -34,36 +34,52 @@ export default function FaqSection() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
-    <div className="space-y-4">
-      {FAQS.map((faq, idx) => (
-        <div
-          key={idx}
-          className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50 transition-all hover:bg-slate-800"
-        >
-          <button
-            onClick={() => setOpen(open === idx ? null : idx)}
-            className="flex w-full items-center justify-between px-6 py-4 text-left transition-colors hover:bg-slate-700/50"
-            aria-expanded={open === idx}
+    <div className="space-y-3">
+      {FAQS.map((faq, idx) => {
+        const isOpen = open === idx;
+        return (
+          <div
+            key={idx}
+            className={`group glass-card overflow-hidden rounded-xl transition-all duration-300 ${
+              isOpen
+                ? 'border-cyan-500/20 shadow-lg shadow-cyan-500/5'
+                : 'hover:border-white/[0.08]'
+            }`}
           >
-            <span className="text-lg font-bold text-white">{faq.q}</span>
-            <span className="text-2xl text-cyan-400">{open === idx ? '−' : '+'}</span>
-          </button>
-          {open === idx && (
-            <div className="border-t border-slate-700 bg-slate-900/50 px-6 py-4">
-              <p className="leading-relaxed text-slate-300">{faq.a}</p>
+            <button
+              onClick={() => setOpen(isOpen ? null : idx)}
+              className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors"
+              aria-expanded={isOpen}
+            >
+              <span className="pr-4 text-lg font-semibold text-white">{faq.q}</span>
+              <ChevronDown
+                className={`h-5 w-5 flex-shrink-0 text-cyan-400 transition-transform duration-300 ${
+                  isOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+            <div
+              className="accordion-content"
+              data-open={isOpen ? 'true' : 'false'}
+            >
+              <div>
+                <div className="border-t border-white/[0.04] px-6 pb-5 pt-4">
+                  <p className="leading-relaxed text-slate-400">{faq.a}</p>
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
 
-      <div className="mt-16 text-center">
-        <p className="mb-4 text-slate-300">Still have questions?</p>
+      <div className="mt-12 text-center">
+        <p className="mb-4 text-slate-400">Still have questions?</p>
         <a
           href="/book-call"
-          className="inline-flex items-center gap-2 text-lg font-semibold text-cyan-400 hover:text-cyan-300"
+          className="group inline-flex items-center gap-2 text-lg font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
         >
-          <ArrowRight className="h-5 w-5" />
           Book a free strategy call
+          <ArrowRight className="h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
         </a>
       </div>
     </div>
