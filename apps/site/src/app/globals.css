@@ -67,3 +67,19 @@ body {
 .accordion-content > div {
   overflow: hidden;
 }
+
+/* Ambient glow drift animation */
+@keyframes ambient-glow {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.08;
+  }
+  50% {
+    transform: translate(4%, 3%) scale(1.03);
+    opacity: 0.12;
+  }
+}
+
+.animate-ambient {
+  animation: ambient-glow 20s ease-in-out infinite;
+}

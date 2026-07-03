@@ -2,6 +2,7 @@ import Header from '@/components/Header';
 import Reveal from '@/components/Reveal';
 import FaqSection from '@/components/FaqSection';
 import GlowButton from '@/components/GlowButton';
+import AnimatedCounter from '@/components/AnimatedCounter';
 import {
   ArrowRight,
   CheckCircle2,
@@ -27,6 +28,12 @@ export default function HomePage() {
 
       {/* ===== HERO SECTION ===== */}
       <section className="relative z-10 px-4 pb-32 pt-36 lg:pt-44">
+        {/* Ambient background glow */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="animate-ambient absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-[100px]" />
+          <div className="animate-ambient absolute -left-32 bottom-0 h-[400px] w-[400px] rounded-full bg-violet-500/10 blur-[90px]" style={{ animationDelay: '-10s' }} />
+        </div>
+
         <div className="relative z-10 mx-auto max-w-5xl text-center">
           {/* Badge */}
           <Reveal variant="fade">
@@ -82,9 +89,10 @@ export default function HomePage() {
                   key={stat.label}
                   className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 transition-all duration-300 hover:border-cyan-500/20"
                 >
-                  <span className="mb-1 block text-3xl font-bold text-cyan-400">
-                    {stat.value}
-                  </span>
+                  <AnimatedCounter
+                    value={stat.value}
+                    className="mb-1 block text-3xl font-bold text-cyan-400"
+                  />
                   <div className="text-sm text-slate-400">{stat.label}</div>
                 </div>
               ))}
@@ -94,7 +102,7 @@ export default function HomePage() {
 
         {/* Dashboard mock */}
         <Reveal className="relative z-10 mx-auto mt-16 max-w-3xl" delay={500} variant="fade">
-          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 shadow-2xl shadow-black/20">
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 shadow-2xl shadow-black/25 transition-all duration-500 hover:-translate-y-1 hover:border-cyan-500/10">
             <div className="mb-4 flex items-center gap-2">
               <span className="h-3 w-3 rounded-full bg-red-400/60" />
               <span className="h-3 w-3 rounded-full bg-yellow-400/60" />
@@ -111,10 +119,13 @@ export default function HomePage() {
                 return (
                   <div
                     key={metric.label}
-                    className="rounded-lg border border-white/[0.04] bg-white/[0.02] p-4"
+                    className="rounded-lg border border-white/[0.04] bg-white/[0.02] p-4 transition-colors duration-300 hover:bg-white/[0.04]"
                   >
                     <Icon className="mb-2 h-5 w-5 text-cyan-400" />
-                    <div className="text-2xl font-bold text-white">{metric.value}</div>
+                    <AnimatedCounter
+                      value={metric.value}
+                      className="text-2xl font-bold text-white block"
+                    />
                     <div className="text-xs text-slate-500">{metric.label}</div>
                   </div>
                 );
@@ -238,11 +249,14 @@ export default function HomePage() {
               const Icon = item.icon;
               return (
                 <Reveal key={idx} delay={idx * 80}>
-                  <div className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center transition-all duration-300 hover:border-cyan-500/15">
+                  <div className="group rounded-xl border border-white/[0.06] bg-white/[0.02] p-8 text-center transition-all duration-300 hover:-translate-y-1 hover:border-cyan-500/15">
                     <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/[0.08]">
                       <Icon className="h-6 w-6 text-cyan-400" />
                     </div>
-                    <div className="mb-2 text-4xl font-bold text-white">{item.metric}</div>
+                    <AnimatedCounter
+                      value={item.metric}
+                      className="mb-2 block text-4xl font-bold text-white"
+                    />
                     <div className="font-medium text-slate-400">{item.label}</div>
                   </div>
                 </Reveal>
@@ -283,7 +297,7 @@ export default function HomePage() {
           <div className="mb-16 grid gap-6 lg:grid-cols-3">
             {/* STARTER */}
             <Reveal>
-              <div className="group h-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-cyan-500/15">
+              <div className="group h-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-500/15">
                 <div className="mb-8">
                   <h3 className="mb-2 font-display text-2xl font-bold text-white">STARTER</h3>
                   <p className="mb-6 text-sm text-slate-500">For freelancers &amp; small teams testing outbound.</p>
@@ -314,7 +328,7 @@ export default function HomePage() {
 
             {/* GROWTH — Featured */}
             <Reveal delay={100}>
-              <div className="group relative h-full rounded-2xl border-2 border-cyan-500/30 bg-white/[0.02] p-8 transition-all duration-300 hover:border-cyan-500/50 lg:scale-105">
+              <div className="group relative h-full rounded-2xl border-2 border-cyan-500/30 bg-white/[0.02] p-8 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-500/50 lg:scale-105">
                 <div className="absolute -top-0 right-6 rounded-b-lg bg-cyan-500 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-white">
                   Most Popular
                 </div>
@@ -354,7 +368,7 @@ export default function HomePage() {
 
             {/* SCALE */}
             <Reveal delay={200}>
-              <div className="group h-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:border-cyan-500/15">
+              <div className="group h-full rounded-2xl border border-white/[0.06] bg-white/[0.02] p-8 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-500/15">
                 <div className="mb-8">
                   <h3 className="mb-2 font-display text-2xl font-bold text-white">SCALE</h3>
                   <p className="mb-6 text-sm text-slate-500">For established teams wanting maximum volume.</p>
@@ -536,6 +550,11 @@ export default function HomePage() {
 
       {/* ===== CTA ===== */}
       <section className="relative z-10 px-4 py-28">
+        {/* Ambient background glow */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="animate-ambient absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500/10 blur-[100px]" />
+        </div>
+
         <Reveal className="relative mx-auto max-w-4xl text-center" variant="fade">
           <h2 className="mb-6 font-display text-4xl font-bold text-white md:text-5xl">
             Ready to <span className="text-cyan-400">Scale</span>?
