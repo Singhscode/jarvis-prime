@@ -1,156 +1,107 @@
-# JARVIS PRIME — Enterprise Migration Guide
+# JARVIS PRIME — Enterprise Migration Priority Roadmap
 
-This guide provides a step-by-step technical roadmap to transition the current Jarvis Prime bootstrap MVP into the target enterprise architecture.
+This roadmap arranges the migration steps in order of **technical priority and dependency**. P0 (Critical Security & Isolation) must be implemented first, as all subsequent features (Temporal workflows, integrations, scaling) depend on a secure database and authentication structure.
 
 ---
 
 ```mermaid
 graph TD
-    subgraph Phase 1: API & Security
-        A[OpenAPI Specs & C4 Diagrams] --> B[Decouple App & Engine]
-        B --> C[Introduce HashiCorp Vault]
-        C --> D[Add Field-Level Encryption pg_crypto]
+    subgraph P0: Critical Foundation (Security & Isolation)
+        P0_1[1. Secrets Management & Vault] --> P0_2[2. Database Encryption pg_crypto]
+        P0_2 --> P0_3[3. Identity & RLS Multi-Tenancy]
     end
 
-    subgraph Phase 2: Core Platform & Workflows
-        D --> E[Keycloak/Auth0 JWT Validation]
-        E --> F[Temporal Workflow Engine Migration]
-        F --> G[LangGraph Agent & Vector DB Setup]
+    subgraph P1: Core Reliability & Capabilities
+        P0_3 --> P1_1[4. Temporal Workflow Engine]
+        P1_1 --> P1_2[5. OAuth2 Client Integrations]
+        P1_2 --> P1_3[6. LangGraph AI Agents]
     end
 
-    subgraph Phase 3: Scaling & Production
-        G --> H[Winston JSON Logging + Prometheus]
-        H --> I[Docker, Terraform, and K8s]
+    subgraph P2: Scale, Monitoring & Operations
+        P1_3 --> P2_1[7. Redis Caching & Rate Limits]
+        P2_1 --> P2_2[8. JSON Logging & Prometheus]
+        P2_2 --> P2_3[9. Docker, K8s, & Terraform IaC]
     end
 ```
 
 ---
 
-## Phase 1: Product & System Architecture (decoupling & specs)
+## 🔴 P0: Critical Foundation (Security & Tenant Isolation)
 
-Before modifying code, formalize service boundaries and document API interactions.
+Implement these steps first. Without secure credential management and strict database level isolation, the system cannot safely support multiple customers.
 
-1. **Document OpenAPI Specifications**:
-   * Create an OpenAPI 3.0 specification file (e.g. `openapi.yaml`) mapping every route in `engine/src/api/routes/` (`/api/analytics`, `/api/linkedin`, `/api/calendar`, `/api/scheduler`).
-   * Explicitly define parameter schemas, auth headers, and response shapes.
-2. **Design C4 Architecture Diagrams**:
-   * Create C4 Context and Container diagrams showing the interactions between the Next.js Frontend, Express API, Temporal Workers, Supabase Database, Redis, and External APIs (Apollo, LinkedIn, Twilio, Resend).
-3. **Decouple App and Engine**:
-   * Ensure `apps/site` strictly communicates with the engine via authenticated HTTP calls, removing any shared file-system dependency.
+### 1. Secrets Management (Vault / Infisical)
+*   **Objective**: Remove all plain-text sensitive variables from `.env` files.
+*   **Steps**:
+    1. Spin up a HashiCorp Vault or Infisical cluster.
+    2. Define secret scopes (Development, Staging, Production).
+    3. Modify [config.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/config.js) to resolve variables dynamically from the vault transit manager at runtime.
 
----
+### 2. Database Field-Level Encryption (pg_crypto)
+*   **Objective**: Ensure that if the database is compromised, client access tokens and cookies remain unreadable.
+*   **Steps**:
+    1. Run `CREATE EXTENSION IF NOT EXISTS pgcrypto;` on your Supabase Postgres instance.
+    2. Encrypt sensitive columns (e.g. `linkedin_cookie`, `resend_api_key`) using `pgp_sym_encrypt` on insertion.
+    3. Update [db.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/lib/db.js) to decrypt columns using `pgp_sym_decrypt` on query read.
 
-## Phase 2: Secrets Management & Database Encryption
-
-Move away from plain-text configurations and secure sensitive customer tokens (e.g. LinkedIn cookies, email API keys).
-
-1. **Introduce HashiCorp Vault or Infisical**:
-   * Install and configure Vault in your local environment.
-   * Modify [config.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/config.js) to resolve credentials from Vault's transit engine at runtime rather than `process.env`.
-2. **Implement Database Field-Level Encryption**:
-   * In [schema.sql](file:///Users/anujsingh/Jarvis%20ai%20company/engine/sql/schema.sql), alter columns storing API credentials (such as client LinkedIn cookies or Resend keys) to use the `pgcrypto` extension.
-   * Update [db.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/lib/db.js) to call postgres encryption functions (`pgp_sym_encrypt` and `pgp_sym_decrypt`) when writing and reading client records.
-
----
-
-## Phase 3: Identity & Multi-Tenancy
-
-Replace static token authentication with JWT validation and isolate customer data.
-
-1. **Integrate Keycloak or Auth0**:
-   * Setup a Keycloak instance. Create realms for Administrators and Client users.
-2. **Implement JWT Validation Middleware**:
-   * Replace the legacy static authentication function in [runner.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/runner.js#L193-L199) with a JWT token parser middleware.
-   * Use library like `jsonwebtoken` and `jwks-rsa` to verify signatures against Keycloak's public keys.
-3. **Enable Row-Level Security (RLS)**:
-   * Define Postgres tenant views or enforce matching `tenant_id` (or `client_id`) on all operations. Enable Postgres RLS policies:
-     ```sql
-     ALTER TABLE public.prospects ENABLE ROW LEVEL SECURITY;
-     CREATE POLICY tenant_isolation ON public.prospects 
-       USING (client_id = current_setting('app.current_client_id')::uuid);
-     ```
+### 3. Identity and Row-Level Security (Keycloak/Auth0 + Postgres RLS)
+*   **Objective**: Transition from single-secret header auth to dynamic multi-tenant JSON Web Token (JWT) verification.
+*   **Steps**:
+    1. Set up Auth0 or Keycloak and create user client profiles.
+    2. Replace the auth token checker in [runner.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/runner.js) with token signature verification against the Identity Provider's JWKS endpoint.
+    3. Apply Row Level Security (RLS) policies in [schema.sql](file:///Users/anujsingh/Jarvis%20ai%20company/engine/sql/schema.sql) so database queries default to the current caller's tenant context.
 
 ---
 
-## Phase 4: Scaling the Database & Cache (Redis)
+## 🟡 P1: Core Reliability & Capabilities (Workflow & AI Agents)
 
-Optimize database query execution and manage transient states.
+With tenant security resolved, replace the MVP scripting engine with resilient enterprise-grade workflow workers and AI agent graph layers.
 
-1. **Setup Redis**:
-   * Add Redis to store session caches and token configurations.
-2. **Implement Distributed Rate Limiting**:
-   * Replace the in-memory rate limiter in [runner.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/runner.js#L226-L251) with a Redis-backed token bucket algorithm (e.g., `rate-limiter-flexible`). This prevents rate-limit failures when scaling Express across multiple instances.
+### 4. Temporal Workflow Engine Migration
+*   **Objective**: Replace the built-in scheduler (`scheduler.js`) with a fault-tolerant distributed workflow engine that handles state retention, automatic retries, and failures.
+*   **Steps**:
+    1. Set up a Temporal cluster.
+    2. Convert outreach sequences into Temporal Workflows (`OutreachWorkflow`).
+    3. Map email generation, sending, and LinkedIn DMs into decoupled Temporal Activities.
+    4. Implement Temporal workflow timers to wait days/weeks securely without process-crash state loss.
 
----
+### 5. Enterprise Integrations & OAuth2 Flow
+*   **Objective**: Allow clients to safely authorize their own outreach accounts (Gmail, Google Calendar, HubSpot) via standardized consent pages.
+*   **Steps**:
+    1. Register OAuth2 applications on Google Cloud Platform, Microsoft Entra, and HubSpot developer portals.
+    2. Create secure OAuth redirect callback routes in the Express API to receive auth codes.
+    3. Securely store encrypted refresh tokens in the Postgres DB using pg_crypto.
 
-## Phase 5: Transition Schedulers to Temporal & BullMQ
-
-Replace the 150-line cron utility with a robust, fault-tolerant workflow orchestrator.
-
-1. **Setup Temporal**:
-   * Install Temporal locally using Docker Compose.
-2. **Translate Campaigns to Temporal Workflows**:
-   * Define campaigns as Temporal Workflows (`outreachWorkflow`).
-   * Translate campaign sequence steps (email creation, sending, LinkedIn tasks) into Temporal Activities (`SendEmailActivity`, `LinkedInVisitActivity`).
-   * Leverage Temporal's native timers (`workflow.sleep()`) to handle day-long sequence delays. If the worker crashes, Temporal resumes exactly where it stopped.
-3. **Implement Retries and Backoffs**:
-   * Set retry policies on activities to handle network timeouts automatically (e.g., Apollo API limits or Resend failures).
-
----
-
-## Phase 6: AI Agent Platform (LangGraph & Vector DB)
-
-Move away from simple LLM calls and introduce structured agent state machines.
-
-1. **Adopt LangGraph**:
-   * Install `langgraph` in the engine.
-   * Translate the outbound qualification logic into a directed agent graph:
-     `Sourced Lead` $\rightarrow$ `Scrape tech-stack` $\rightarrow$ `Evaluate against ICP schema` $\rightarrow$ `Write personalized lines` $\rightarrow$ `Validate output compliance` $\rightarrow$ `Approved/Disqualified`.
-2. **Setup a Vector Database**:
-   * Configure pgvector in Supabase or set up an instance of Pinecone.
-   * Embed client case studies, guidelines, and value propositions into vectors.
-3. **Implement Dynamic RAG for Emails**:
-   * Modify [personalizer.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/ai/personalizer.js) to perform a vector search before calling Groq/OpenAI, appending relevant client case studies to the prompt to make cold emails highly contextual.
+### 6. AI Agent Platform Upgrade (LangGraph & Vector DB)
+*   **Objective**: Introduce context-aware AI agents instead of simple template completions, complete with prompt injection safeguards.
+*   **Steps**:
+    1. Rebuild prospect qualification pipelines using LangGraph state machines.
+    2. Set up pgvector inside the PostgreSQL database.
+    3. Index company data, PDFs, and client scripts to perform Vector Semantic Searches, providing precise contextual parameters to the LLM during email writing.
 
 ---
 
-## Phase 7: Enterprise Integration Platform (OAuth2 flow)
+## 🔵 P2: Scale, Monitoring & Operations (Production Hardening)
 
-Enable secure, standard integrations for clients.
+Hardening steps that can be run once the core features are validated.
 
-1. **Create OAuth2 Callbacks**:
-   * Create routes in `engine/src/api/routes/` to handle OAuth authorization code flows for Google (Gmail/Calendar) and Microsoft (Outlook/365).
-   * Securely store authorization and refresh tokens inside the encrypted Supabase database.
-2. **Sync CRM Data Bidirectionally**:
-   * Implement event-based sync listeners: when a prospect stage transitions to `replied` or `booked` in `db.js`, trigger webhooks to HubSpot/Salesforce APIs to update deals automatically.
+### 7. Caching and Distributed Rate Limiting (Redis)
+*   **Objective**: Scale backend APIs across multiple instances and cache frequent database queries.
+*   **Steps**:
+    1. Setup a Redis cluster.
+    2. Replace Express in-memory rate limiting with Redis token bucket middleware.
+    3. Cache database dashboard queries.
 
----
+### 8. Structured Logging & Prometheus Metrics
+*   **Objective**: Acquire full visibility over system performance, API latency, queue lag, and error rates.
+*   **Steps**:
+    1. Install `winston` / `pino` to write structured logs in JSON format.
+    2. Stream JSON logs to Grafana Loki or ELK.
+    3. Integrate `prom-client` in Express to expose metric endpoints.
 
-## Phase 8: Production Monitoring & ELK Stack
-
-Replace simple logs with centralized, searchable system metrics.
-
-1. **Implement Structured JSON Logging**:
-   * Replace `console.log` in [logger.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/lib/logger.js) with a structured JSON logger (e.g. `winston` or `pino`).
-   * Configure logger transports to send logs to Grafana Loki or ELK.
-2. **Expose Prometheus Metrics**:
-   * Integrate `prom-client` in Express to expose metrics like:
-     * `http_requests_total`
-     * `outreach_emails_sent_total`
-     * `active_workflow_runs`
-     * `linkedin_actions_failed`
-   * Build a Grafana dashboard to visualize these metrics.
-
----
-
-## Phase 9: Infrastructure as Code (Docker + K8s + Terraform)
-
-Scale deployment and operational orchestration using configuration scripts.
-
-1. **Write Dockerfiles**:
-   * Build container configurations for both the web frontend (`apps/site`) and the automation engine backend (`engine/`).
-2. **Write Terraform Configurations**:
-   * Write Terraform manifests (`main.tf`, `variables.tf`) to provision AWS resources (EKS Kubernetes Cluster, RDS PostgreSQL Instance, ElastiCache Redis).
-3. **Create Kubernetes Manifests & Helm Charts**:
-   * Write deployment manifests for backend Express servers, Temporal Workers, and PostgreSQL database migrations.
-   * Set up Horizontal Pod Autoscaling (HPA) to scale backend pods based on CPU/Memory usage.
+### 9. Infrastructure as Code (Docker + Kubernetes + Terraform)
+*   **Objective**: Automate the provisioning of databases, caches, K8s clusters, and deployment pipelines.
+*   **Steps**:
+    1. Standardize backend and frontend Dockerfiles.
+    2. Write Terraform files (`main.tf`) to define AWS EKS, AWS RDS, and AWS ElastiCache resources.
+    3. Write Helm charts to deploy the containers across Kubernetes, using Horizontal Pod Autoscaling (HPA).
