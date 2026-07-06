@@ -24,36 +24,36 @@ All engine automation logic resides under `engine/`:
 
 ## Operating the System (CLI Commands)
 
-Use these commands in `engine/` to run automation workflows:
+Use these commands in the root directory to run automation workflows:
 
 ### 1. Verification & Diagnostics
 Run a configuration doctor check to see which providers are active:
 ```bash
-node src/runner.js --doctor
+node engine/src/runner.js --doctor
 ```
 
 ### 2. Manual Pipelines
 - **Run Sourcing & Scoring**: Sourced from Apollo, qualified, scored via ICP:
   ```bash
-  node src/runner.js --task=source
+  node engine/src/runner.js --task=source
   ```
 - **Run Outreach Sends**: Delivers sequence emails and performs LinkedIn actions:
   ```bash
-  node src/runner.js --task=outbound
+  node engine/src/runner.js --task=outbound
   ```
 - **Simulate Inbound Replies**: Evaluates inbound classification (dry-run):
   ```bash
-  node src/runner.js --task=inbound
+  node engine/src/runner.js --task=inbound
   ```
 - **Run Full Sourcing + Outreach sequence**:
   ```bash
-  node src/runner.js
+  node engine/src/runner.js
   ```
 
 ### 3. Server Mode
 To start the REST API backend server (port 3001 by default):
 ```bash
-node src/runner.js --server
+node engine/src/runner.js --server
 ```
 
 ---
@@ -83,6 +83,6 @@ When running in server mode, the following endpoints are available under `http:/
 ---
 
 ## Execution Flow & Honesty
-1. **Safety First**: Verify if `DRY_RUN=true` is set in `.env` before performing live tests.
+1. **Safety First**: Verify if `DRY_RUN=true` is set in `engine/.env` before performing live tests.
 2. **Alerts**: Keep track of hot leads/replies. Alert Anuj immediately on Telegram/Slack when a meeting is booked.
 3. **No Placeholders**: Never use dummy email templates in campaigns; generate targeted B2B agency-focused copies.
