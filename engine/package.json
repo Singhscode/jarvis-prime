@@ -1,0 +1,27 @@
+{
+  "name": "jarvis-prime-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "JARVIS PRIME engine — CLI + HTTP API. Finds prospects, scores, personalizes, sends sequences, handles replies.",
+  "main": "src/runner.js",
+  "scripts": {
+    "run": "node src/runner.js",
+    "run:once": "node src/runner.js --once",
+    "source": "node src/runner.js --task=source",
+    "score": "node src/runner.js --task=score",
+    "outbound": "node src/runner.js --task=outbound",
+    "inbound": "node src/runner.js --task=inbound",
+    "doctor": "node src/runner.js --doctor",
+    "server": "node src/runner.js --server",
+    "server:dev": "node --watch src/runner.js --server",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "express": "^4.22.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

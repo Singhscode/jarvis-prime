@@ -1,0 +1,667 @@
+{
+  "workflows": [
+    {
+      "id": "workflow_1",
+      "name": "Daily Outreach Automation",
+      "description": "Automatically sends personalized outreach emails to qualified prospects every morning",
+      "trigger": "Schedule (9 AM daily)",
+      "nodes": [
+        {
+          "id": "node_1",
+          "name": "Trigger: Daily Outreach",
+          "type": "schedule",
+          "config": {
+            "interval": "1d",
+            "time": "09:00"
+          }
+        },
+        {
+          "id": "node_2",
+          "name": "Check Daily Limit",
+          "type": "http",
+          "config": {
+            "method": "GET",
+            "url": "http://localhost:3001/health",
+            "description": "Verify system is operational"
+          }
+        },
+        {
+          "id": "node_3",
+          "name": "Get Due Prospects",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "prospects",
+            "filters": [
+              {
+                "column": "stage",
+                "operator": "=",
+                "value": "queued"
+              },
+              {
+                "column": "next_action_at",
+                "operator": "<=",
+                "value": "now()"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "id": "node_4",
+          "name": "Loop: Process Each Prospect",
+          "type": "loop",
+          "config": {
+            "sourceArray": "node_3.output"
+          }
+        },
+        {
+          "id": "node_5",
+          "name": "Generate AI Email",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "http://localhost:3001/api/enrichment",
+            "headers": {
+              "x-automation-secret": "{{env.AUTOMATION_SECRET}}"
+            },
+            "body": {
+              "prospect_id": "{{node_4.item.id}}",
+              "action": "generate_email"
+            }
+          }
+        },
+        {
+          "id": "node_6",
+          "name": "Send Email via Resend",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "http://localhost:3001/api/outreach",
+            "headers": {
+              "x-automation-secret": "{{env.AUTOMATION_SECRET}}"
+            },
+            "body": {
+              "prospect_id": "{{node_4.item.id}}",
+              "client_id": "{{node_4.item.client_id}}",
+              "email": "{{node_5.output.email}}",
+              "subject": "{{node_5.output.subject}}"
+            }
+          }
+        },
+        {
+          "id": "node_7",
+          "name": "Update Prospect Stage",
+          "type": "supabase",
+          "config": {
+            "operation": "update",
+            "table": "prospects",
+            "id": "{{node_4.item.id}}",
+            "data": {
+              "stage": "contacted",
+              "step": "{{node_4.item.step + 1}}",
+              "next_action_at": "{{addDays(now(), 3)}}"
+            }
+          }
+        },
+        {
+          "id": "node_8",
+          "name": "Log Message",
+          "type": "supabase",
+          "config": {
+            "operation": "insert",
+            "table": "messages",
+            "data": {
+              "prospect_id": "{{node_4.item.id}}",
+              "client_id": "{{node_4.item.client_id}}",
+              "subject": "{{node_5.output.subject}}",
+              "body": "{{node_5.output.body}}",
+              "status": "{{env.DRY_RUN ? 'dry_run' : 'sent'}}",
+              "sent_at": "{{now()}}"
+            }
+          }
+        },
+        {
+          "id": "node_9",
+          "name": "Send Slack Notification",
+          "type": "slack",
+          "config": {
+            "channel": "#outreach",
+            "message": "✅ Sent {{node_3.output.length}} outreach emails"
+          }
+        }
+      ],
+      "connections": [
+        { "from": "node_1", "to": "node_2" },
+        { "from": "node_2", "to": "node_3" },
+        { "from": "node_3", "to": "node_4" },
+        { "from": "node_4", "to": "node_5" },
+        { "from": "node_5", "to": "node_6" },
+        { "from": "node_6", "to": "node_7" },
+        { "from": "node_7", "to": "node_8" },
+        { "from": "node_8", "to": "node_9" }
+      ]
+    },
+    {
+      "id": "workflow_2",
+      "name": "Reply Processing Pipeline",
+      "description": "Process incoming email replies, classify intent, and schedule follow-ups",
+      "trigger": "Webhook (email reply received)",
+      "nodes": [
+        {
+          "id": "node_1",
+          "name": "Trigger: Email Webhook",
+          "type": "webhook",
+          "config": {
+            "url": "{{env.N8N_WEBHOOK_URL}}/reply",
+            "method": "POST"
+          }
+        },
+        {
+          "id": "node_2",
+          "name": "Parse Email",
+          "type": "function",
+          "code": "msg = json.parse(data.body); return { sender: msg.from, subject: msg.subject, body: msg.text, timestamp: msg.timestamp }"
+        },
+        {
+          "id": "node_3",
+          "name": "Find Prospect",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "prospects",
+            "filters": [
+              {
+                "column": "email",
+                "operator": "=",
+                "value": "{{node_2.output.sender}}"
+              }
+            ],
+            "limit": 1
+          }
+        },
+        {
+          "id": "node_4",
+          "name": "Classify Reply Intent",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "{{env.OPENAI_API}}/chat/completions",
+            "headers": {
+              "Authorization": "Bearer {{env.OPENAI_KEY}}"
+            },
+            "body": {
+              "model": "gpt-4",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Classify the email reply as: INTERESTED, NOT_INTERESTED, or NEEDS_REVIEW"
+                },
+                {
+                  "role": "user",
+                  "content": "{{node_2.output.body}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "node_5",
+          "name": "Conditional: Classification",
+          "type": "conditional",
+          "config": {
+            "conditions": [
+              {
+                "condition": "{{node_4.output.classification}} == 'INTERESTED'"
+              },
+              {
+                "condition": "{{node_4.output.classification}} == 'NOT_INTERESTED'"
+              },
+              {
+                "condition": "{{node_4.output.classification}} == 'NEEDS_REVIEW'"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_6a",
+          "name": "INTERESTED: Create Meeting",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "http://localhost:3001/api/campaigns",
+            "body": {
+              "action": "book_meeting",
+              "prospect_id": "{{node_3.output[0].id}}",
+              "email": "{{node_3.output[0].email}}"
+            }
+          }
+        },
+        {
+          "id": "node_6b",
+          "name": "NOT_INTERESTED: Add to Suppression",
+          "type": "supabase",
+          "config": {
+            "operation": "insert",
+            "table": "suppression",
+            "data": {
+              "email": "{{node_2.output.sender}}",
+              "reason": "not_interested"
+            }
+          }
+        },
+        {
+          "id": "node_6c",
+          "name": "NEEDS_REVIEW: Alert Sales Team",
+          "type": "slack",
+          "config": {
+            "channel": "@sales-team",
+            "message": "⚠️ Review needed: Reply from {{node_3.output[0].email}}"
+          }
+        },
+        {
+          "id": "node_7",
+          "name": "Update Prospect Stage",
+          "type": "supabase",
+          "config": {
+            "operation": "update",
+            "table": "prospects",
+            "id": "{{node_3.output[0].id}}",
+            "data": {
+              "stage": "replied",
+              "updated_at": "{{now()}}"
+            }
+          }
+        },
+        {
+          "id": "node_8",
+          "name": "Log Event",
+          "type": "supabase",
+          "config": {
+            "operation": "insert",
+            "table": "events",
+            "data": {
+              "prospect_id": "{{node_3.output[0].id}}",
+              "type": "reply",
+              "meta": {
+                "classification": "{{node_4.output.classification}}",
+                "body": "{{node_2.output.body}}"
+              }
+            }
+          }
+        }
+      ],
+      "connections": [
+        { "from": "node_1", "to": "node_2" },
+        { "from": "node_2", "to": "node_3" },
+        { "from": "node_3", "to": "node_4" },
+        { "from": "node_4", "to": "node_5" },
+        { "from": "node_5", "to": "node_6a" },
+        { "from": "node_5", "to": "node_6b" },
+        { "from": "node_5", "to": "node_6c" },
+        { "from": "node_6a", "to": "node_7" },
+        { "from": "node_6b", "to": "node_7" },
+        { "from": "node_6c", "to": "node_7" },
+        { "from": "node_7", "to": "node_8" }
+      ]
+    },
+    {
+      "id": "workflow_3",
+      "name": "Daily Campaign Analytics",
+      "description": "Generate daily performance report and send to clients",
+      "trigger": "Schedule (6 PM daily)",
+      "nodes": [
+        {
+          "id": "node_1",
+          "name": "Trigger: Daily 6 PM",
+          "type": "schedule",
+          "config": {
+            "interval": "1d",
+            "time": "18:00"
+          }
+        },
+        {
+          "id": "node_2",
+          "name": "Query Today's Messages",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "messages",
+            "filters": [
+              {
+                "column": "created_at",
+                "operator": ">=",
+                "value": "{{startOfDay(now())}}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_3",
+          "name": "Query Today's Events",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "events",
+            "filters": [
+              {
+                "column": "created_at",
+                "operator": ">=",
+                "value": "{{startOfDay(now())}}"
+              },
+              {
+                "column": "type",
+                "operator": "=",
+                "value": "reply"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_4",
+          "name": "Calculate Metrics",
+          "type": "function",
+          "code": "return { emails_sent: node_2.output.length, replies: node_3.output.length, reply_rate: Math.round((node_3.output.length / node_2.output.length) * 100), meetings_booked: node_3.output.filter(e => e.meta.meeting_booked).length }"
+        },
+        {
+          "id": "node_5",
+          "name": "Generate Report PDF",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "{{env.REPORT_SERVICE}}/generate",
+            "body": {
+              "metrics": "{{node_4.output}}",
+              "date": "{{now()}}"
+            }
+          }
+        },
+        {
+          "id": "node_6",
+          "name": "Get All Clients",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "clients",
+            "filters": [
+              {
+                "column": "status",
+                "operator": "=",
+                "value": "active"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_7",
+          "name": "Send Reports to Clients",
+          "type": "loop",
+          "config": {
+            "sourceArray": "node_6.output",
+            "operations": [
+              {
+                "type": "email",
+                "to": "{{item.contact_email}}",
+                "subject": "Daily Report: {{formatDate(now())}}",
+                "attachments": ["{{node_5.output.pdf_url}}"]
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_8",
+          "name": "Log to Google Sheets",
+          "type": "googleSheets",
+          "config": {
+            "spreadsheetId": "{{env.METRICS_SHEET_ID}}",
+            "range": "Daily!A:F",
+            "values": [
+              [
+                "{{formatDate(now())}}",
+                "{{node_4.output.emails_sent}}",
+                "{{node_4.output.replies}}",
+                "{{node_4.output.reply_rate}}%",
+                "{{node_4.output.meetings_booked}}",
+                "{{node_4.output.emails_sent * 5}}$"
+              ]
+            ]
+          }
+        },
+        {
+          "id": "node_9",
+          "name": "Send Slack Summary",
+          "type": "slack",
+          "config": {
+            "channel": "#daily-metrics",
+            "message": "📊 Daily Summary:\n✉️ {{node_4.output.emails_sent}} emails sent\n💬 {{node_4.output.reply_rate}}% reply rate\n📅 {{node_4.output.meetings_booked}} meetings booked"
+          }
+        }
+      ]
+    },
+    {
+      "id": "workflow_4",
+      "name": "Prospect Enrichment Pipeline",
+      "description": "Enrich new prospects with Apollo/Hunter data and calculate ICP score",
+      "trigger": "New prospect created",
+      "nodes": [
+        {
+          "id": "node_1",
+          "name": "Trigger: Prospect Created",
+          "type": "webhook",
+          "config": {
+            "url": "{{env.N8N_WEBHOOK_URL}}/prospect-created"
+          }
+        },
+        {
+          "id": "node_2",
+          "name": "Query Apollo API",
+          "type": "http",
+          "config": {
+            "method": "GET",
+            "url": "https://api.apollo.io/v1/people/match",
+            "headers": {
+              "Authorization": "Bearer {{env.APOLLO_KEY}}"
+            },
+            "params": {
+              "email": "{{data.email}}"
+            }
+          }
+        },
+        {
+          "id": "node_3",
+          "name": "Extract Apollo Data",
+          "type": "function",
+          "code": "return { title: data.title, company: data.company, industry: data.industry, keywords: data.keywords, news: data.recent_news }"
+        },
+        {
+          "id": "node_4",
+          "name": "Query Hunter API",
+          "type": "http",
+          "config": {
+            "method": "GET",
+            "url": "https://api.hunter.io/v2/domain-search",
+            "params": {
+              "domain": "{{node_3.output.company}}",
+              "limit": 100
+            }
+          }
+        },
+        {
+          "id": "node_5",
+          "name": "Calculate ICP Score",
+          "type": "function",
+          "code": "let score = 0; score += (icp.titles.includes(node_3.output.title) ? 30 : 0); score += (icp.industries.includes(node_3.output.industry) ? 30 : 0); score += (icp.keywords.filter(k => node_3.output.keywords.includes(k)).length * 5); return { score: Math.min(score, 100), qualified: score > 70 }"
+        },
+        {
+          "id": "node_6",
+          "name": "Update Prospect Record",
+          "type": "supabase",
+          "config": {
+            "operation": "update",
+            "table": "prospects",
+            "id": "{{data.prospect_id}}",
+            "data": {
+              "title": "{{node_3.output.title}}",
+              "company": "{{node_3.output.company}}",
+              "industry": "{{node_3.output.industry}}",
+              "icp_score": "{{node_5.output.score}}",
+              "qualified": "{{node_5.output.qualified}}"
+            }
+          }
+        },
+        {
+          "id": "node_7",
+          "name": "Conditional: If Qualified",
+          "type": "conditional",
+          "config": {
+            "condition": "{{node_5.output.qualified}} == true"
+          }
+        },
+        {
+          "id": "node_8",
+          "name": "Add to Outreach Queue",
+          "type": "supabase",
+          "config": {
+            "operation": "update",
+            "table": "prospects",
+            "id": "{{data.prospect_id}}",
+            "data": {
+              "stage": "queued",
+              "hot": "{{node_5.output.score > 85}}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "workflow_5",
+      "name": "Weekly Performance Summary",
+      "description": "Generate comprehensive weekly report for all clients",
+      "trigger": "Every Monday 9 AM",
+      "nodes": [
+        {
+          "id": "node_1",
+          "name": "Trigger: Monday 9 AM",
+          "type": "schedule",
+          "config": {
+            "interval": "1w",
+            "dayOfWeek": "Monday",
+            "time": "09:00"
+          }
+        },
+        {
+          "id": "node_2",
+          "name": "Query Weekly Messages",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "messages",
+            "filters": [
+              {
+                "column": "created_at",
+                "operator": ">=",
+                "value": "{{addDays(now(), -7)}}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_3",
+          "name": "Query Weekly Events",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "events",
+            "filters": [
+              {
+                "column": "created_at",
+                "operator": ">=",
+                "value": "{{addDays(now(), -7)}}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_4",
+          "name": "Calculate Weekly Metrics",
+          "type": "function",
+          "code": "return { total_emails: node_2.output.length, replies: node_3.output.filter(e => e.type == 'reply').length, meetings: node_3.output.filter(e => e.type == 'meeting').length, reply_rate: Math.round((node_3.output.filter(e => e.type == 'reply').length / node_2.output.length) * 100) }"
+        },
+        {
+          "id": "node_5",
+          "name": "Get Top Performers",
+          "type": "supabase",
+          "config": {
+            "operation": "select",
+            "table": "prospects",
+            "filters": [
+              {
+                "column": "stage",
+                "operator": "=",
+                "value": "booked"
+              },
+              {
+                "column": "updated_at",
+                "operator": ">=",
+                "value": "{{addDays(now(), -7)}}"
+              }
+            ],
+            "limit": 10
+          }
+        },
+        {
+          "id": "node_6",
+          "name": "Create Dashboard Summary",
+          "type": "googleSheets",
+          "config": {
+            "spreadsheetId": "{{env.DASHBOARD_SHEET_ID}}",
+            "updates": [
+              {
+                "range": "Summary!B2",
+                "value": "{{node_4.output.total_emails}}"
+              },
+              {
+                "range": "Summary!B3",
+                "value": "{{node_4.output.reply_rate}}%"
+              },
+              {
+                "range": "Summary!B4",
+                "value": "{{node_4.output.meetings}}"
+              }
+            ]
+          }
+        },
+        {
+          "id": "node_7",
+          "name": "Generate PDF Report",
+          "type": "http",
+          "config": {
+            "method": "POST",
+            "url": "{{env.REPORT_SERVICE}}/generate-weekly",
+            "body": {
+              "metrics": "{{node_4.output}}",
+              "top_performers": "{{node_5.output}}"
+            }
+          }
+        },
+        {
+          "id": "node_8",
+          "name": "Send to All Clients",
+          "type": "loop",
+          "config": {
+            "sourceArray": "{{getAllClients()}}",
+            "operations": [
+              {
+                "type": "email",
+                "to": "{{item.contact_email}}",
+                "subject": "Weekly Report: {{formatDate(now())}}",
+                "template": "weekly_report",
+                "attachments": ["{{node_7.output.pdf_url}}"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
