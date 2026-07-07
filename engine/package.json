@@ -19,7 +19,8 @@
     "test": "node --test",
     "test:watch": "node --test --watch",
     "migrate": "node scripts/migrate.js",
-    "migrate:status": "node scripts/migrate.js --status"
+    "migrate:status": "node scripts/migrate.js --status",
+    "vault:sync": "node scripts/vault-sync.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
