@@ -1,10 +1,24 @@
-// AI personalization. Uses Groq (fast LLM) to write a short, human-sounding
-// cold email tailored to each prospect. Falls back to a solid template when
-// Groq isn't configured or in dry-run mode, so the pipeline always produces
-// a sendable message.
+// AI personalization. Uses the configured AI provider (Groq by default) to
+// write a short, human-sounding cold email tailored to each prospect.
+// Falls back to a solid template when AI isn't configured or in dry-run mode,
+// so the pipeline always produces a sendable message.
+//
+// Now uses provider abstraction — swap Groq for OpenAI by setting
+// AI_PROVIDER=openai in .env.
 
 import { config } from '../config.js';
 import { log } from '../lib/logger.js';
+import { getAIProvider } from '../providers/ai/index.js';
+
+// Cache the provider instance (lazy initialized)
+let _aiProvider = null;
+
+async function getProvider() {
+  if (!_aiProvider) {
+    _aiProvider = await getAIProvider();
+  }
+  return _aiProvider;
+}
 
 // Step-based fallback templates (used when AI is off). Kept short, honest,
 // and non-spammy — first email opens a conversation, follow-ups add value.
@@ -42,7 +56,7 @@ function templateFor(step, prospect, client) {
   };
 }
 
-async function groqWrite(step, prospect, client) {
+async function aiWrite(step, prospect, client) {
   const first = prospect.first_name || (prospect.full_name || 'there').split(' ')[0];
   const stepGuidance = {
     1: 'This is the FIRST cold email. Open a conversation, be specific to their role/company, one clear ask for a short call.',
@@ -57,24 +71,11 @@ async function groqWrite(step, prospect, client) {
     `Rules: under 90 words, no buzzwords, no fake flattery, plain text, address them as ${first}, sign as "${config.fromName}". ` +
     `Return strict JSON: {"subject": "...", "body": "..."}.`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.groqApiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.groqModel,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      response_format: { type: 'json_object' },
-    }),
-  });
-  if (!res.ok) throw new Error(`Groq failed: ${res.status}`);
-  const json = await res.json();
-  const content = json.choices?.[0]?.message?.content || '{}';
-  const parsed = JSON.parse(content);
-  if (!parsed.subject || !parsed.body) throw new Error('Groq returned incomplete email');
+  const provider = await getProvider();
+  const result = await provider.generate(prompt, { json: true, temperature: 0.7 });
+  const parsed = JSON.parse(result.content);
+
+  if (!parsed.subject || !parsed.body) throw new Error('AI returned incomplete email');
   return { subject: parsed.subject, body: parsed.body };
 }
 
@@ -82,11 +83,14 @@ async function groqWrite(step, prospect, client) {
  * Produce a personalized {subject, body} for a prospect at a given sequence step.
  */
 export async function writeEmail(step, prospect, client) {
-  if (config.dryRun || !config.groqApiKey) {
+  const provider = await getProvider();
+
+  if (config.dryRun || !provider.isConfigured()) {
     return templateFor(step, prospect, client);
   }
+
   try {
-    return await groqWrite(step, prospect, client);
+    return await aiWrite(step, prospect, client);
   } catch (err) {
     log.warn(`AI personalization failed (${err.message}); using template instead.`);
     return templateFor(step, prospect, client);

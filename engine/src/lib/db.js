@@ -40,6 +40,44 @@ export function getDb() {
   return { client, usingMemory };
 }
 
+/**
+ * Verify database connectivity. Returns true if connected, false otherwise.
+ * Used by deep health checks and readiness probes.
+ */
+export async function checkConnection() {
+  const { client: db, usingMemory: isMem } = getDb();
+  if (isMem) return true; // In-memory always "connected"
+  try {
+    const { error } = await db.from('clients').select('id').limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Execute a DB operation with retry logic for transient errors.
+ * @param {Function} operation  Async function to execute
+ * @param {number} maxRetries   Maximum retry attempts (default: 3)
+ * @param {number} baseDelay    Base delay in ms for exponential backoff (default: 500)
+ */
+async function withRetry(operation, maxRetries = 3, baseDelay = 500) {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        log.warn(`DB operation failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms: ${err.message}`);
+        await new Promise((r) => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
 // Seed a sample client + prospects so dry-runs have something to chew on.
 function seedMemory() {
   const clientId = 'demo-client-0001';
@@ -329,3 +367,14 @@ export async function getProspectCounts(clientId) {
   return { total: (data || []).length, stages };
 }
 
+// ---- Client Helpers ----
+
+export async function getClientById(clientId) {
+  const { client: dbClient, usingMemory } = getDb();
+  if (usingMemory) {
+    return mem.clients.find((c) => c.id === clientId) || null;
+  }
+  const { data, error } = await dbClient.from('clients').select('*').eq('id', clientId).maybeSingle();
+  if (error) throw new Error(`getClientById: ${error.message}`);
+  return data;
+}

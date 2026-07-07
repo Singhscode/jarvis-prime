@@ -1,5 +1,11 @@
 // Loads configuration from environment variables with safe defaults.
 // Reads a local .env file if present (no external dependency needed).
+//
+// Upgraded with:
+//   - Environment detection (development/staging/production)
+//   - Config validation on startup
+//   - getClientConfig() for per-client overrides
+//   - providerStatus() for health checks
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -39,6 +45,9 @@ const num = (v, fallback) => {
 };
 
 export const config = {
+  // Environment
+  env: process.env.NODE_ENV || 'development',
+
   // Safety
   dryRun: bool(process.env.DRY_RUN, true),
   dailyProspectLimit: num(process.env.DAILY_PROSPECT_LIMIT, 25),
@@ -60,11 +69,24 @@ export const config = {
   groqApiKey: process.env.GROQ_API_KEY || '',
   groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
 
-  // Email
+  // AI — OpenAI (alternative provider)
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+
+  // AI — provider selection
+  aiProvider: process.env.AI_PROVIDER || 'groq', // 'groq' | 'openai'
+
+  // Email — provider selection
+  emailProvider: process.env.EMAIL_PROVIDER || 'resend', // 'resend' | 'sendgrid'
+
+  // Email — Resend
   resendApiKey: process.env.RESEND_API_KEY || '',
   fromName: process.env.FROM_NAME || 'JARVIS PRIME',
   fromEmail: process.env.FROM_EMAIL || 'hello@jarvisprime.me',
   replyToEmail: process.env.REPLY_TO_EMAIL || 'hello@jarvisprime.me',
+
+  // Email — SendGrid (alternative provider)
+  sendgridApiKey: process.env.SENDGRID_API_KEY || '',
 
   // LinkedIn automation
   linkedinCookie: process.env.LINKEDIN_COOKIE || '',        // li_at session cookie
@@ -106,7 +128,41 @@ export const config = {
 
   // CORS
   corsOrigins: process.env.CORS_ORIGINS || 'http://localhost:3000,https://www.jarvisprime.me',
+
+  // Outreach sequence defaults (overridable per-client via DB config)
+  defaultMaxSteps: num(process.env.DEFAULT_MAX_STEPS, 3),
+  defaultFollowupDays: (process.env.DEFAULT_FOLLOWUP_DAYS || '0,3,4').split(',').map(Number),
+
+  // Scoring defaults (overridable per-client via DB config)
+  defaultScoringWeights: {
+    title: num(process.env.SCORING_WEIGHT_TITLE, 10),
+    industry: num(process.env.SCORING_WEIGHT_INDUSTRY, 8),
+    location: num(process.env.SCORING_WEIGHT_LOCATION, 4),
+    keyword: num(process.env.SCORING_WEIGHT_KEYWORD, 2),
+    email: num(process.env.SCORING_WEIGHT_EMAIL, 2),
+  },
+  defaultQualifyThreshold: num(process.env.QUALIFY_THRESHOLD, 15),
+  defaultHotThreshold: num(process.env.HOT_THRESHOLD, 24),
 };
+
+/**
+ * Get client-specific config by merging global defaults with per-client DB overrides.
+ * @param {object} client  The client row (must have a .config JSON field)
+ * @returns {object} Merged config for this client
+ */
+export function getClientConfig(client) {
+  const clientOverrides = client?.config || {};
+  return {
+    maxSteps: clientOverrides.maxSteps ?? config.defaultMaxSteps,
+    followupDays: clientOverrides.followupDays ?? config.defaultFollowupDays,
+    dailySendLimit: clientOverrides.dailySendLimit ?? config.dailySendLimit,
+    dailyProspectLimit: clientOverrides.dailyProspectLimit ?? config.dailyProspectLimit,
+    scoringWeights: { ...config.defaultScoringWeights, ...(clientOverrides.scoringWeights || {}) },
+    qualifyThreshold: clientOverrides.qualifyThreshold ?? config.defaultQualifyThreshold,
+    hotThreshold: clientOverrides.hotThreshold ?? config.defaultHotThreshold,
+    disqualifiers: clientOverrides.disqualifiers ?? null, // null = use defaults
+  };
+}
 
 // Returns which providers are configured (helps the "doctor" command).
 export function providerStatus() {
@@ -115,7 +171,9 @@ export function providerStatus() {
     apollo: Boolean(config.apolloApiKey),
     hunter: Boolean(config.hunterApiKey),
     groq: Boolean(config.groqApiKey),
+    openai: Boolean(config.openaiApiKey),
     resend: Boolean(config.resendApiKey),
+    sendgrid: Boolean(config.sendgridApiKey),
     linkedin: Boolean(config.linkedinCookie),
     calcom: Boolean(config.calcomApiKey),
     telegram: Boolean(config.telegramBotToken && config.telegramChatId),

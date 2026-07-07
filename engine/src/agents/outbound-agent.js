@@ -4,7 +4,7 @@
 //   3. Send the next email in the sequence to prospects that are due,
 //      respecting the daily send cap, suppression list, and follow-up timing.
 
-import { config } from '../config.js';
+import { config, getClientConfig } from '../config.js';
 import { log } from '../lib/logger.js';
 import { findProspects } from '../sources/prospect-finder.js';
 import { scoreProspect } from '../scoring/icp-scorer.js';
@@ -21,8 +21,8 @@ import {
   countMessagesSentToday,
 } from '../lib/db.js';
 
-const MAX_STEPS = 3; // first email + 2 follow-ups
-const FOLLOWUP_DAYS = [0, 3, 4]; // wait before step 2 (3d) and step 3 (4d)
+// Sequence constants are now configurable per-client via getClientConfig().
+// Defaults: MAX_STEPS=3, FOLLOWUP_DAYS=[0,3,4] (first email + 2 follow-ups)
 
 function daysFromNow(days) {
   const d = new Date();
@@ -73,8 +73,12 @@ async function advanceProspect(prospect, client) {
     return false;
   }
 
+  const clientConfig = getClientConfig(client);
+  const maxSteps = clientConfig.maxSteps;
+  const followupDays = clientConfig.followupDays;
+
   const nextStep = (prospect.step || 0) + 1;
-  if (nextStep > MAX_STEPS) {
+  if (nextStep > maxSteps) {
     await updateProspect(prospect.id, { next_action_at: null });
     return false;
   }
@@ -102,11 +106,11 @@ async function advanceProspect(prospect, client) {
 
   await insertEvent({ prospect_id: prospect.id, type: 'sent', meta: { step: nextStep } });
 
-  const isLast = nextStep >= MAX_STEPS;
+  const isLast = nextStep >= maxSteps;
   await updateProspect(prospect.id, {
     stage: 'contacted',
     step: nextStep,
-    next_action_at: isLast ? null : daysFromNow(FOLLOWUP_DAYS[nextStep] || 3),
+    next_action_at: isLast ? null : daysFromNow(followupDays[nextStep] || 3),
   });
 
   if (prospect.hot) {

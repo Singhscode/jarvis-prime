@@ -4,10 +4,11 @@
 import express from 'express';
 import { providerStatus } from '../../config.js';
 import * as enrichmentService from '../services/enrichment-service.js';
+import { validate } from '../../middleware/validate.js';
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validate({ action: 'string' }), async (req, res) => {
   try {
     const { action, params, dry_run } = req.body;
 

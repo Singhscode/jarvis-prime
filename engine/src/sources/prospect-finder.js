@@ -1,11 +1,26 @@
-// Prospect sourcing. Uses Apollo.io to search for people matching a client's
-// ICP, and Hunter.io to find/verify emails when Apollo doesn't return one.
+// Prospect sourcing. Uses the configured source provider (Apollo by default)
+// to search for people matching a client's ICP, and Hunter.io to find/verify
+// emails when the source doesn't return one.
 //
 // In dry-run mode (or when no API keys are set) it returns realistic MOCK
 // prospects so the rest of the pipeline can be tested without spending credits.
+//
+// Now uses provider abstraction — add new sources by creating a provider
+// in providers/source/.
 
 import { config } from '../config.js';
 import { log } from '../lib/logger.js';
+import { getSourceProvider } from '../providers/source/index.js';
+
+// Cache the provider
+let _sourceProvider = null;
+
+async function getProvider() {
+  if (!_sourceProvider) {
+    _sourceProvider = await getSourceProvider();
+  }
+  return _sourceProvider;
+}
 
 const FIRST_NAMES = ['Aarav', 'Diya', 'Rohan', 'Sara', 'Kabir', 'Ananya', 'Vivaan', 'Isha', 'Arjun', 'Meera'];
 const LAST_NAMES = ['Sharma', 'Patel', 'Reddy', 'Nair', 'Gupta', 'Iyer', 'Singh', 'Mehta', 'Bose', 'Rao'];
@@ -36,38 +51,6 @@ function mockProspects(client, limit) {
   return out;
 }
 
-async function apolloSearch(client, limit) {
-  // Apollo People Search API
-  const body = {
-    api_key: config.apolloApiKey,
-    page: 1,
-    per_page: Math.min(limit, 100),
-    person_titles: client.icp_titles || [],
-    person_locations: client.icp_locations || [],
-    q_organization_industries: client.icp_industries || [],
-  };
-  const res = await fetch('https://api.apollo.io/v1/mixed_people/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`Apollo search failed: ${res.status}`);
-  const json = await res.json();
-  const people = json.people || [];
-  return people.map((p) => ({
-    full_name: p.name,
-    first_name: p.first_name,
-    title: p.title,
-    company: p.organization?.name,
-    email: p.email || null,
-    linkedin_url: p.linkedin_url,
-    industry: p.organization?.industry,
-    location: [p.city, p.state, p.country].filter(Boolean).join(', '),
-    source: 'apollo',
-    _domain: p.organization?.primary_domain,
-  }));
-}
-
 async function hunterFindEmail(firstName, lastName, domain) {
   if (!config.hunterApiKey || !domain) return null;
   const url = `https://api.hunter.io/v2/email-finder?domain=${encodeURIComponent(domain)}&first_name=${encodeURIComponent(
@@ -85,29 +68,32 @@ async function hunterFindEmail(firstName, lastName, domain) {
 
 /**
  * Find prospects for a client.
+ * Uses the configured source provider, with mock fallback for dry-run.
  * @returns {Promise<Array>} normalized prospect objects (not yet scored/saved)
  */
 export async function findProspects(client, limit = config.dailyProspectLimit) {
-  // Safe path: no Apollo key or dry-run -> mock data.
-  if (config.dryRun || !config.apolloApiKey) {
-    log.dry(`Sourcing ${limit} mock prospects for "${client.name}" (no live Apollo call).`);
+  const provider = await getProvider();
+
+  // Safe path: no provider configured or dry-run -> mock data.
+  if (config.dryRun || !provider.isConfigured()) {
+    log.dry(`Sourcing ${limit} mock prospects for "${client.name}" (no live ${provider.name} call).`);
     return mockProspects(client, limit);
   }
 
-  log.step(`Searching Apollo for up to ${limit} prospects for "${client.name}"...`);
-  const found = await apolloSearch(client, limit);
+  log.step(`Searching ${provider.name} for up to ${limit} prospects for "${client.name}"...`);
+  const found = await provider.search(client, limit);
 
   // Fill in missing emails via Hunter where possible.
   for (const p of found) {
     if (!p.email && p._domain) {
       const [first, ...rest] = (p.full_name || '').split(' ');
       p.email = await hunterFindEmail(first, rest.join(' '), p._domain);
-      if (p.email) p.source = 'apollo+hunter';
+      if (p.email) p.source = `${provider.name}+hunter`;
     }
     delete p._domain;
   }
 
   const withEmail = found.filter((p) => p.email);
-  log.ok(`Apollo returned ${found.length} people, ${withEmail.length} with usable emails.`);
+  log.ok(`${provider.name} returned ${found.length} people, ${withEmail.length} with usable emails.`);
   return withEmail;
 }

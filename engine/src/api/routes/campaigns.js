@@ -3,10 +3,11 @@
 
 import express from 'express';
 import * as campaignService from '../services/campaign-service.js';
+import { validate } from '../../middleware/validate.js';
 
 const router = express.Router();
 
-router.post('/', async (req, res) => {
+router.post('/', validate({ clientId: 'string' }), async (req, res) => {
   try {
     const { clientId, campaignData } = req.body;
     if (!clientId) return res.status(400).json({ error: 'Missing clientId' });
