@@ -17,7 +17,10 @@ import { fileURLToPath } from 'node:url';
 import readline from 'node:readline';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.join(__dirname, '..', '.env');
+const paths = {
+  '1': { name: 'engine/.env', path: path.join(__dirname, '..', '.env') },
+  '2': { name: 'apps/site/.env.local', path: path.join(__dirname, '..', '..', 'apps', 'site', '.env.local') }
+};
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -31,12 +34,34 @@ async function main() {
   console.log('  JARVIS PRIME — Vault Secrets Migration Utility  ');
   console.log('==================================================\n');
 
-  if (!fs.existsSync(envPath)) {
-    console.log(`[Error] Local .env file not found at: ${envPath}`);
-    console.log('Please copy .env.example to .env and fill in configuration values first.');
+  // Find available env files
+  const availablePaths = [];
+  if (fs.existsSync(paths['1'].path)) availablePaths.push('1');
+  if (fs.existsSync(paths['2'].path)) availablePaths.push('2');
+
+  if (availablePaths.length === 0) {
+    console.log('[Error] No local env files found to migrate.');
+    console.log(`Checked paths:\n  - ${paths['1'].path}\n  - ${paths['2'].path}`);
     rl.close();
     return;
   }
+
+  let selectedKey = availablePaths[0];
+
+  if (availablePaths.length > 1) {
+    console.log('Multiple environment files found:');
+    console.log(`  [1] ${paths['1'].name}`);
+    console.log(`  [2] ${paths['2'].name}`);
+    const answer = await question('\nSelect which file to migrate (1 or 2): ');
+    if (paths[answer.trim()]) {
+      selectedKey = answer.trim();
+    } else {
+      console.log('Invalid selection. Defaulting to: ' + paths[selectedKey].name);
+    }
+  }
+
+  const envPath = paths[selectedKey].path;
+  console.log(`\nMigrating secrets from: ${paths[selectedKey].name}\n`);
 
   // Parse .env file
   const rawEnv = fs.readFileSync(envPath, 'utf8');
