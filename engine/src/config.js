@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { fetchVaultSecrets } from './lib/vault.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Minimal .env loader (avoids adding a dependency).
@@ -35,6 +37,10 @@ function loadEnvFile() {
 
 loadEnvFile();
 
+// Load secrets from HashiCorp Vault dynamically at boot
+const vaultSecrets = await fetchVaultSecrets();
+const env = { ...process.env, ...vaultSecrets };
+
 const bool = (v, fallback) => {
   if (v === undefined) return fallback;
   return String(v).toLowerCase() === 'true';
@@ -46,103 +52,103 @@ const num = (v, fallback) => {
 
 export const config = {
   // Environment
-  env: process.env.NODE_ENV || 'development',
+  env: env.NODE_ENV || 'development',
 
   // Safety
-  dryRun: bool(process.env.DRY_RUN, true),
-  dailyProspectLimit: num(process.env.DAILY_PROSPECT_LIMIT, 25),
-  dailySendLimit: num(process.env.DAILY_SEND_LIMIT, 40),
+  dryRun: bool(env.DRY_RUN, true),
+  dailyProspectLimit: num(env.DAILY_PROSPECT_LIMIT, 25),
+  dailySendLimit: num(env.DAILY_SEND_LIMIT, 40),
 
   // Server (for HTTP mode)
-  port: num(process.env.PORT, 3001),
-  automationSecret: process.env.AUTOMATION_SERVER_SECRET || 'dev-secret',
+  port: num(env.PORT, 3001),
+  automationSecret: env.AUTOMATION_SERVER_SECRET || 'dev-secret',
 
   // Database
-  supabaseUrl: process.env.SUPABASE_URL || '',
-  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  supabaseUrl: env.SUPABASE_URL || '',
+  supabaseKey: env.SUPABASE_SERVICE_ROLE_KEY || '',
 
   // Sourcing
-  apolloApiKey: process.env.APOLLO_API_KEY || '',
-  hunterApiKey: process.env.HUNTER_API_KEY || '',
+  apolloApiKey: env.APOLLO_API_KEY || '',
+  hunterApiKey: env.HUNTER_API_KEY || '',
 
   // AI
-  groqApiKey: process.env.GROQ_API_KEY || '',
-  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  groqApiKey: env.GROQ_API_KEY || '',
+  groqModel: env.GROQ_MODEL || 'llama-3.3-70b-versatile',
 
   // AI — OpenAI (alternative provider)
-  openaiApiKey: process.env.OPENAI_API_KEY || '',
-  openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  openaiApiKey: env.OPENAI_API_KEY || '',
+  openaiModel: env.OPENAI_MODEL || 'gpt-4o-mini',
 
   // AI — provider selection
-  aiProvider: process.env.AI_PROVIDER || 'groq', // 'groq' | 'openai'
+  aiProvider: env.AI_PROVIDER || 'groq', // 'groq' | 'openai'
 
   // Email — provider selection
-  emailProvider: process.env.EMAIL_PROVIDER || 'resend', // 'resend' | 'sendgrid'
+  emailProvider: env.EMAIL_PROVIDER || 'resend', // 'resend' | 'sendgrid'
 
   // Email — Resend
-  resendApiKey: process.env.RESEND_API_KEY || '',
-  fromName: process.env.FROM_NAME || 'JARVIS PRIME',
-  fromEmail: process.env.FROM_EMAIL || 'hello@jarvisprime.me',
-  replyToEmail: process.env.REPLY_TO_EMAIL || 'hello@jarvisprime.me',
+  resendApiKey: env.RESEND_API_KEY || '',
+  fromName: env.FROM_NAME || 'JARVIS PRIME',
+  fromEmail: env.FROM_EMAIL || 'hello@jarvisprime.me',
+  replyToEmail: env.REPLY_TO_EMAIL || 'hello@jarvisprime.me',
 
   // Email — SendGrid (alternative provider)
-  sendgridApiKey: process.env.SENDGRID_API_KEY || '',
+  sendgridApiKey: env.SENDGRID_API_KEY || '',
 
   // LinkedIn automation
-  linkedinCookie: process.env.LINKEDIN_COOKIE || '',        // li_at session cookie
-  linkedinCsrf: process.env.LINKEDIN_CSRF || '',            // JSESSIONID CSRF token
-  linkedinDailyConnects: num(process.env.LINKEDIN_DAILY_CONNECTS, 20),
-  linkedinDailyDMs: num(process.env.LINKEDIN_DAILY_DMS, 30),
-  linkedinDailyViews: num(process.env.LINKEDIN_DAILY_VIEWS, 50),
+  linkedinCookie: env.LINKEDIN_COOKIE || '',        // li_at session cookie
+  linkedinCsrf: env.LINKEDIN_CSRF || '',            // JSESSIONID CSRF token
+  linkedinDailyConnects: num(env.LINKEDIN_DAILY_CONNECTS, 20),
+  linkedinDailyDMs: num(env.LINKEDIN_DAILY_DMS, 30),
+  linkedinDailyViews: num(env.LINKEDIN_DAILY_VIEWS, 50),
 
   // Calendar (Cal.com)
-  calcomApiKey: process.env.CALCOM_API_KEY || '',
-  calcomBaseUrl: process.env.CALCOM_BASE_URL || 'https://api.cal.com',
-  calcomEventTypeId: num(process.env.CALCOM_EVENT_TYPE_ID, 0),
-  calcomBookingUrl: process.env.CALCOM_BOOKING_URL || 'https://cal.com/jarvisprime/strategy-call',
+  calcomApiKey: env.CALCOM_API_KEY || '',
+  calcomBaseUrl: env.CALCOM_BASE_URL || 'https://api.cal.com',
+  calcomEventTypeId: num(env.CALCOM_EVENT_TYPE_ID, 0),
+  calcomBookingUrl: env.CALCOM_BOOKING_URL || 'https://cal.com/jarvisprime/strategy-call',
 
   // Alerts — Telegram
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
-  telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+  telegramBotToken: env.TELEGRAM_BOT_TOKEN || '',
+  telegramChatId: env.TELEGRAM_CHAT_ID || '',
 
   // Alerts — Slack
-  slackWebhookUrl: process.env.SLACK_WEBHOOK_URL || '',
-  slackChannel: process.env.SLACK_CHANNEL || '#jarvis-alerts',
+  slackWebhookUrl: env.SLACK_WEBHOOK_URL || '',
+  slackChannel: env.SLACK_CHANNEL || '#jarvis-alerts',
 
   // Alerts — WhatsApp (via Twilio)
-  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
-  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
-  twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM || '',  // e.g. whatsapp:+14155238886
-  whatsappAlertTo: process.env.WHATSAPP_ALERT_TO || '',        // e.g. whatsapp:+918810500723
+  twilioAccountSid: env.TWILIO_ACCOUNT_SID || '',
+  twilioAuthToken: env.TWILIO_AUTH_TOKEN || '',
+  twilioWhatsappFrom: env.TWILIO_WHATSAPP_FROM || '',  // e.g. whatsapp:+14155238886
+  whatsappAlertTo: env.WHATSAPP_ALERT_TO || '',        // e.g. whatsapp:+918810500723
 
   // Scheduler
-  schedulerEnabled: bool(process.env.SCHEDULER_ENABLED, true),
-  schedulerTimezone: process.env.SCHEDULER_TIMEZONE || 'Asia/Kolkata',
+  schedulerEnabled: bool(env.SCHEDULER_ENABLED, true),
+  schedulerTimezone: env.SCHEDULER_TIMEZONE || 'Asia/Kolkata',
 
   // A/B Testing
-  abTestMinSample: num(process.env.AB_TEST_MIN_SAMPLE, 50),
+  abTestMinSample: num(env.AB_TEST_MIN_SAMPLE, 50),
 
   // Compliance
-  postalAddress: process.env.COMPANY_POSTAL_ADDRESS || 'JARVIS PRIME, Gurgaon, Haryana, India',
-  unsubscribeUrl: process.env.UNSUBSCRIBE_URL || 'https://www.jarvisprime.me/unsubscribe',
+  postalAddress: env.COMPANY_POSTAL_ADDRESS || 'JARVIS PRIME, Gurgaon, Haryana, India',
+  unsubscribeUrl: env.UNSUBSCRIBE_URL || 'https://www.jarvisprime.me/unsubscribe',
 
   // CORS
-  corsOrigins: process.env.CORS_ORIGINS || 'http://localhost:3000,https://www.jarvisprime.me',
+  corsOrigins: env.CORS_ORIGINS || 'http://localhost:3000,https://www.jarvisprime.me',
 
   // Outreach sequence defaults (overridable per-client via DB config)
-  defaultMaxSteps: num(process.env.DEFAULT_MAX_STEPS, 3),
-  defaultFollowupDays: (process.env.DEFAULT_FOLLOWUP_DAYS || '0,3,4').split(',').map(Number),
+  defaultMaxSteps: num(env.DEFAULT_MAX_STEPS, 3),
+  defaultFollowupDays: (env.DEFAULT_FOLLOWUP_DAYS || '0,3,4').split(',').map(Number),
 
   // Scoring defaults (overridable per-client via DB config)
   defaultScoringWeights: {
-    title: num(process.env.SCORING_WEIGHT_TITLE, 10),
-    industry: num(process.env.SCORING_WEIGHT_INDUSTRY, 8),
-    location: num(process.env.SCORING_WEIGHT_LOCATION, 4),
-    keyword: num(process.env.SCORING_WEIGHT_KEYWORD, 2),
-    email: num(process.env.SCORING_WEIGHT_EMAIL, 2),
+    title: num(env.SCORING_WEIGHT_TITLE, 10),
+    industry: num(env.SCORING_WEIGHT_INDUSTRY, 8),
+    location: num(env.SCORING_WEIGHT_LOCATION, 4),
+    keyword: num(env.SCORING_WEIGHT_KEYWORD, 2),
+    email: num(env.SCORING_WEIGHT_EMAIL, 2),
   },
-  defaultQualifyThreshold: num(process.env.QUALIFY_THRESHOLD, 15),
-  defaultHotThreshold: num(process.env.HOT_THRESHOLD, 24),
+  defaultQualifyThreshold: num(env.QUALIFY_THRESHOLD, 15),
+  defaultHotThreshold: num(env.HOT_THRESHOLD, 24),
 };
 
 /**
