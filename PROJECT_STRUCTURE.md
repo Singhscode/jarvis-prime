@@ -155,6 +155,12 @@ npm run outbound      # CLI: Send outreach
 npm run doctor        # CLI: Health check
 ```
 
+### Full-stack local startup
+```bash
+npm install
+npm run dev           # Starts site + engine together
+```
+
 ### Documentation
 ```bash
 # View presentation materials

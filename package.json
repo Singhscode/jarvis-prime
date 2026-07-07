@@ -4,14 +4,14 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "engine"
   ],
   "scripts": {
     "dev:site": "npm run dev --workspace=apps/site",
-    "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+    "dev:engine": "npm run server --workspace=engine",
     "build:site": "npm run build --workspace=apps/site",
-    "build:dashboard": "npm run build --workspace=apps/dashboard",
-    "dev": "concurrently \"npm run dev:site\" \"npm run dev:dashboard\""
+    "test:engine": "npm run test --workspace=engine",
+    "dev": "concurrently \"npm run dev:site\" \"npm run dev:engine\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
