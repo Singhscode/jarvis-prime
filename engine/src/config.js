@@ -11,8 +11,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { fetchVaultSecrets } from './lib/vault.js';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Minimal .env loader (avoids adding a dependency).
@@ -37,9 +35,7 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-// Load secrets from HashiCorp Vault dynamically at boot
-const vaultSecrets = await fetchVaultSecrets();
-const env = { ...process.env, ...vaultSecrets };
+const env = { ...process.env };
 
 const bool = (v, fallback) => {
   if (v === undefined) return fallback;

@@ -7,7 +7,7 @@ This roadmap arranges the migration steps in order of **technical priority and d
 ```mermaid
 graph TD
     subgraph P0: Critical Foundation (Security & Isolation)
-        P0_1[1. Secrets Management & Vault] --> P0_2[2. Database Encryption pg_crypto]
+        P0_1[1. Secrets Management] --> P0_2[2. Database Encryption pg_crypto]
         P0_2 --> P0_3[3. Identity & RLS Multi-Tenancy]
     end
 
@@ -30,12 +30,12 @@ graph TD
 
 Implement these steps first. Without secure credential management and strict database level isolation, the system cannot safely support multiple customers.
 
-### 1. Secrets Management (Vault / Infisical)
+### 1. Secrets Management (Managed Secret Store)
 *   **Objective**: Remove all plain-text sensitive variables from `.env` files.
 *   **Steps**:
-    1. Spin up a HashiCorp Vault or Infisical cluster.
+    1. Use a managed secret store (Vercel env vars for the site, AWS Secrets Manager / Doppler for the engine).
     2. Define secret scopes (Development, Staging, Production).
-    3. Modify [config.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/config.js) to resolve variables dynamically from the vault transit manager at runtime.
+    3. Ensure [config.js](file:///Users/anujsingh/Jarvis%20ai%20company/engine/src/config.js) reads secrets from the platform environment at runtime; keep `.env` for local development only.
 
 ### 2. Database Field-Level Encryption (pg_crypto)
 *   **Objective**: Ensure that if the database is compromised, client access tokens and cookies remain unreadable.
