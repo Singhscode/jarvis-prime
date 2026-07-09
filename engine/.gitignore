@@ -1,4 +1,27 @@
-node_modules/
+# =============================================================================
+# JARVIS PRIME ENGINE — .gitignore
+# =============================================================================
+
+# Secrets — NEVER commit actual secret files
 .env
+.env.local
+
+# Allow committed safe templates (contain only safe defaults / placeholders)
+!.env.development
+!.env.test
+!.env.production
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Logs
 *.log
+logs/
+
+# Local runtime data
 data/
+
+# Build
+dist/
+*.tsbuildinfo

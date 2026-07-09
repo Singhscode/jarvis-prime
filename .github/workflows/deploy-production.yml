@@ -1,0 +1,153 @@
+name: Deploy — Production
+
+# Deploys only when a release tag is pushed (v*.*.*).
+# Requires manual approval via GitHub Environment protection rules.
+#
+# To deploy:
+#   git tag v1.2.3
+#   git push origin v1.2.3
+#
+# Then approve the deployment in GitHub Actions UI.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Require manual approval before deploying to production.
+  # Configure in: GitHub → Settings → Environments → production
+  #   → Add required reviewers
+  # ─────────────────────────────────────────────────────────────────────────
+  approve:
+    name: Await Production Approval
+    runs-on: ubuntu-latest
+    environment: production   # Pauses here until a reviewer approves
+
+    steps:
+      - name: Approved
+        run: echo "Production deployment approved for ${{ github.ref_name }}"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Run CI one final time before deploying
+  # ─────────────────────────────────────────────────────────────────────────
+  pre-deploy-ci:
+    name: Pre-deploy CI Check
+    needs: approve
+    uses: ./.github/workflows/ci.yml
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Engine → production server
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy-engine-production:
+    name: Deploy Engine → Production
+    runs-on: ubuntu-latest
+    needs: pre-deploy-ci
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Install engine dependencies (production only)
+        working-directory: engine
+        run: npm ci --production
+
+      # All secrets live in GitHub Environments → production → Secrets.
+      # They are injected at runtime. Nothing is hardcoded or printed.
+      - name: Deploy to production server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+          DEPLOY_USER: ${{ secrets.PRODUCTION_USER }}
+          DEPLOY_PATH: ${{ secrets.PRODUCTION_DEPLOY_PATH }}
+        run: |
+          echo "$DEPLOY_SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          rsync -az --delete \
+            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude='.env*' \
+            --exclude='node_modules' \
+            ./engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd ${DEPLOY_PATH} && npm ci --production && pm2 reload jarvis-engine --update-env"
+          rm /tmp/deploy_key
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Site → Vercel production
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy-site-production:
+    name: Deploy Site → Vercel Production
+    runs-on: ubuntu-latest
+    needs: pre-deploy-ci
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--prod"
+          working-directory: apps/site
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Post-deploy smoke tests
+  # ─────────────────────────────────────────────────────────────────────────
+  smoke-test-production:
+    name: Smoke Test Production
+    runs-on: ubuntu-latest
+    needs: [deploy-engine-production, deploy-site-production]
+    environment: production
+
+    steps:
+      - name: Health check — engine
+        env:
+          PRODUCTION_ENGINE_URL: ${{ secrets.PRODUCTION_ENGINE_URL }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "${PRODUCTION_ENGINE_URL}/health")
+          if [ "$status" != "200" ]; then
+            echo "::error::Engine health check failed: HTTP $status"
+            exit 1
+          fi
+          echo "Engine health check passed ✓"
+
+      - name: Health check — site
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "https://www.jarvisprime.me")
+          if [ "$status" != "200" ]; then
+            echo "::error::Site health check failed: HTTP $status"
+            exit 1
+          fi
+          echo "Site health check passed ✓"
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Create GitHub Release
+  # ─────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: smoke-test-production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

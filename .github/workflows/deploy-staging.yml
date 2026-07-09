@@ -1,0 +1,109 @@
+name: Deploy — Staging
+
+# Deploys automatically when a PR is merged into main.
+# Uses staging secrets from GitHub Actions Environments.
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Engine → staging server
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy-engine-staging:
+    name: Deploy Engine → Staging
+    runs-on: ubuntu-latest
+    environment: staging   # Uses "staging" environment secrets in GitHub
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: npm ci --production
+
+      # Secrets are injected via GitHub Environments — never hardcoded here.
+      # Set these in: GitHub → Settings → Environments → staging → Secrets
+      - name: Deploy to staging server
+        env:
+          # SSH deploy key stored as repository secret
+          DEPLOY_SSH_KEY: ${{ secrets.STAGING_DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+          DEPLOY_USER: ${{ secrets.STAGING_USER }}
+          DEPLOY_PATH: ${{ secrets.STAGING_DEPLOY_PATH }}
+        run: |
+          echo "$DEPLOY_SSH_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          rsync -az --delete \
+            -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+            --exclude='.env*' \
+            --exclude='node_modules' \
+            ./engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "cd ${DEPLOY_PATH} && npm ci --production && pm2 restart jarvis-engine || pm2 start src/runner.js --name jarvis-engine"
+          rm /tmp/deploy_key
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Site → Vercel preview (staging)
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy-site-staging:
+    name: Deploy Site → Vercel Staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (preview)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: apps/site
+          # No --prod flag → creates a Vercel preview deployment (not production)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Smoke test staging
+  # ─────────────────────────────────────────────────────────────────────────
+  smoke-test-staging:
+    name: Smoke Test Staging
+    runs-on: ubuntu-latest
+    needs: [deploy-engine-staging, deploy-site-staging]
+    environment: staging
+
+    steps:
+      - name: Health check — engine
+        env:
+          STAGING_ENGINE_URL: ${{ secrets.STAGING_ENGINE_URL }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_ENGINE_URL}/health")
+          if [ "$status" != "200" ]; then
+            echo "Engine health check failed: HTTP $status"
+            exit 1
+          fi
+          echo "Engine health check passed ✓"
+
+      - name: Health check — site
+        env:
+          STAGING_SITE_URL: ${{ secrets.STAGING_SITE_URL }}
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_SITE_URL}")
+          if [ "$status" != "200" ]; then
+            echo "Site health check failed: HTTP $status"
+            exit 1
+          fi
+          echo "Site health check passed ✓"

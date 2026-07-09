@@ -1,0 +1,110 @@
+name: CI — Test & Lint
+
+# Run on every push and PR to any branch.
+# Never deploys. Never touches production secrets.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Engine — lint, type-check, unit tests
+  # ─────────────────────────────────────────────────────────────────────────
+  engine:
+    name: Engine CI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: engine
+
+    env:
+      NODE_ENV: test
+      # Test env — safe stub values only, no real secrets needed
+      DRY_RUN: "true"
+      DAILY_PROSPECT_LIMIT: "3"
+      DAILY_SEND_LIMIT: "5"
+      PORT: "3002"
+      AUTOMATION_SERVER_SECRET: "ci-test-secret-not-for-prod"
+      APOLLO_API_KEY: "test_apollo_key"
+      GROQ_API_KEY: "test_groq_key"
+      RESEND_API_KEY: "test_resend_key"
+      FROM_EMAIL: "test@jarvisprime.me"
+      CORS_ORIGINS: "http://localhost:3000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Site — lint, type-check, production build
+  # ─────────────────────────────────────────────────────────────────────────
+  site:
+    name: Site CI
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/site
+
+    env:
+      NODE_ENV: test
+      NEXT_PUBLIC_ENGINE_URL: "http://localhost:3002"
+      # Supabase not needed for build — leave empty
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+      AUTOMATION_SECRET: "ci-test-secret-not-for-prod"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: apps/site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (production)
+        run: npm run build
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Secret scan — no credentials in committed files
+  # ─────────────────────────────────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for gitleaks
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

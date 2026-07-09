@@ -1,11 +1,9 @@
 // Loads configuration from environment variables with safe defaults.
-// Reads a local .env file if present (no external dependency needed).
+// Reads environment-specific .env files in this priority order:
+//   1. .env.<NODE_ENV>  (e.g. .env.development, .env.production)
+//   2. .env             (local override — gitignored, never commit)
 //
-// Upgraded with:
-//   - Environment detection (development/staging/production)
-//   - Config validation on startup
-//   - getClientConfig() for per-client overrides
-//   - providerStatus() for health checks
+// No external dotenv dependency needed.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,11 +11,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Minimal .env loader (avoids adding a dependency).
-function loadEnvFile() {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) return;
-  const raw = fs.readFileSync(envPath, 'utf8');
+// Load a single env file, only setting vars not already defined.
+function loadFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const raw = fs.readFileSync(filePath, 'utf8');
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -25,7 +22,6 @@ function loadEnvFile() {
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
     let val = trimmed.slice(eq + 1).trim();
-    // Strip surrounding quotes
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1);
     }
@@ -33,7 +29,10 @@ function loadEnvFile() {
   }
 }
 
-loadEnvFile();
+// Load environment-specific file first, then local override.
+const envName = process.env.NODE_ENV || 'development';
+loadFile(path.join(__dirname, '..', `.env.${envName}`));
+loadFile(path.join(__dirname, '..', '.env'));
 
 const env = { ...process.env };
 
@@ -57,6 +56,7 @@ export const config = {
 
   // Server (for HTTP mode)
   port: num(env.PORT, 3001),
+  // In production, missing or default secret is a hard startup error (see validateSecrets below).
   automationSecret: env.AUTOMATION_SERVER_SECRET || 'dev-secret',
 
   // Database
@@ -183,4 +183,61 @@ export function providerStatus() {
     whatsapp: Boolean(config.twilioAccountSid && config.twilioWhatsappFrom),
     scheduler: config.schedulerEnabled,
   };
+}
+
+/**
+ * Validate that all secrets required for the current environment are present.
+ * Throws on critical missing values in production; returns warnings in dev/test.
+ *
+ * Call this once at startup before accepting traffic.
+ * @returns {string[]} Array of warning messages (empty = all good)
+ */
+export function validateSecrets() {
+  const isProduction = config.env === 'production';
+  const errors = [];
+  const warnings = [];
+
+  // --- Critical secrets (must exist in production) ---
+  const missing = (name, value) => {
+    if (!value) {
+      (isProduction ? errors : warnings).push(`${name} is not set`);
+    }
+  };
+
+  missing('SUPABASE_URL', config.supabaseUrl);
+  missing('SUPABASE_SERVICE_ROLE_KEY', config.supabaseKey);
+
+  // At least one email provider must be configured in live mode
+  if (!config.dryRun) {
+    if (!config.resendApiKey && !config.sendgridApiKey) {
+      (isProduction ? errors : warnings).push(
+        'No email provider configured — set RESEND_API_KEY or SENDGRID_API_KEY'
+      );
+    }
+    if (!config.apolloApiKey) {
+      warnings.push('APOLLO_API_KEY is not set — prospect sourcing will be skipped');
+    }
+    if (!config.groqApiKey && !config.openaiApiKey) {
+      warnings.push('No AI provider configured — emails will use basic templates');
+    }
+  }
+
+  // --- Security checks ---
+  if (isProduction && config.automationSecret === 'dev-secret') {
+    errors.push(
+      'AUTOMATION_SERVER_SECRET is using the default "dev-secret" — this is insecure in production. ' +
+      'Generate a strong secret: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+
+  if (isProduction && config.corsOrigins.includes('localhost')) {
+    warnings.push('CORS_ORIGINS includes localhost — verify this is intentional in production');
+  }
+
+  if (errors.length > 0) {
+    const msg = ['STARTUP FAILED — critical secrets missing:', ...errors].join('\n  ');
+    throw new Error(msg);
+  }
+
+  return warnings;
 }

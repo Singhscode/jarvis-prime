@@ -1,44 +1,115 @@
-# Dependencies
-node_modules/
+# =============================================================================
+# JARVIS PRIME — Root .gitignore
+# =============================================================================
 
-# Environment variables — NEVER commit these
+# ---------------------------------------------------------------------------
+# SECRETS — Never commit any of these
+# ---------------------------------------------------------------------------
+# Ignore real local secret files (the ones that contain actual keys)
 .env
 .env.local
-.env.production
 .env.*.local
+*.env
+*.secret
+*.secrets
+# Ignore env files at monorepo root level
+/.env.*
+!/.env.local.example
+# Ignore env files inside sub-packages (engine/, apps/site/)
+# but allow committed safe templates (.env.development, .env.test, .env.production)
+# Those are added via package-level .gitignore instead.
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+*.keystore
+*credentials*.json
+*secrets*.json
+serviceAccountKey.json
 
-# Next.js build output
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+
+# ---------------------------------------------------------------------------
+# Build outputs
+# ---------------------------------------------------------------------------
 .next/
 out/
 dist/
+build/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
 
-# Misc
-.DS_Store
+# ---------------------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------------------
 *.log
 *.log.*
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Backup files
-*.backup
-*.backup.*
-*-backup.*
-*.old
-*.bak
-*-old.*
-*.tmp
-
-# IDE
+# ---------------------------------------------------------------------------
+# OS / Editor artifacts
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V3
+.Trashes
+Thumbs.db
+desktop.ini
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Local Netlify folder
-.netlify
+# ---------------------------------------------------------------------------
+# Deployment / Platform
+# ---------------------------------------------------------------------------
 .vercel
-.env*.local
+.netlify
+.firebase/
 
-# Documentation (keep in docs/ folder)
+# ---------------------------------------------------------------------------
+# Temporary / Backup files
+# ---------------------------------------------------------------------------
+*.tmp
+*.temp
+*.backup
+*.bak
+*.old
+*-backup.*
+*-old.*
+
+# ---------------------------------------------------------------------------
+# Test artifacts
+# ---------------------------------------------------------------------------
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# ---------------------------------------------------------------------------
+# Data files (local only)
+# ---------------------------------------------------------------------------
+engine/data/
+
+# ---------------------------------------------------------------------------
+# Monorepo reorganization docs (keep in docs/ only)
+# ---------------------------------------------------------------------------
 /*-COMPLETE.txt
 /*-ADDED.txt
 /*-LIVE.txt
 /*_REPORT.txt
-/*_PLAN.txt
 CLEANUP_PLAN.txt

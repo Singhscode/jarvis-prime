@@ -14,7 +14,7 @@
 //
 // Safe by default: DRY_RUN=true means nothing is emailed/paid APIs not called.
 
-import { config, providerStatus } from './config.js';
+import { config, providerStatus, validateSecrets } from './config.js';
 import { log } from './lib/logger.js';
 import { listActiveClients, getProspectsByStage } from './lib/db.js';
 import { sourceAndScore, runOutreach } from './agents/outbound-agent.js';
@@ -167,6 +167,14 @@ async function startHttpServer() {
 
 async function main() {
   try {
+    // Validate secrets before doing anything else.
+    // In production, throws if critical secrets are missing or insecure.
+    // In development, prints warnings only.
+    const warnings = validateSecrets();
+    if (warnings.length > 0) {
+      for (const w of warnings) log.warn(`[config] ${w}`);
+    }
+
     if (hasFlag('doctor')) return await doctor();
 
     // HTTP SERVER MODE

@@ -1,0 +1,41 @@
+# =============================================================================
+# Gitleaks configuration — secret scanning rules for JARVIS PRIME
+# https://github.com/gitleaks/gitleaks
+# =============================================================================
+
+title = "Gitleaks — JARVIS PRIME"
+
+[extend]
+# Use the official gitleaks ruleset as the base
+useDefault = true
+
+[allowlist]
+description = "Allowlist for known safe patterns"
+
+# Ignore test stub keys — these are fake, not real credentials
+regexes = [
+  # Test stub keys used in .env.test and CI env vars
+  '''test_(apollo|hunter|groq|resend|openai)_key''',
+  # CI placeholder values
+  '''ci-test-secret-not-for-prod''',
+  '''test-secret-not-for-prod''',
+  # Placeholder strings in template files
+  '''REPLACE_WITH_''',
+  # Dev secret with explicit warning
+  '''dev-secret-change-me''',
+]
+
+# Ignore committed env template files (contain only placeholders)
+paths = [
+  '''engine/\.env\.example''',
+  '''engine/\.env\.development''',
+  '''engine/\.env\.test''',
+  '''engine/\.env\.production''',
+  '''apps/site/\.env\.example''',
+  '''apps/site/\.env\.development''',
+  '''apps/site/\.env\.test''',
+  '''apps/site/\.env\.production''',
+  '''\.env\.local\.example''',
+  # Documentation examples
+  '''docs/security/SECRETS_MANAGEMENT\.md''',
+]
