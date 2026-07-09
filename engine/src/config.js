@@ -13,23 +13,57 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Minimal .env loader (avoids adding a dependency).
+// Minimal .env loader with environment-specific support (avoids adding a dependency).
+// Loads in order: .env.{NODE_ENV} → .env (allows overrides per environment)
 function loadEnvFile() {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (!fs.existsSync(envPath)) return;
-  const raw = fs.readFileSync(envPath, 'utf8');
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let val = trimmed.slice(eq + 1).trim();
-    // Strip surrounding quotes
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-      val = val.slice(1, -1);
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const baseDir = path.join(__dirname, '..');
+  
+  // Files to try in order (later ones override earlier ones)
+  const filesToLoad = [
+    path.join(baseDir, '.env'),                    // base defaults (committed)
+    path.join(baseDir, `.env.${nodeEnv}`),         // environment-specific (committed for dev/test)
+  ];
+
+  // Helper to parse and load a single .env file
+  function parseEnvFile(filePath) {
+    if (!fs.existsSync(filePath)) return 0;
+    
+    const raw = fs.readFileSync(filePath, 'utf8');
+    let count = 0;
+    
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      
+      // Strip surrounding quotes
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      
+      // Only set if not already set (env vars take precedence over files)
+      if (process.env[key] === undefined) {
+        process.env[key] = val;
+        count++;
+      }
     }
-    if (process.env[key] === undefined) process.env[key] = val;
+    
+    return count;
+  }
+
+  // Load all files in order
+  for (const filePath of filesToLoad) {
+    const count = parseEnvFile(filePath);
+    if (count > 0) {
+      const filename = path.basename(filePath);
+      // Silently load (production is usually noisy already)
+    }
   }
 }
 

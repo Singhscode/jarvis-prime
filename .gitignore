@@ -1,11 +1,30 @@
 # Dependencies
 node_modules/
 
-# Environment variables — NEVER commit these
+# ============================================================
+# Environment Variables — SECURITY CRITICAL
+# NEVER commit actual secret values to git
+# ============================================================
+
+# Actual secrets (ALWAYS ignore these)
 .env
 .env.local
 .env.production
 .env.*.local
+
+# Development/Test/Production local overrides (ignore these)
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Allow templates and examples (these document what's needed)
+# DO NOT ignore these — commit them so team sees required variables
+!.env.example
+!.env.*.example
+!.env.development
+!.env.test
+!*.env.template
+!.env.*.template
 
 # Next.js build output
 .next/

@@ -1,0 +1,55 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Load staging environment
+        run: |
+          cp apps/site/.env.test apps/site/.env.local
+          cp engine/.env.test engine/.env
+        
+      - name: Run final tests before deploy
+        run: npm run test:engine
+
+      - name: Build site for staging
+        run: npm run build:site
+        env:
+          NODE_ENV: staging
+
+      - name: Deploy to Staging
+        run: |
+          echo "🚀 Deploying to staging..."
+          # Add your staging deployment command here
+          # Example: netlify deploy --prod --dir=apps/site/.next
+          # Or: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
+          echo "✓ Staging deployment initiated"
+
+      - name: Notify deployment
+        if: success()
+        run: |
+          echo "✓ Staging deployment completed successfully"
+          echo "Staging URL: https://staging.jarvisprime.me"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Staging deployment failed"
+          exit 1

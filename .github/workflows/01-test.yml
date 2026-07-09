@@ -1,0 +1,93 @@
+name: CI — Test & Lint
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Load test environment
+        run: cp engine/.env.test engine/.env
+
+      - name: Run engine tests
+        run: npm run test:engine
+
+      - name: Run engine doctor (health check)
+        run: npm run doctor --workspace=engine
+        env:
+          NODE_ENV: test
+
+  test-site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Load test environment
+        run: cp apps/site/.env.test apps/site/.env.local
+
+      - name: Lint site
+        run: npm run lint --workspace=apps/site
+
+      - name: Build site
+        run: npm run build:site
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug --only-verified
+
+      - name: Detect secrets in env files
+        run: |
+          echo "Checking for hardcoded secrets in .env files..."
+          
+          # Fail if actual secret files exist (not templates)
+          if [ -f ".env" ]; then
+            echo "ERROR: .env file should not be committed!"
+            exit 1
+          fi
+          
+          if [ -f "apps/site/.env.local" ]; then
+            echo "ERROR: apps/site/.env.local should not be committed!"
+            exit 1
+          fi
+          
+          if [ -f "engine/.env" ] && [ ! -f "engine/.env.test" ]; then
+            echo "ERROR: engine/.env should not be committed (use .env.test in CI)!"
+            exit 1
+          fi
+          
+          echo "✓ No secret files detected in commit"
