@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({
-  path: path.join(__dirname, "../apps/site/.env.local"),
+  path: path.join(__dirname, "../apps/.env.local"),
 });
 
 // Parse command line arguments
