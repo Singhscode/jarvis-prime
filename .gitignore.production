@@ -1,0 +1,414 @@
+# ============================================================================
+# JARVIS PRIME - Production-Ready .gitignore
+# ============================================================================
+# This file should be used as .gitignore in the production-ready structure.
+# It covers all directories and files that should not be committed.
+# ============================================================================
+
+# ============================================================================
+# ENVIRONMENT & CONFIGURATION
+# ============================================================================
+# Environment files - NEVER commit these
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.test
+!.env.example
+
+# Configuration files with secrets
+config/.env
+config/.env.local
+config/.env.production
+config/.env.staging
+!config/.env.example
+!config/defaults.json
+
+# ============================================================================
+# NODE & DEPENDENCIES
+# ============================================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.pnpm-debug.log
+package-lock.json.bak
+yarn.lock.bak
+pnpm-lock.yaml.bak
+
+# Turborepo cache
+.turbo/
+.turbo/**
+dist-incremental/
+
+# ============================================================================
+# BUILD OUTPUTS
+# ============================================================================
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+.swc/
+
+# Next.js
+.next/
+out/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# TypeScript
+*.tsbuildinfo
+.typescript/
+
+# Vite
+dist/
+.vite/
+
+# ============================================================================
+# IDE & EDITOR
+# ============================================================================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.history
+*.log
+.vscode-test
+
+# WebStorm
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/dictionaries
+
+# Vim
+.vim/
+.vimrc
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# OPERATING SYSTEM
+# ============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+*.cab
+.directory
+
+# ============================================================================
+# TESTING
+# ============================================================================
+coverage/
+.nyc_output/
+*.lcov
+test-results/
+.jest-cache/
+.tap/
+*.tgz
+
+# ============================================================================
+# TEMPORARY FILES
+# ============================================================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+*.swp
+*.swo
+*~
+.cache/
+.temp/
+
+# ============================================================================
+# LOGS
+# ============================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# ============================================================================
+# RUNTIME & PROCESS FILES
+# ============================================================================
+pid/
+*.pid
+*.seed
+*.pid.lock
+.pm2/
+
+# ============================================================================
+# DOCKER
+# ============================================================================
+.docker/
+docker-compose.override.yml
+.dockerignore.local
+.docker-ignore
+
+# ============================================================================
+# DATABASE & PERSISTENCE
+# ============================================================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+data/
+.pgdata/
+postgres_data/
+mysql_data/
+mongo_data/
+
+# ============================================================================
+# UPLOADS & FILES
+# ============================================================================
+storage/uploads/
+public/uploads/
+tmp/uploads/
+files/
+media/
+*.iso
+*.zip
+*.rar
+*.tar.gz
+
+# ============================================================================
+# CREDENTIALS & SECRETS
+# ============================================================================
+.credentials/
+credentials.json
+secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+.ssh/
+.aws/credentials
+~/.aws/
+.kube/
+kubeconfig
+
+# ============================================================================
+# AWS & CLOUD
+# ============================================================================
+.aws/
+.awscli-cache/
+SAM_CLI_TELEMETRY_OPTION_TRACKING
+
+# ============================================================================
+# CERTIFICATES & SSL
+# ============================================================================
+*.crt
+*.cer
+*.der
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+certs/
+ssl/
+certificates/
+
+# ============================================================================
+# INFRASTRUCTURE & DEPLOYMENT
+# ============================================================================
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Kubernetes
+kubeconfig
+.kube/
+helm/charts/*/charts/
+helm/repository/
+helm/repository/cache/
+
+# Ansible
+*.retry
+
+# ============================================================================
+# MONITORING & OBSERVABILITY
+# ============================================================================
+jaeger-data/
+prometheus_data/
+grafana_data/
+influxdb_data/
+
+# ============================================================================
+# DEVELOPMENT & DEBUGGING
+# ============================================================================
+.debug/
+.breakpoints
+debugger.json
+launch.json
+.localhistory/
+
+# ============================================================================
+# GENERATED FILES (Should be in dist/ but being explicit)
+# ============================================================================
+*.js
+*.js.map
+!jest.config.js
+!next.config.mjs
+!postcss.config.js
+!tailwind.config.ts
+!tools/scripts/*.js
+!tools/generators/*.js
+
+# ============================================================================
+# MONOREPO SPECIFIC
+# ============================================================================
+# Turborepo
+.turbo/
+.turbo/**
+
+# pnpm
+.pnpm-debug.log
+
+# Workspace lockfiles
+pnpm-lock.yaml.bak
+yarn.lock.bak
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/workflows/*.log
+.gitlab-ci.yml.bak
+.circleci/cache/
+
+# ============================================================================
+# DOCUMENTATION BUILD
+# ============================================================================
+docs/_build/
+docs/.doctrees/
+docs/.vuepress/dist/
+site/dist/
+
+# ============================================================================
+# PERFORMANCE & PROFILING
+# ============================================================================
+*.prof
+*.flamegraph
+cpu-profile-*
+heap-snapshot-*
+*.heapsnapshot
+
+# ============================================================================
+# SECURITY SCANNING
+# ============================================================================
+.snyk-policy.json.bak
+.whitesource
+.bandit
+.semgrep/
+
+# ============================================================================
+# PACKAGE MANAGER LOCKS (Keep commented out - usually want these)
+# ============================================================================
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================================================
+# VENDOR & EXTERNAL
+# ============================================================================
+vendor/
+venv/
+env/
+ENV/
+.venv/
+
+# ============================================================================
+# ARCHIVE & BACKUP
+# ============================================================================
+.archive/
+.backup/
+*.archive
+*.bak
+old/
+legacy/
+
+# ============================================================================
+# PROJECT SPECIFIC
+# ============================================================================
+# N8N Workflows (if storing locally)
+n8n_workflows_backup/
+
+# Export files
+exports/
+imports/
+migrations/applied/
+
+# Temporary test data
+test-data/
+test-fixtures/
+
+# ============================================================================
+# MISCELLANEOUS
+# ============================================================================
+.env.*.bak
+TODO.txt
+FIXME.txt
+WIP.md
+.WIP
+
+# ============================================================================
+# NOTES
+# ============================================================================
+# 
+# This .gitignore covers:
+# - Environment variables and secrets
+# - Build and dependency artifacts
+# - IDE and editor files
+# - Operating system files
+# - Test coverage and artifacts
+# - Runtime files and logs
+# - Cloud and infrastructure files
+# - Generated files
+#
+# To use this file:
+# 1. Copy to root: cp .gitignore.production .gitignore
+# 2. Or replace existing: mv .gitignore.production .gitignore
+#
+# To see what's ignored:
+# git check-ignore -v <file>
+#
+# To ignore tracked files:
+# git rm --cached <file>
+# git commit -m "Remove tracked file from git"
+#
+# ============================================================================

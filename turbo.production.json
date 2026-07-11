@@ -1,0 +1,147 @@
+{
+  "extends": ["//"],
+  "globalDependencies": [
+    "**/.env.*.local",
+    "**/tsconfig.json",
+    "package.json"
+  ],
+  "globalEnv": [
+    "NODE_ENV",
+    "CI",
+    "TURBO_CACHE_DIR"
+  ],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build", "^type-check"],
+      "outputs": [
+        "dist/**",
+        "build/**",
+        ".next/**",
+        "out/**",
+        "coverage/**"
+      ],
+      "outputMode": "auto",
+      "cache": true,
+      "env": ["NODE_ENV=production"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream",
+      "env": ["NODE_ENV=development"]
+    },
+    "dev:web": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream",
+      "env": ["NODE_ENV=development"]
+    },
+    "dev:engine": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream",
+      "env": ["NODE_ENV=development"]
+    },
+    "test": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**", "test-results/**"],
+      "outputMode": "auto",
+      "env": ["NODE_ENV=test"]
+    },
+    "test:unit": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "outputMode": "auto",
+      "env": ["NODE_ENV=test"]
+    },
+    "test:integration": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "outputMode": "auto",
+      "env": ["NODE_ENV=test"]
+    },
+    "test:e2e": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "outputMode": "stream",
+      "env": ["NODE_ENV=test"]
+    },
+    "lint": {
+      "cache": true,
+      "outputs": [".eslint-cache/**"],
+      "outputMode": "auto"
+    },
+    "lint:fix": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "format": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "format:check": {
+      "cache": true,
+      "outputMode": "auto"
+    },
+    "type-check": {
+      "cache": true,
+      "outputs": [".tsbuildinfo/**"],
+      "outputMode": "auto"
+    },
+    "type-check:watch": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream"
+    },
+    "clean": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "start": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream",
+      "env": ["NODE_ENV=production"]
+    },
+    "server": {
+      "cache": false,
+      "persistent": true,
+      "outputMode": "stream"
+    },
+    "generate": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "migrate": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "seed": {
+      "cache": false,
+      "outputMode": "stream"
+    },
+    "bundle": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+      "outputMode": "auto"
+    },
+    "analyze": {
+      "cache": false,
+      "outputs": ["analysis/**"],
+      "outputMode": "stream"
+    },
+    "docs": {
+      "cache": true,
+      "outputs": ["docs/**", "site/**"],
+      "outputMode": "auto"
+    }
+  },
+  "remoteCache": {
+    "enabled": true
+  },
+  "ui": "tui"
+}
