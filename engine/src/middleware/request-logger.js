@@ -6,7 +6,7 @@
 //   - Logs method, path, status code, and duration
 //   - Uses the upgraded logger (supports JSON and context binding)
 
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import crypto from 'node:crypto';
 
 /**

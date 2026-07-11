@@ -12,7 +12,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreProspect } from '../src/scoring/icp-scorer.js';
+import { scoreProspect } from 'icp-scorer';
 import { classifyReply } from '../src/agents/inbound-agent.js';
 
 const client = {
@@ -335,14 +335,14 @@ describe('Config', () => {
 
 describe('Logger', () => {
   test('child logger preserves context', async () => {
-    const { log } = await import('../src/lib/logger.js');
+    const { log } = await import('jarvis-logger');
     const childLog = log.child({ requestId: 'test-123', clientId: 'client-abc' });
     assert.ok(childLog.info, 'child logger should have info method');
     assert.ok(childLog.child, 'child logger should support further nesting');
   });
 
   test('timer works', async () => {
-    const { log } = await import('../src/lib/logger.js');
+    const { log } = await import('jarvis-logger');
     log.time('test-timer');
     await new Promise((r) => setTimeout(r, 10));
     // Should not throw

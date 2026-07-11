@@ -3,8 +3,8 @@
 
 import { config } from '../../config.js';
 import { findProspects } from '../../sources/prospect-finder.js';
-import { scoreProspect } from '../../scoring/icp-scorer.js';
 import { insertProspects } from '../../lib/db.js';
+import { scoreProspect } from 'icp-scorer';
 
 /**
  * Search and score prospects using Apollo/Hunter.

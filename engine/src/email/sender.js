@@ -8,7 +8,7 @@
 //   EMAIL_PROVIDER=sendgrid in .env.
 
 import { config } from '../config.js';
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { getEmailProvider } from '../providers/email/index.js';
 
 // Cache the provider instance (lazy initialized)

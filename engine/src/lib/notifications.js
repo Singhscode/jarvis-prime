@@ -3,7 +3,7 @@
 // Replaces the Telegram-only alerting from sender.js.
 
 import { config } from '../config.js';
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 
 /**
  * Send a notification across one or more channels.

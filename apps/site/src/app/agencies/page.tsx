@@ -85,7 +85,7 @@ export default function AgenciesPage() {
                 <li>✗ Low-quality prospects wasting your time</li>
                 <li>✗ Same generic cold emails everyone uses</li>
                 <li>✗ Inconsistent follow-ups (leads get lost)</li>
-                <li>✗ No visibility into what's working</li>
+                <li>✗ No visibility into what&apos;s working</li>
                 <li>✗ Hiring expensive SDRs or agencies</li>
                 <li>✗ Pipeline dries up if outreach stops</li>
               </ul>

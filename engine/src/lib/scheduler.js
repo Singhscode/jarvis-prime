@@ -3,7 +3,7 @@
 // without requiring external tools like n8n for basic scheduling.
 
 import { config } from '../config.js';
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 
 const jobs = new Map();
 const timers = new Map();

@@ -2,7 +2,7 @@
 // Extracted from email/sender.js for provider abstraction.
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { BaseEmailProvider } from './index.js';
 
 export class ResendProvider extends BaseEmailProvider {

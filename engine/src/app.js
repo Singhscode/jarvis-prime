@@ -11,7 +11,7 @@
 //   app.listen(3001);
 
 import { config, providerStatus } from './config.js';
-import { log } from './lib/logger.js';
+import { log } from 'jarvis-logger';
 import { listActiveClients } from './lib/db.js';
 import { sourceAndScore, runOutreach } from './agents/outbound-agent.js';
 import { createCors } from './middleware/cors.js';

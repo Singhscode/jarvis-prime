@@ -7,7 +7,7 @@
 // AI_PROVIDER=openai in .env.
 
 import { config } from '../config.js';
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { getAIProvider } from '../providers/ai/index.js';
 
 // Cache the provider instance (lazy initialized)

@@ -7,8 +7,7 @@
 //   3. Optionally set OPENAI_MODEL=gpt-4o-mini (default)
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
-import { BaseAIProvider } from './index.js';
+import { BaseAIProvider, chatCompletion } from './index.js';
 
 export class OpenAIProvider extends BaseAIProvider {
   get name() { return 'openai'; }
@@ -24,41 +23,14 @@ export class OpenAIProvider extends BaseAIProvider {
    * @returns {Promise<{ content: string, usage?: object }>}
    */
   async generate(prompt, opts = {}) {
-    const {
-      temperature = 0.7,
-      maxTokens,
-      json = false,
-      model = config.openaiModel,
-    } = opts;
-
-    const body = {
+    const { model = config.openaiModel, ...rest } = opts;
+    return chatCompletion({
+      url: 'https://api.openai.com/v1/chat/completions',
+      apiKey: config.openaiApiKey,
       model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature,
-    };
-
-    if (maxTokens) body.max_tokens = maxTokens;
-    if (json) body.response_format = { type: 'json_object' };
-
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.openaiApiKey}`,
-      },
-      body: JSON.stringify(body),
+      prompt,
+      opts: rest,
+      errorLabel: 'OpenAI',
     });
-
-    if (!res.ok) {
-      throw new Error(`OpenAI failed: ${res.status}`);
-    }
-
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content || '';
-
-    return {
-      content,
-      usage: data.usage || undefined,
-    };
   }
 }

@@ -93,12 +93,5 @@ function defaultKeyFn(req) {
   return req.ip || req.connection?.remoteAddress || 'unknown';
 }
 
-/**
- * Client-scoped key function: uses x-client-id header if present, falls back to IP.
- */
-export function clientKeyFn(req) {
-  return req.headers['x-client-id'] || defaultKeyFn(req);
-}
-
 // Default instance for backward compatibility (100 req/min per IP)
 export default createRateLimiter();

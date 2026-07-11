@@ -9,7 +9,7 @@
 // is environment-specific; this module exposes handleReply() which your webhook
 // or poller calls per message. In dry-run we can simulate replies for testing.
 
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { telegramAlert } from '../email/sender.js';
 import { updateProspect, insertEvent, addSuppression } from '../lib/db.js';
 

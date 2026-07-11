@@ -10,7 +10,7 @@
 //   Day 10: Final break-up email
 
 import { config } from '../config.js';
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { writeEmail } from '../ai/personalizer.js';
 import { sendEmail } from '../email/sender.js';
 import {

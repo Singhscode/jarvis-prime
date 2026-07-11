@@ -67,7 +67,7 @@ Jarvis ai company/
 │   └── 📂 sql/
 │       └── schema.sql               ← Database schema
 │
-├── 📂 docs/                         ← DOCUMENTATION
+├── 📂 documentation/                ← DOCUMENTATION
 │   ├── 📂 presentation/             ← Meeting materials
 │   │   ├── PRESENT_THIS_NOW.txt     ← ⭐ 10-min script
 │   │   ├── PRESENTATION_ONE_PAGE_SUMMARY.txt
@@ -81,7 +81,15 @@ Jarvis ai company/
 │   ├── 📂 technical/                ← Technical details
 │   │   └── BUSINESS_LOGIC_DETAILED.md
 │   │
-│   └── ESSENTIAL_FILES.txt          ← Quick reference
+│   ├── 📂 auth/                     ← Authentication docs
+│   ├── 📂 security/                 ← Security docs
+│   ├── 📂 changelog/                ← Development history
+│   └── 📂 business/                 ← Business docs and execution plans
+
+├── 📂 automation/                   ← n8n workflows and diagrams
+├── 📂 database/                     ← SQL assets
+│   └── 📂 schema/
+│       └── supabase-schema.sql
 │
 ├── 📂 .github/                      ← GitHub configuration
 │   └── workflows/                   ← CI/CD workflows
@@ -164,13 +172,13 @@ npm run dev           # Starts site + engine together
 ### Documentation
 ```bash
 # View presentation materials
-open docs/presentation/PRESENT_THIS_NOW.txt
+open documentation/presentation/PRESENT_THIS_NOW.txt
 
 # View onboarding materials
-open docs/onboarding/EMPLOYEE_ONBOARDING.md
+open documentation/onboarding/EMPLOYEE_ONBOARDING.md
 
 # View technical documentation
-open docs/technical/BUSINESS_LOGIC_DETAILED.md
+open documentation/technical/BUSINESS_LOGIC_DETAILED.md
 ```
 
 ---
@@ -206,9 +214,9 @@ npm run dev
 | `apps/site/` | Frontend website | TypeScript/React | Next.js app, components, API routes |
 | `engine/` | Backend automation | JavaScript/Node.js | Agents, APIs, database logic |
 | `engine/sql/` | Database | SQL | Schema, migrations |
-| `docs/presentation/` | Meeting materials | Markdown/Text | Presentation scripts, slides |
-| `docs/onboarding/` | Employee training | Markdown | Training guides |
-| `docs/technical/` | Technical docs | Markdown | Architecture, algorithms |
+| `documentation/presentation/` | Meeting materials | Markdown/Text | Presentation scripts, slides |
+| `documentation/onboarding/` | Employee training | Markdown | Training guides |
+| `documentation/technical/` | Technical docs | Markdown | Architecture, algorithms |
 | `.github/` | CI/CD | YAML | GitHub Actions workflows |
 
 ---
@@ -261,7 +269,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3001
 - Database: Setup PostgreSQL (Supabase)
 
 ### Product Manager
-- Reference: `docs/technical/BUSINESS_LOGIC_DETAILED.md`
+- Reference: `documentation/technical/BUSINESS_LOGIC_DETAILED.md`
 - Analytics: Use dashboard at `apps/site/src/app/dashboard/`
 
 ---

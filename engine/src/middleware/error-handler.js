@@ -6,7 +6,7 @@
 //   - Separate not-found handler
 //   - Stack traces only in development mode
 
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { config } from '../config.js';
 
 /**

@@ -1,0 +1,66 @@
+JARVIS PRIME — ALL SCRIPTS REFERENCE
+=====================================
+Last updated: 2026-07-08
+
+-------------------------------------
+ROOT — package.json (5 scripts)
+-------------------------------------
+npm run dev          -> concurrently runs dev:site + dev:engine
+npm run dev:site      -> npm run dev --workspace=apps/site
+npm run dev:engine    -> npm run server --workspace=engine
+npm run build:site    -> npm run build --workspace=apps/site
+npm run test:engine   -> npm run test --workspace=engine
+
+-------------------------------------
+ENGINE — engine/package.json (14 scripts)
+-------------------------------------
+npm run run            -> node src/runner.js (main CLI loop)
+npm run run:once        -> node src/runner.js --once
+npm run source          -> node src/runner.js --task=source (lead sourcing)
+npm run score           -> node src/runner.js --task=score (lead scoring)
+npm run outbound        -> node src/runner.js --task=outbound (send sequences)
+npm run inbound         -> node src/runner.js --task=inbound (classify replies)
+npm run doctor          -> node src/runner.js --doctor (diagnostics/health check)
+npm run server          -> node src/runner.js --server (HTTP API)
+npm run server:dev       -> node --watch src/runner.js --server
+npm run dev             -> node --watch src/runner.js --server
+npm run test            -> node --test (28 unit tests)
+npm run test:watch       -> node --test --watch
+npm run migrate         -> node scripts/migrate.js (run DB migrations)
+npm run migrate:status    -> node scripts/migrate.js --status
+
+-------------------------------------
+SITE — apps/site/package.json (4 scripts)
+-------------------------------------
+npm run dev     -> next dev -p 3000
+npm run build   -> next build
+npm run start   -> next start
+npm run lint    -> next lint
+
+-------------------------------------
+STANDALONE NODE SCRIPTS
+-------------------------------------
+scripts/enrich-prospects.js            -> prospect data enrichment
+scripts/enrich-linkedin-prospects.js     -> LinkedIn-specific prospect enrichment
+engine/scripts/migrate.js              -> database migration runner (used by npm run migrate)
+
+-------------------------------------
+SHELL SCRIPTS
+-------------------------------------
+None present in the project.
+
+-------------------------------------
+GITHUB ACTIONS WORKFLOWS
+-------------------------------------
+.github/workflows/ is empty — no CI/CD workflows configured yet.
+
+-------------------------------------
+DOCKER / INFRASTRUCTURE
+-------------------------------------
+No Dockerfile, docker-compose, or Kubernetes manifests yet.
+(Planned for Phase 9 — Infrastructure as Code, per MIGRATION_ROADMAP_PHASE_BY_PHASE.txt)
+
+-------------------------------------
+ENTRY POINT
+-------------------------------------
+engine/src/runner.js — main CLI entry point, handles all --task flags and --server mode.

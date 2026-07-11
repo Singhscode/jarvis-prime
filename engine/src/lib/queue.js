@@ -8,7 +8,7 @@
 //   queue.enqueue('send_email', { to: 'x@y.com', subject: 'hi' });
 //   queue.process('send_email', async (job) => { ... });
 
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 
 class InMemoryQueue {
   constructor() {

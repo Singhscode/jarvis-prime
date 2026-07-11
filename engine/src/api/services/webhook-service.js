@@ -2,7 +2,7 @@
 // Processes inbound webhooks from external services (Resend, Cal.com, CRM, n8n).
 // Routes events to the appropriate handlers and logs everything for debugging.
 
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { handleReply } from '../../agents/inbound-agent.js';
 import * as calendarService from './calendar-service.js';
 import { getDb, _memory as mem } from '../../lib/db.js';

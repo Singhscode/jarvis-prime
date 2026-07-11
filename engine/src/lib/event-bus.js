@@ -18,7 +18,7 @@
 //   eventBus.on('email.sent', async (data) => { ... });
 //   eventBus.emit('email.sent', { prospectId, subject, status });
 
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 
 class EventBus {
   constructor() {

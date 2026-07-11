@@ -64,10 +64,16 @@ open http://localhost:3000
 Jarvis ai company/
 ├── apps/site/          ← FRONTEND (Next.js website)
 ├── engine/             ← BACKEND (Node.js API)
-├── docs/               ← DOCUMENTATION
+├── documentation/      ← DOCUMENTATION
 │   ├── presentation/   ← Meeting materials
 │   ├── onboarding/     ← Employee training
-│   └── technical/      ← Technical docs
+│   ├── technical/      ← Technical docs
+│   ├── auth/           ← Authentication docs
+│   ├── security/       ← Security docs
+│   ├── changelog/      ← Development history
+│   └── business/       ← Business and execution docs
+├── automation/         ← n8n workflows and diagrams
+├── database/           ← Canonical SQL assets
 └── PROJECT_STRUCTURE.md ← Detailed folder guide
 ```
 
@@ -206,24 +212,24 @@ psql -f engine/sql/schema.sql
 ## 📚 Documentation
 
 ### For New Employees
-👉 See: [`docs/presentation/PRESENT_THIS_NOW.txt`](docs/presentation/PRESENT_THIS_NOW.txt)
+👉 See: [`documentation/presentation/PRESENT_THIS_NOW.txt`](documentation/presentation/PRESENT_THIS_NOW.txt)
 - 10-minute presentation script
 - Everything they need to know
 
 ### For Developers
-👉 See: [`docs/technical/BUSINESS_LOGIC_DETAILED.md`](docs/technical/BUSINESS_LOGIC_DETAILED.md)
+👉 See: [`documentation/technical/BUSINESS_LOGIC_DETAILED.md`](documentation/technical/BUSINESS_LOGIC_DETAILED.md)
 - Algorithms explained
 - Architecture deep dive
 - Data models
 
 ### For Onboarding
-👉 See: [`docs/onboarding/EMPLOYEE_ONBOARDING.md`](docs/onboarding/EMPLOYEE_ONBOARDING.md)
+👉 See: [`documentation/onboarding/EMPLOYEE_ONBOARDING.md`](documentation/onboarding/EMPLOYEE_ONBOARDING.md)
 - Complete training guide
 - First week tasks
 - Development setup
 
 ### For Presentations
-👉 See: [`docs/presentation/`](docs/presentation/)
+👉 See: [`documentation/presentation/`](documentation/presentation/)
 - Multiple presentation formats
 - Meeting preparation checklist
 
@@ -338,9 +344,9 @@ cat engine/.env
 
 ## 📞 Support
 
-**For Presentations**: See `docs/presentation/PRESENT_THIS_NOW.txt`  
-**For Technical Help**: See `docs/technical/BUSINESS_LOGIC_DETAILED.md`  
-**For Onboarding**: See `docs/onboarding/EMPLOYEE_ONBOARDING.md`  
+**For Presentations**: See `documentation/presentation/PRESENT_THIS_NOW.txt`  
+**For Technical Help**: See `documentation/technical/BUSINESS_LOGIC_DETAILED.md`  
+**For Onboarding**: See `documentation/onboarding/EMPLOYEE_ONBOARDING.md`  
 
 ---
 

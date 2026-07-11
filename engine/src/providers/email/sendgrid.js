@@ -7,7 +7,7 @@
 //   3. Fill in the send() method below
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { BaseEmailProvider } from './index.js';
 
 export class SendGridProvider extends BaseEmailProvider {

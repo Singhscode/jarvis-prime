@@ -3,7 +3,7 @@
 // Wired to the campaign orchestrator and database layer.
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { getDb, listActiveClients, _memory as mem } from '../../lib/db.js';
 import { runMultiChannelOutreach } from '../../agents/campaign-orchestrator.js';
 

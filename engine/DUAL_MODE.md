@@ -152,14 +152,19 @@ NEXT_PUBLIC_ENGINE_SERVER_URL=http://localhost:3001  # dev
 AUTOMATION_SERVER_SECRET=your_secret_from_engine_.env
 ```
 
-In website code:
+In website code (server-side, e.g. a Next.js API route):
 ```typescript
-import { callEngineServer } from '@/lib/automation-client';
-
-const result = await callEngineServer('/api/enrichment', {
-  action: 'find_agencies',
-  params: { location: 'India' },
-});
+const result = await fetch(`${process.env.NEXT_PUBLIC_ENGINE_SERVER_URL}/api/enrichment`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-automation-secret': process.env.AUTOMATION_SERVER_SECRET!,
+  },
+  body: JSON.stringify({
+    action: 'find_agencies',
+    params: { location: 'India' },
+  }),
+}).then((res) => res.json());
 ```
 
 ## Setup

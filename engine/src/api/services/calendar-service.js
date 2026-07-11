@@ -3,7 +3,7 @@
 // Handles availability checks, booking creation, and webhook processing.
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { updateProspect, insertEvent } from '../../lib/db.js';
 import { alertEvent } from '../../lib/notifications.js';
 

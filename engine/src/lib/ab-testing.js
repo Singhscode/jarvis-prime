@@ -2,7 +2,7 @@
 // Creates, manages, and evaluates split tests for email subjects, bodies,
 // and LinkedIn messages to optimize conversion rates.
 
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 import { config } from '../config.js';
 
 // In-memory fallback for A/B test tracking

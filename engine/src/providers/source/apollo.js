@@ -2,7 +2,6 @@
 // Extracted from sources/prospect-finder.js.
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
 import { BaseSourceProvider } from './index.js';
 
 export class ApolloProvider extends BaseSourceProvider {

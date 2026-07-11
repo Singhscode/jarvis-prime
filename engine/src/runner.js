@@ -15,7 +15,7 @@
 // Safe by default: DRY_RUN=true means nothing is emailed/paid APIs not called.
 
 import { config, providerStatus, validateSecrets } from './config.js';
-import { log } from './lib/logger.js';
+import { log } from 'jarvis-logger';
 import { listActiveClients, getProspectsByStage } from './lib/db.js';
 import { sourceAndScore, runOutreach } from './agents/outbound-agent.js';
 import { handleReply } from './agents/inbound-agent.js';

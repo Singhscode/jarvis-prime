@@ -13,7 +13,7 @@
 //   - Random delays between actions (2-8 seconds)
 
 import { config } from '../config.js';
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 
 // In-memory counters for daily limits (reset at midnight)
 const dailyCounters = { views: 0, connects: 0, dms: 0, resetDate: todayStr() };

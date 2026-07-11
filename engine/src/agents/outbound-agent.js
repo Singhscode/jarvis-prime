@@ -5,9 +5,8 @@
 //      respecting the daily send cap, suppression list, and follow-up timing.
 
 import { config, getClientConfig } from '../config.js';
-import { log } from '../lib/logger.js';
+import { log } from 'jarvis-logger';
 import { findProspects } from '../sources/prospect-finder.js';
-import { scoreProspect } from '../scoring/icp-scorer.js';
 import { writeEmail } from '../ai/personalizer.js';
 import { sendEmail, telegramAlert } from '../email/sender.js';
 import {
@@ -20,6 +19,7 @@ import {
   isSuppressed,
   countMessagesSentToday,
 } from '../lib/db.js';
+import { scoreProspect } from 'icp-scorer';
 
 // Sequence constants are now configurable per-client via getClientConfig().
 // Defaults: MAX_STEPS=3, FOLLOWUP_DAYS=[0,3,4] (first email + 2 follow-ups)

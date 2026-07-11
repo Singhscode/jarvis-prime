@@ -2,19 +2,26 @@
   "name": "jarvis-prime",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.8.2",
   "workspaces": [
     "apps/*",
-    "engine"
+    "engine",
+    "packages/*",
+    "services/*"
   ],
   "scripts": {
     "dev:site": "npm run dev --workspace=apps/site",
     "dev:engine": "npm run server --workspace=engine",
     "build:site": "npm run build --workspace=apps/site",
     "test:engine": "npm run test --workspace=engine",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
     "dev": "concurrently \"npm run dev:site\" \"npm run dev:engine\""
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "turbo": "^2.4.0"
   },
   "dependencies": {
     "dotenv": "^17.4.2"

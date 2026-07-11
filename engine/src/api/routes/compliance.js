@@ -5,7 +5,7 @@
 import express from 'express';
 import { addSuppression, isSuppressed, insertEvent } from '../../lib/db.js';
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 
 const router = express.Router();
 

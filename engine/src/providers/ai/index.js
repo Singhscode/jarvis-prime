@@ -48,3 +48,50 @@ export class BaseAIProvider {
     throw new Error(`${this.name}: generate() not implemented`);
   }
 }
+
+/**
+ * Shared helper for OpenAI-compatible chat completion APIs (Groq, OpenAI).
+ * Both providers use the same request/response shape, differing only in
+ * endpoint URL, API key, and default model.
+ * @param {object} params
+ * @param {string} params.url        Chat completions endpoint
+ * @param {string} params.apiKey     Bearer token
+ * @param {string} params.model      Model name
+ * @param {string} params.prompt     User prompt
+ * @param {object} [params.opts]     { temperature, maxTokens, json }
+ * @param {string} params.errorLabel Label used in thrown error messages
+ * @returns {Promise<{ content: string, usage?: object }>}
+ */
+export async function chatCompletion({ url, apiKey, model, prompt, opts = {}, errorLabel }) {
+  const { temperature = 0.7, maxTokens, json = false } = opts;
+
+  const body = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature,
+  };
+
+  if (maxTokens) body.max_tokens = maxTokens;
+  if (json) body.response_format = { type: 'json_object' };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    throw new Error(`${errorLabel} failed: ${res.status}`);
+  }
+
+  const data = await res.json();
+  const content = data.choices?.[0]?.message?.content || '';
+
+  return {
+    content,
+    usage: data.usage || undefined,
+  };
+}

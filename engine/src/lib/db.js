@@ -4,7 +4,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
-import { log } from './logger.js';
+import { log } from 'jarvis-logger';
 
 let client = null;
 let usingMemory = false;

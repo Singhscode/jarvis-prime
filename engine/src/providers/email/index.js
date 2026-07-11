@@ -9,7 +9,7 @@
 //   const result = await provider.send(to, subject, body);
 
 import { config } from '../../config.js';
-import { log } from '../../lib/logger.js';
+import { log } from 'jarvis-logger';
 
 /**
  * Get the configured email provider.

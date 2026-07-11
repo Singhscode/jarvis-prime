@@ -6,6 +6,7 @@
   "description": "JARVIS PRIME engine — CLI + HTTP API. Finds prospects, scores, personalizes, sends sequences, handles replies. Plugin-based provider system, event-driven architecture.",
   "main": "src/runner.js",
   "scripts": {
+    "lint": "eslint src --ext .js",
     "run": "node src/runner.js",
     "run:once": "node src/runner.js --once",
     "source": "node src/runner.js --task=source",
@@ -23,7 +24,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "jarvis-logger": "file:../packages/logger",
+    "icp-scorer": "file:../packages/shared"
   },
   "engines": {
     "node": ">=18.0.0"
