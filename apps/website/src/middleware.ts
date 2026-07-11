@@ -1,60 +1,128 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { createHmac, timingSafeEqual } from 'crypto';
 
-// Rate limiting store (in-memory - use Redis in production)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+// ── Security headers ──────────────────────────────────────────────────────────
 
-function rateLimit(ip: string, limit: number = 10, windowMs: number = 60000): boolean {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
-    return true;
-  }
-
-  if (record.count >= limit) {
-    return false;
-  }
-
-  record.count++;
-  return true;
-}
-
-export function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
-  const response = NextResponse.next();
-
-  // Security headers
+function applySecurityHeaders(response: NextResponse): void {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  
-  // HSTS (only in production)
+
   if (process.env.NODE_ENV === 'production') {
-    response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    response.headers.set(
+      'Strict-Transport-Security',
+      'max-age=63072000; includeSubDomains; preload'
+    );
+  }
+}
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+
+// In-memory store — adequate for a low-traffic internal portal.
+// For edge / multi-region deployments, replace with Upstash Redis.
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function rateLimit(ip: string, limit = 10, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(ip, { count: 1, resetTime: now + windowMs });
+    return true; // allowed
   }
 
-  // Rate limiting for API routes
+  if (record.count >= limit) return false; // blocked
+
+  record.count += 1;
+  return true; // allowed
+}
+
+// ── Cookie verification ───────────────────────────────────────────────────────
+
+const COOKIE_NAME = 'portal_token';
+
+/**
+ * Verifies the HMAC-signed portal cookie set by /api/portal-auth.
+ * Format expected: <nonce>.<hmac_sha256_hex>
+ *
+ * Returns true only when:
+ *   1. The cookie exists and is correctly formatted.
+ *   2. The HMAC of the nonce matches the signature (constant-time compare).
+ *   3. PORTAL_COOKIE_SECRET is configured on the server.
+ *
+ * A copied cookie value is still valid for its lifetime — this is intentional
+ * for a shared-password portal. The HMAC prevents *forged* cookies (anyone
+ * setting portal_token=anything-they-like to bypass the login page).
+ */
+function isValidPortalCookie(cookieValue: string | undefined): boolean {
+  if (!cookieValue) return false;
+
+  const secret = process.env.PORTAL_COOKIE_SECRET;
+  if (!secret) {
+    // Misconfigured: no secret → reject all access (fail closed)
+    console.error('[middleware] PORTAL_COOKIE_SECRET is not set — all portal access denied.');
+    return false;
+  }
+
+  const dotIndex = cookieValue.lastIndexOf('.');
+  if (dotIndex === -1) return false;
+
+  const nonce = cookieValue.slice(0, dotIndex);
+  const providedSig = cookieValue.slice(dotIndex + 1);
+
+  if (!nonce || !providedSig) return false;
+
+  const expectedSig = createHmac('sha256', secret).update(nonce).digest('hex');
+
+  try {
+    // timingSafeEqual requires same-length Buffers
+    const a = Buffer.from(providedSig, 'hex');
+    const b = Buffer.from(expectedSig, 'hex');
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+// ── Middleware ────────────────────────────────────────────────────────────────
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const response = NextResponse.next();
+
+  applySecurityHeaders(response);
+
+  // Rate-limit all API routes
   if (pathname.startsWith('/api/')) {
-    const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
-    
-    if (!rateLimit(ip, 10, 60000)) {
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+      request.headers.get('x-real-ip') ??
+      'unknown';
+
+    if (!rateLimit(ip, 10, 60_000)) {
       return new NextResponse('Too many requests', { status: 429 });
     }
   }
 
-  // Portal pages that require authentication
+  // Protect internal portal pages
   const protectedPaths = ['/dashboard', '/leads', '/tasks'];
-  const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
+  const isProtectedPath = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtectedPath) {
-    const authCookie = request.cookies.get('portal_authenticated');
+    const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
 
-    if (!authCookie) {
-      return NextResponse.redirect(new URL('/portal-auth', request.url));
+    if (!isValidPortalCookie(cookieValue)) {
+      // Clear any stale / forged cookie before redirecting
+      const redirectResponse = NextResponse.redirect(
+        new URL('/portal-auth', request.url)
+      );
+      applySecurityHeaders(redirectResponse);
+      redirectResponse.cookies.delete(COOKIE_NAME);
+      return redirectResponse;
     }
   }
 
