@@ -1,0 +1,5 @@
+Repository: https://github.com/Singhscode/jarvis-prime
+Branch: main
+
+Archived status snapshot from initial project setup.
+See git log for current history.

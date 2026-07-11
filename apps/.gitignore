@@ -1,7 +1,0 @@
-node_modules/
-.next/
-.env.local
-.env
-.env.production
-.DS_Store
-*.log

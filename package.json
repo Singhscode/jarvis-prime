@@ -3,18 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "workspaces": [
-    "apps",
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:site": "npm run dev --workspace=apps",
-    "dev:engine": "npm run server --workspace=packages/engine",
-    "build:site": "npm run build --workspace=apps",
-    "test:engine": "npm run test --workspace=packages/engine",
-    "dev": "concurrently \"npm run dev:site\" \"npm run dev:engine\""
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "npm run server --workspace=apps/api"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "turbo": "^2.0.0"
   },
   "dependencies": {
     "dotenv": "^17.4.2"

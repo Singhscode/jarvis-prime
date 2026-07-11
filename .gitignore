@@ -1,64 +1,49 @@
 # Dependencies
 node_modules/
 
-# ============================================================
-# Environment Variables — SECURITY CRITICAL
-# NEVER commit actual secret values to git
-# ============================================================
+# Builds
+.next/
+dist/
+build/
+coverage/
+.turbo/
 
-# Actual secrets (ALWAYS ignore these)
+# Environment secrets
 .env
 .env.local
-.env.production
-.env.*.local
-
-# Development/Test/Production local overrides (ignore these)
 .env.development.local
 .env.test.local
 .env.production.local
+apps/*/.env
+apps/*/.env.local
+packages/*/.env
 
-# Allow templates and examples (these document what's needed)
-# DO NOT ignore these — commit them so team sees required variables
+# Allow committed non-secret env files (placeholder values only)
 !.env.example
-!.env.*.example
 !.env.development
 !.env.test
-!*.env.template
-!.env.*.template
 
-# Next.js build output
-.next/
-out/
-dist/
-
-# Misc
-.DS_Store
+# Logs
 *.log
-*.log.*
+logs/
 
-# Backup files
-*.backup
-*.backup.*
-*-backup.*
-*.old
-*.bak
-*-old.*
-*.tmp
+# Local storage
+uploads/
+storage/
+backups/
 
-# IDE
-.vscode/
+# IDE and OS
+.DS_Store
+Thumbs.db
 .idea/
+.vscode/
 
-# Local Netlify folder
+# Deployment
 .netlify
 .vercel
-.env*.local
 
-# Documentation (keep in docs/ folder)
-/*-COMPLETE.txt
-/*-ADDED.txt
-/*-LIVE.txt
-/*_REPORT.txt
-/*_PLAN.txt
-CLEANUP_PLAN.txt
-.turbo/
+# Misc
+*.backup
+*.bak
+*.tmp
+*.old

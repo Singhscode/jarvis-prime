@@ -1,0 +1,5 @@
+Archived: Original reorganization status file from first monorepo setup.
+
+Current structure is defined in how_to_work.md at the project root.
+The engine moved from engine/ → packages/engine → apps/api/.
+The frontend moved from apps/ → apps/web/.
