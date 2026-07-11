@@ -30,7 +30,6 @@ const nextConfig = {
   },
   // Environment-aware configuration
   env: {
-    NODE_ENV: process.env.NODE_ENV || 'development',
     DRY_RUN: process.env.DRY_RUN || 'true',
   },
 };

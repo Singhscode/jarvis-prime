@@ -119,7 +119,11 @@ export async function createApp(options = {}) {
   const { default: webhooksRouter } = await import('./api/routes/webhooks.js');
   app.use('/webhooks', webhooksRouter);
 
-  // ---- Auth middleware for all /api routes ----
+  // ---- User auth routes (public — handle their own auth internally) ----
+  const { router: authRouter } = await import('./api/auth-routes.js');
+  app.use('/api/auth', authRouter);
+
+  // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());
 
   // ---- Import and mount API routes ----

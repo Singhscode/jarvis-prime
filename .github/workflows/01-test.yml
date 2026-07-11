@@ -22,15 +22,16 @@ jobs:
         run: npm ci
 
       - name: Load test environment
-        run: cp engine/.env.test engine/.env
+        run: cp packages/engine/.env.test packages/engine/.env
 
       - name: Run engine tests
         run: npm run test:engine
 
       - name: Run engine doctor (health check)
-        run: npm run doctor --workspace=engine
+        run: npm run doctor --workspace=packages/engine
         env:
           NODE_ENV: test
+          JWT_SECRET: ci-test-jwt-secret-not-for-prod-aaaaaaaaaaaaaaaaaaaaaaaaaaa
 
   test-site:
     runs-on: ubuntu-latest
@@ -47,13 +48,17 @@ jobs:
         run: npm ci
 
       - name: Load test environment
-        run: cp apps/site/.env.test apps/site/.env.local
+        run: cp apps/.env.test apps/.env.local
 
       - name: Lint site
-        run: npm run lint --workspace=apps/site
+        run: npm run lint --workspace=apps
 
       - name: Build site
         run: npm run build:site
+        env:
+          # Portal auth — safe test values for CI build (never real secrets)
+          PORTAL_PASSWORD: ci-test-portal-password
+          PORTAL_COOKIE_SECRET: ci-test-cookie-secret-not-for-prod-aaaaaaaaaaaaaaa
 
   secret-scan:
     runs-on: ubuntu-latest
@@ -73,21 +78,20 @@ jobs:
       - name: Detect secrets in env files
         run: |
           echo "Checking for hardcoded secrets in .env files..."
-          
-          # Fail if actual secret files exist (not templates)
+
           if [ -f ".env" ]; then
             echo "ERROR: .env file should not be committed!"
             exit 1
           fi
-          
-          if [ -f "apps/site/.env.local" ]; then
-            echo "ERROR: apps/site/.env.local should not be committed!"
+
+          if [ -f "apps/.env.local" ]; then
+            echo "ERROR: apps/.env.local should not be committed!"
             exit 1
           fi
-          
-          if [ -f "engine/.env" ] && [ ! -f "engine/.env.test" ]; then
-            echo "ERROR: engine/.env should not be committed (use .env.test in CI)!"
+
+          if [ -f "packages/engine/.env" ] && [ ! -f "packages/engine/.env.test" ]; then
+            echo "ERROR: packages/engine/.env should not be committed (use .env.test in CI)!"
             exit 1
           fi
-          
+
           echo "✓ No secret files detected in commit"

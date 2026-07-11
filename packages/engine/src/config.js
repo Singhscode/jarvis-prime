@@ -93,6 +93,10 @@ export const config = {
   port: num(env.PORT, 3001),
   automationSecret: env.AUTOMATION_SERVER_SECRET || 'dev-secret',
 
+  // Authentication (JWT — user-facing auth layer)
+  jwtSecret: env.JWT_SECRET || '',
+  encryptionKey: env.ENCRYPTION_KEY || '',
+
   // Database
   supabaseUrl: env.SUPABASE_URL || '',
   supabaseKey: env.SUPABASE_SERVICE_ROLE_KEY || '',
