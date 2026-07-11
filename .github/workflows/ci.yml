@@ -22,7 +22,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: engine
+        working-directory: services/automation-engine
 
     env:
       NODE_ENV: test
@@ -32,6 +32,7 @@ jobs:
       DAILY_SEND_LIMIT: "5"
       PORT: "3002"
       AUTOMATION_SERVER_SECRET: "ci-test-secret-not-for-prod"
+      JWT_SECRET: "ci-test-jwt-secret-not-for-prod-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       APOLLO_API_KEY: "test_apollo_key"
       GROQ_API_KEY: "test_groq_key"
       RESEND_API_KEY: "test_resend_key"
@@ -46,7 +47,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-          cache-dependency-path: engine/package-lock.json
+          cache-dependency-path: services/automation-engine/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -63,7 +64,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/site
+        working-directory: apps/website
 
     env:
       NODE_ENV: test
@@ -81,7 +82,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-          cache-dependency-path: apps/site/package-lock.json
+          cache-dependency-path: apps/website/package-lock.json
 
       - name: Install dependencies
         run: npm ci

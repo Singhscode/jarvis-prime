@@ -121,6 +121,10 @@ export const config = {
   schedulerEnabled: bool(env.SCHEDULER_ENABLED, true),
   schedulerTimezone: env.SCHEDULER_TIMEZONE || 'Asia/Kolkata',
 
+  // Authentication (JWT — for user-facing auth layer)
+  jwtSecret: env.JWT_SECRET || '',
+  encryptionKey: env.ENCRYPTION_KEY || '',
+
   // A/B Testing
   abTestMinSample: num(env.AB_TEST_MIN_SAMPLE, 50),
 
@@ -206,6 +210,7 @@ export function validateSecrets() {
 
   missing('SUPABASE_URL', config.supabaseUrl);
   missing('SUPABASE_SERVICE_ROLE_KEY', config.supabaseKey);
+  missing('JWT_SECRET', config.jwtSecret);
 
   // At least one email provider must be configured in live mode
   if (!config.dryRun) {

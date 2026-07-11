@@ -57,10 +57,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-          cache-dependency-path: engine/package-lock.json
+          cache-dependency-path: services/automation-engine/package-lock.json
 
       - name: Install engine dependencies (production only)
-        working-directory: engine
+        working-directory: services/automation-engine
         run: npm ci --production
 
       # All secrets live in GitHub Environments → production → Secrets.
@@ -78,7 +78,7 @@ jobs:
             -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
             --exclude='.env*' \
             --exclude='node_modules' \
-            ./engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+            ./services/automation-engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "cd ${DEPLOY_PATH} && npm ci --production && pm2 reload jarvis-engine --update-env"
@@ -103,7 +103,7 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: "--prod"
-          working-directory: apps/site
+          working-directory: apps/website
 
   # ─────────────────────────────────────────────────────────────────────────
   # Post-deploy smoke tests

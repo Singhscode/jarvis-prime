@@ -28,10 +28,10 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: "npm"
-          cache-dependency-path: engine/package-lock.json
+          cache-dependency-path: services/automation-engine/package-lock.json
 
       - name: Install engine dependencies
-        working-directory: engine
+        working-directory: services/automation-engine
         run: npm ci --production
 
       # Secrets are injected via GitHub Environments — never hardcoded here.
@@ -50,7 +50,7 @@ jobs:
             -e "ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
             --exclude='.env*' \
             --exclude='node_modules' \
-            ./engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+            ./services/automation-engine/ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no \
             "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "cd ${DEPLOY_PATH} && npm ci --production && pm2 restart jarvis-engine || pm2 start src/runner.js --name jarvis-engine"
@@ -73,7 +73,7 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: apps/site
+          working-directory: apps/website
           # No --prod flag → creates a Vercel preview deployment (not production)
 
   # ─────────────────────────────────────────────────────────────────────────

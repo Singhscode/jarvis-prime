@@ -16,7 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'sql', 'migrations');
+const MIGRATIONS_DIR = path.join(__dirname, '..', '..', '..', 'database', 'migrations');
 
 async function main() {
   const showStatus = process.argv.includes('--status');

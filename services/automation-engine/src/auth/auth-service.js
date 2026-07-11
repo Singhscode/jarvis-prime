@@ -2,6 +2,8 @@
 // Core business logic for user registration, login, password management, and security
 // Orchestrates crypto, JWT, database, and audit logging
 
+import { createHash } from 'node:crypto';
+import { config } from '../config.js';
 import {
   hashPassword,
   verifyPassword,
@@ -304,7 +306,7 @@ export async function loginUser(params, ipAddress, userAgent) {
     });
 
     // Generate tokens
-    const accessToken = createAccessToken(user, session, process.env.JWT_SECRET);
+    const accessToken = createAccessToken(user, session, config.jwtSecret);
 
     // Create refresh token (stored in DB)
     const refreshTokenRaw = generateToken();
@@ -429,10 +431,9 @@ function validatePasswordStrength(password) {
  * @param {string} userAgent - User agent string
  * @returns {string} Device ID
  */
-async function generateDeviceId(ipAddress, userAgent) {
-  const crypto = await import('node:crypto');
+function generateDeviceId(ipAddress, userAgent) {
   const data = `${ipAddress}|${userAgent || ''}`;
-  return crypto.createHash('sha256').update(data).digest('hex');
+  return createHash('sha256').update(data).digest('hex');
 }
 
 /**
@@ -649,5 +650,5 @@ export function sanitizeUser(user) {
  */
 export function verifyToken(token) {
   const bearerToken = extractBearerToken(`Bearer ${token}`) || token;
-  return verifyAccessToken(bearerToken, process.env.JWT_SECRET);
+  return verifyAccessToken(bearerToken, config.jwtSecret);
 }
