@@ -25,23 +25,32 @@ jobs:
       - name: Verify production secrets are set
         run: |
           echo "✓ Checking production environment secrets..."
-          
-          # Verify required secrets exist
+
           if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
             echo "❌ ERROR: SUPABASE_URL secret not set in GitHub Environment"
             exit 1
           fi
-          
+
           if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
             echo "❌ ERROR: SUPABASE_SERVICE_ROLE_KEY secret not set in GitHub Environment"
             exit 1
           fi
-          
+
+          if [ -z "${{ secrets.PORTAL_PASSWORD }}" ]; then
+            echo "❌ ERROR: PORTAL_PASSWORD secret not set in GitHub Environment"
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.PORTAL_COOKIE_SECRET }}" ]; then
+            echo "❌ ERROR: PORTAL_COOKIE_SECRET secret not set in GitHub Environment"
+            exit 1
+          fi
+
           echo "✓ All required secrets verified"
 
       - name: Create production environment
         run: |
-          cat > apps/site/.env.local << EOF
+          cat > apps/.env.local << EOF
           NODE_ENV=production
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
@@ -49,15 +58,19 @@ jobs:
           TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID=${{ secrets.TELEGRAM_CHAT_ID }}
           N8N_WEBHOOK_URL=${{ secrets.N8N_WEBHOOK_URL }}
+          PORTAL_PASSWORD=${{ secrets.PORTAL_PASSWORD }}
+          PORTAL_COOKIE_SECRET=${{ secrets.PORTAL_COOKIE_SECRET }}
           DRY_RUN=false
           LOG_LEVEL=warn
           EOF
-          
-          cat > engine/.env << EOF
+
+          cat > packages/engine/.env << EOF
           NODE_ENV=production
           DRY_RUN=false
           SUPABASE_URL=${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
           APOLLO_API_KEY=${{ secrets.APOLLO_API_KEY }}
           HUNTER_API_KEY=${{ secrets.HUNTER_API_KEY }}
           GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
@@ -80,6 +93,8 @@ jobs:
         run: npm run build:site
         env:
           NODE_ENV: production
+          PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+          PORTAL_COOKIE_SECRET: ${{ secrets.PORTAL_COOKIE_SECRET }}
 
       - name: Deploy to Production
         run: |
@@ -90,7 +105,7 @@ jobs:
           echo "All real secrets are now active"
           echo ""
           # Add your production deployment command here
-          # Example: netlify deploy --prod --dir=apps/site/.next
+          # Example: netlify deploy --prod --dir=apps/.next
           # Or: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
           echo "✓ Production deployment initiated"
 

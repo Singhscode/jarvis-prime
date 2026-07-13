@@ -62,7 +62,7 @@ export default function ContactSection() {
             Start Your <span className="text-gradient">Free 7-Day Pilot</span>
           </h2>
           <p className="text-white/50">
-            No credit card needed. We'll set up your system and show you exactly how many qualified leads we can generate for you.
+            No credit card needed. We&apos;ll set up your system and show you exactly how many qualified leads we can generate for you.
           </p>
         </div>
 
@@ -128,7 +128,7 @@ export default function ContactSection() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-sm text-white/60 mb-1 block">What's your biggest challenge?</label>
+                  <label className="text-sm text-white/60 mb-1 block">What&apos;s your biggest challenge?</label>
                   <textarea
                     rows={3}
                     value={form.message}
@@ -161,9 +161,9 @@ export default function ContactSection() {
                 <div className="w-16 h-16 bg-brand-500/20 rounded-full flex items-center justify-center mb-4">
                   <Send className="w-8 h-8 text-brand-400" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-2">Perfect! You're in.</h3>
+                <h3 className="text-xl font-bold text-white mb-2">Perfect! You&apos;re in.</h3>
                 <p className="text-white/50 text-sm">
-                  Check your email + WhatsApp in the next 2 hours. We'll have your system ready to go.
+                  Check your email + WhatsApp in the next 2 hours. We&apos;ll have your system ready to go.
                 </p>
               </div>
             )}
@@ -197,7 +197,7 @@ export default function ContactSection() {
               <h3 className="font-bold text-white mb-1">Response Guaranteed</h3>
               <p className="text-sm text-white/50">
                 Mon – Fri · 9 AM – 8 PM IST<br />
-                We respond to every inquiry within 2 hours. If you don't hear back, check your spam folder or WhatsApp.
+                We respond to every inquiry within 2 hours. If you don&apos;t hear back, check your spam folder or WhatsApp.
               </p>
             </div>
           </div>
