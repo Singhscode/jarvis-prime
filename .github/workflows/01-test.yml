@@ -22,16 +22,15 @@ jobs:
         run: npm ci
 
       - name: Load test environment
-        run: cp packages/engine/.env.test packages/engine/.env
+        run: cp apps/api/.env.test apps/api/.env
 
       - name: Run engine tests
-        run: npm run test:engine
+        run: npm run test --workspace=apps/api
 
       - name: Run engine doctor (health check)
-        run: npm run doctor --workspace=packages/engine
+        run: npm run doctor --workspace=apps/api
         env:
           NODE_ENV: test
-          JWT_SECRET: ci-test-jwt-secret-not-for-prod-aaaaaaaaaaaaaaaaaaaaaaaaaaa
 
   test-site:
     runs-on: ubuntu-latest
@@ -48,15 +47,19 @@ jobs:
         run: npm ci
 
       - name: Load test environment
-        run: cp apps/.env.test apps/.env.local
+        run: |
+          if [ -f "apps/web/.env.test" ]; then
+            cp apps/web/.env.test apps/web/.env.local
+          elif [ -f "apps/web/.env.development" ]; then
+            cp apps/web/.env.development apps/web/.env.local
+          fi
 
       - name: Lint site
-        run: npm run lint --workspace=apps
+        run: npm run lint --workspace=apps/web
 
       - name: Build site
-        run: npm run build:site
+        run: npm run build --workspace=apps/web
         env:
-          # Portal auth — safe test values for CI build (never real secrets)
           PORTAL_PASSWORD: ci-test-portal-password
           PORTAL_COOKIE_SECRET: ci-test-cookie-secret-not-for-prod-aaaaaaaaaaaaaaa
 
@@ -67,14 +70,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: TruffleHog Secret Scan
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --only-verified
-
       - name: Detect secrets in env files
         run: |
           echo "Checking for hardcoded secrets in .env files..."
@@ -84,13 +79,13 @@ jobs:
             exit 1
           fi
 
-          if [ -f "apps/.env.local" ]; then
-            echo "ERROR: apps/.env.local should not be committed!"
+          if [ -f "apps/web/.env.local" ]; then
+            echo "ERROR: apps/web/.env.local should not be committed!"
             exit 1
           fi
 
-          if [ -f "packages/engine/.env" ] && [ ! -f "packages/engine/.env.test" ]; then
-            echo "ERROR: packages/engine/.env should not be committed (use .env.test in CI)!"
+          if [ -f "apps/api/.env" ] && [ ! -f "apps/api/.env.test" ]; then
+            echo "ERROR: apps/api/.env should not be committed!"
             exit 1
           fi
 

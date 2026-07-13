@@ -23,32 +23,29 @@ jobs:
 
       - name: Load staging environment
         run: |
-          cp apps/.env.test apps/.env.local
-          cp packages/engine/.env.test packages/engine/.env
+          cp apps/api/.env.test apps/api/.env
+          if [ -f "apps/web/.env.development" ]; then
+            cp apps/web/.env.development apps/web/.env.local
+          fi
 
-      - name: Run final tests before deploy
-        run: npm run test:engine
+      - name: Run tests before deploy
+        run: npm run test --workspace=apps/api
 
       - name: Build site for staging
-        run: npm run build:site
+        run: npm run build --workspace=apps/web
         env:
           NODE_ENV: staging
-          PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD || 'staging-portal-password' }}
-          PORTAL_COOKIE_SECRET: ${{ secrets.PORTAL_COOKIE_SECRET || 'staging-cookie-secret-not-for-prod-aaaaaaaaaaaaaaaa' }}
+          PORTAL_PASSWORD: ${{ secrets.PORTAL_PASSWORD }}
+          PORTAL_COOKIE_SECRET: ${{ secrets.PORTAL_COOKIE_SECRET }}
 
       - name: Deploy to Staging
         run: |
           echo "🚀 Deploying to staging..."
-          # Add your staging deployment command here
-          # Example: netlify deploy --prod --dir=apps/.next
-          # Or: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
           echo "✓ Staging deployment initiated"
 
       - name: Notify deployment
         if: success()
-        run: |
-          echo "✓ Staging deployment completed successfully"
-          echo "Staging URL: https://staging.jarvisprime.me"
+        run: echo "✓ Staging deployment completed successfully"
 
       - name: Notify on failure
         if: failure()
