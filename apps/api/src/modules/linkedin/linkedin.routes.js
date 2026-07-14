@@ -2,8 +2,8 @@
 // HTTP interface for LinkedIn automation actions.
 
 import express from 'express';
-import { providerStatus } from '../../config.js';
-import * as linkedinService from '../services/linkedin-service.js';
+import { providerStatus } from '../../config/config.js';
+import * as linkedinService from './linkedin.service.js';
 
 const router = express.Router();
 

@@ -2,8 +2,8 @@
 // Dashboard metrics, daily/weekly trends, funnels, and channel breakdowns.
 
 import express from 'express';
-import * as analyticsService from '../services/analytics-service.js';
-import { listTests, getTestResults } from '../../lib/ab-testing.js';
+import * as analyticsService from './analytics.service.js';
+import { listTests, getTestResults } from '../../utils/ab-testing.js';
 
 const router = express.Router();
 

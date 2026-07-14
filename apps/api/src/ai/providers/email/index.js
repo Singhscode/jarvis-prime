@@ -4,12 +4,12 @@
 //   { name, isConfigured(), send(to, subject, body, opts) }
 //
 // Usage:
-//   import { getEmailProvider } from '../providers/email/index.js';
+//   import { getEmailProvider } from '../source/index.js';
 //   const provider = getEmailProvider();
 //   const result = await provider.send(to, subject, body);
 
-import { config } from '../../config/config.js';
-import { log } from '../../utils/logger.js';
+import { config } from '../../../config/config.js';
+import { log } from '../../../utils/logger.js';
 
 /**
  * Get the configured email provider.

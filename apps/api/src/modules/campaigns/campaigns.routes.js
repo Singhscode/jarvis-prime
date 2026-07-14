@@ -2,7 +2,7 @@
 // Campaign management and tracking
 
 import express from 'express';
-import * as campaignService from '../services/campaign-service.js';
+import * as campaignService from './campaigns.service.js';
 import { validate } from '../../middleware/validate.js';
 
 const router = express.Router();

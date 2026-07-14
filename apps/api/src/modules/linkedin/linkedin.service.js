@@ -1,7 +1,7 @@
 // LinkedIn Service
 // Business logic for LinkedIn outreach operations via HTTP API.
 
-import { config } from '../../config.js';
+import { config } from '../../config/config.js';
 import {
   visitProfile,
   sendConnectionRequest,
@@ -9,7 +9,7 @@ import {
   generateConnectionNote,
   generateFollowUpDM,
   getDailyStats,
-} from '../../agents/linkedin-agent.js';
+} from '../../ai/agents/linkedin-agent.js';
 
 /**
  * Execute a LinkedIn action for a prospect.

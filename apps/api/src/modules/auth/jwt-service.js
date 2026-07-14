@@ -35,9 +35,7 @@ export function createAccessToken(user, session, secret) {
     // Custom claims (NEVER include sensitive data)
     email: user.email,
     email_verified: user.email_verified_at ? true : false,
-    mfa_enabled: user.mfa_enabled || false,
-    organization_id: user.organization_id || null,
-    role: user.role || 'member',
+    role: user.role || 'client',
     
     // Session binding (for invalidation & security)
     session_id: session.id,
@@ -86,20 +84,6 @@ export function verifyAccessToken(token, secret) {
   } catch {
     return null;
   }
-}
-
-/**
- * Refreshes an access token using a refresh token
- * Implements token rotation for security
- * 
- * @param {string} refreshTokenHash - Hash of refresh token from database
- * @param {object} user - User object
- * @param {object} session - Session object
- * @param {string} secret - Signing secret
- * @returns {string} New access token
- */
-export function refreshAccessToken(user, session, secret) {
-  return createAccessToken(user, session, secret);
 }
 
 /**
@@ -203,46 +187,4 @@ export function extractBearerToken(authHeader) {
   if (!authHeader) return null;
   if (!authHeader.startsWith('Bearer ')) return null;
   return authHeader.slice(7);
-}
-
-/**
- * Decodes JWT without verification (for debugging)
- * UNSAFE: Only use for reading claims, never trust unverified tokens
- * 
- * @param {string} token - JWT to decode
- * @returns {object} Decoded payload (unverified)
- */
-export function decodeToken(token) {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(base64UrlDecode(parts[1]));
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Calculates time until token expiry
- * 
- * @param {object} payload - Decoded JWT payload
- * @returns {number} Milliseconds until expiry (negative if expired)
- */
-export function getTokenExpiry(payload) {
-  const now = Math.floor(Date.now() / 1000);
-  return (payload.exp - now) * 1000;
-}
-
-/**
- * Checks if token is expiring soon (within threshold)
- * Used to refresh before actual expiry
- * 
- * @param {object} payload - Decoded JWT payload
- * @param {number} thresholdSeconds - Threshold in seconds (default: 1 minute)
- * @returns {boolean} True if expiring soon
- */
-export function isExpiringsoon(payload, thresholdSeconds = 60) {
-  const now = Math.floor(Date.now() / 1000);
-  return (payload.exp - now) < thresholdSeconds;
 }

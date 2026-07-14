@@ -4,11 +4,11 @@
 //   { name, isConfigured(), generate(prompt, opts) }
 //
 // Usage:
-//   import { getAIProvider } from '../providers/ai/index.js';
+//   import { getAIProvider } from '../source/index.js';
 //   const ai = await getAIProvider();
 //   const result = await ai.generate('Write a cold email...', { json: true });
 
-import { config } from '../../config.js';
+import { config } from '../../../config/config.js';
 
 /**
  * Get the configured AI provider.

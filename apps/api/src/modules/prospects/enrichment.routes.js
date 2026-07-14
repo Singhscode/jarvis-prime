@@ -2,8 +2,8 @@
 // Wraps enrichment-service for HTTP access
 
 import express from 'express';
-import { providerStatus } from '../../config.js';
-import * as enrichmentService from '../services/enrichment-service.js';
+import { providerStatus } from '../../config/config.js';
+import * as enrichmentService from './enrichment.service.js';
 import { validate } from '../../middleware/validate.js';
 
 const router = express.Router();

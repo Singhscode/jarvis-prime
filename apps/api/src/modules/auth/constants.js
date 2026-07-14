@@ -49,13 +49,6 @@ export const auth = {
     algorithm: 'HS256',
   },
 
-  // MFA
-  mfa: {
-    totpWindow: 1,                                     // +/- 30 second windows
-    recoveryCodesCount: 10,
-    recoveryCodeLength: 8,
-  },
-
   // Rate limiting
   rateLimit: {
     windowMs: 15 * 60 * 1000,                         // 15 minute window
@@ -73,15 +66,7 @@ export const auth = {
     DELETED: 'deleted',
   },
 
-  // Token types (for audit trail)
-  tokenType: {
-    ACCESS: 'access',
-    REFRESH: 'refresh',
-    EMAIL_VERIFICATION: 'email_verification',
-    PASSWORD_RESET: 'password_reset',
-  },
-
-  // Audit event types (for compliance)
+  // Audit event types
   auditEvents: {
     USER_CREATED: 'user.created',
     USER_LOGIN: 'user.login',
@@ -91,32 +76,11 @@ export const auth = {
     PASSWORD_RESET: 'password.reset',
     EMAIL_VERIFIED: 'email.verified',
     EMAIL_VERIFICATION_SENT: 'email.verification_sent',
-    MFA_ENABLED: 'mfa.enabled',
-    MFA_DISABLED: 'mfa.disabled',
-    MFA_VERIFIED: 'mfa.verified',
-    OAUTH_LINKED: 'oauth.linked',
-    OAUTH_UNLINKED: 'oauth.unlinked',
     SESSION_CREATED: 'session.created',
     SESSION_REVOKED: 'session.revoked',
     TOKEN_REFRESHED: 'token.refreshed',
     LOGIN_FAILED: 'login.failed',
     ACCOUNT_LOCKED: 'account.locked',
-  },
-
-  // Security event severity levels
-  securityEventSeverity: {
-    LOW: 'low',
-    MEDIUM: 'medium',
-    HIGH: 'high',
-    CRITICAL: 'critical',
-  },
-
-  // Device types
-  deviceType: {
-    WEB: 'web',
-    MOBILE: 'mobile',
-    DESKTOP: 'desktop',
-    API: 'api',
   },
 };
 
@@ -138,7 +102,7 @@ export const authMessages = {
   UNAUTHORIZED: 'Unauthorized.',
   FORBIDDEN: 'Forbidden.',
 
-  // Specific errors (internal use only, never to client)
+  // Specific errors
   EMAIL_ALREADY_EXISTS: 'Email already registered.',
   USERNAME_ALREADY_EXISTS: 'Username already taken.',
   USER_NOT_FOUND: 'User not found.',
@@ -146,8 +110,6 @@ export const authMessages = {
   ACCOUNT_DELETED: 'Account has been deleted.',
   EMAIL_NOT_VERIFIED: 'Email not verified.',
   ACCOUNT_LOCKED: 'Account locked due to failed login attempts.',
-  MFA_REQUIRED: 'Multi-factor authentication required.',
-  INVALID_MFA_CODE: 'Invalid authentication code.',
 };
 
 // HTTP status codes

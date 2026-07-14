@@ -3,7 +3,7 @@
 // Routes: inbound email replies, calendar events, CRM sync, custom triggers.
 
 import express from 'express';
-import * as webhookService from '../services/webhook-service.js';
+import * as webhookService from '../integrations/webhook.service.js';
 
 const router = express.Router();
 
