@@ -12,9 +12,9 @@ jarvis-prime/
 │   ├── web/          # Next.js frontend (landing page + client portal)
 │   ├── api/          # Node.js automation engine + HTTP API
 │   └── icp-scorer/   # Standalone ICP scoring module
+├── database/          # Version-controlled SQL schemas and migrations
 ├── packages/
 │   ├── ui/           # Shared React components
-│   ├── database/     # Shared DB client and repositories
 │   ├── auth/         # Shared authentication helpers
 │   ├── ai/           # Shared AI provider abstractions
 │   ├── config/       # Shared configuration helpers
@@ -130,7 +130,7 @@ apps/api/src/
 
 - **Frontend:** Deploy `apps/web/` to Vercel (see `apps/web/vercel.json`)
 - **Backend:** Deploy `apps/api/` to any Node.js 18+ host
-- **Database:** Supabase (PostgreSQL) — schema at `apps/api/sql/schema.sql`
+- **Database:** Supabase (PostgreSQL) — SQL source of truth at [`database/`](./database/); apply schemas in the documented order
 
 ---
 

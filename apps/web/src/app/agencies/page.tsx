@@ -1,4 +1,5 @@
 import Navbar from "@/components/Navbar";
+import Link from "next/link";
 import { ArrowRight, CheckCircle2, TrendingUp, Users, Zap, BarChart3, Target, Clock } from "lucide-react";
 
 export default function AgenciesPage() {
@@ -360,13 +361,13 @@ export default function AgenciesPage() {
             <p className="text-white/60 mb-8 max-w-2xl mx-auto">
               Get a free pipeline audit. See exactly how many qualified leads JARVIS can generate for your specific market.
             </p>
-            <a
+            <Link
               href="/#contact"
               className="inline-flex items-center gap-2 bg-brand-500 hover:bg-brand-400 text-white font-bold px-8 py-4 rounded-xl transition-all glow-green hover:scale-105"
             >
               Schedule Free Audit
               <ArrowRight className="w-5 h-5" />
-            </a>
+            </Link>
             <p className="text-white/40 text-sm mt-6">
               Takes 5 minutes. No credit card. Free ₹4,15,000 pipeline report included.
             </p>

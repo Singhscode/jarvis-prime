@@ -25,11 +25,5 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Add migrations tracking table
-CREATE TABLE IF NOT EXISTS public._migrations (
-  name TEXT PRIMARY KEY,
-  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 -- Index for tag-based queries
 CREATE INDEX IF NOT EXISTS prospects_tags_idx ON public.prospects USING gin(tags);

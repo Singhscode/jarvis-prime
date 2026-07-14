@@ -49,7 +49,7 @@ No new directories or services. `/users/me` PATCH and `/settings` endpoints are 
 
 ### Database Schema Changes
 
-No new tables. `role text default 'client'` already exists on `users` (see `apps/api/sql/auth-schema.sql`). One additive column for user settings:
+No new tables. `role text default 'client'` already exists on `users` (see `database/supabase/migrations/20260715000001_create_auth_schema.sql`). One additive column for user settings:
 
 ```sql
 alter table public.users add column if not exists settings jsonb default '{}';

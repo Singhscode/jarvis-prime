@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
 export default function Header() {
@@ -34,16 +36,19 @@ export default function Header() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between lg:h-20">
             {/* Logo */}
-            <a
+            <Link
               href="/"
               className="group flex items-center transition-opacity duration-300 hover:opacity-80"
             >
-              <img
+              <Image
                 src="/logo-white.svg"
                 alt="JARVIS PRIME"
+                width={300}
+                height={64}
+                priority
                 className="h-8 w-auto transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(6,182,212,0.4)] lg:h-9"
               />
-            </a>
+            </Link>
 
             {/* Desktop nav */}
             <nav className="hidden items-center gap-1 md:flex">

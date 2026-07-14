@@ -128,9 +128,11 @@ export function createCustomScorer(config: ScorerConfig) {
       keywordHits * (weights.keywords / 4),
       weights.keywords
     );
-    score += kwScore;
+    const matchedAllCustomKeywords = Boolean(config.hotKeywords?.length) && keywordHits === hotKeywords.length;
+    const awardedKeywordScore = matchedAllCustomKeywords ? Math.max(kwScore, 15) : kwScore;
+    score += awardedKeywordScore;
     if (kwScore > 0) {
-      reasons.push(`Keyword relevance: +${Math.round(kwScore)} (${keywordHits} matches)`);
+      reasons.push(`Keyword relevance: +${Math.round(awardedKeywordScore)} (${keywordHits} matches)`);
     }
 
     // 3. Has phone (2 pts — shows intent)

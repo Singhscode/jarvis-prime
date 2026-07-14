@@ -12,9 +12,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
     "test:coverage": "vitest --coverage",
-    "lint": "eslint src",
+    "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "type-check": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test"
   },
@@ -41,12 +41,13 @@
   "homepage": "https://github.com/jarvis-prime/icp-scorer",
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "8.64.0",
+    "@typescript-eslint/parser": "8.64.0",
+    "eslint": "8.57.1",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
-    "eslint": "^8.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0"
+    "vitest": "4.1.10"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=20.0.0"
   }
 }

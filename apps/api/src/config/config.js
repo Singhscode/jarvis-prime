@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Loads in order: .env.{NODE_ENV} → .env (allows overrides per environment)
 function loadEnvFile() {
   const nodeEnv = process.env.NODE_ENV || 'development';
-  const baseDir = path.join(__dirname, '..');
+  const baseDir = path.join(__dirname, '..', '..');
   
   // Files to try in order (later ones override earlier ones)
   const filesToLoad = [

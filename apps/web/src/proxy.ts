@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createHmac, timingSafeEqual } from 'crypto';
 
 // ── Security headers ──────────────────────────────────────────────────────────
 
@@ -57,7 +56,7 @@ const COOKIE_NAME = 'portal_token';
  * for a shared-password portal. The HMAC prevents *forged* cookies (anyone
  * setting portal_token=anything-they-like to bypass the login page).
  */
-function isValidPortalCookie(cookieValue: string | undefined): boolean {
+async function isValidPortalCookie(cookieValue: string | undefined): Promise<boolean> {
   if (!cookieValue) return false;
 
   const secret = process.env.PORTAL_COOKIE_SECRET;
@@ -72,25 +71,32 @@ function isValidPortalCookie(cookieValue: string | undefined): boolean {
 
   const nonce = cookieValue.slice(0, dotIndex);
   const providedSig = cookieValue.slice(dotIndex + 1);
+  if (!nonce || !/^[a-f0-9]{64}$/i.test(providedSig)) return false;
 
-  if (!nonce || !providedSig) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(nonce))
+  );
+  const provided = Uint8Array.from(
+    providedSig.match(/.{2}/g)!.map((byte) => parseInt(byte, 16))
+  );
 
-  const expectedSig = createHmac('sha256', secret).update(nonce).digest('hex');
-
-  try {
-    // timingSafeEqual requires same-length Buffers
-    const a = Buffer.from(providedSig, 'hex');
-    const b = Buffer.from(expectedSig, 'hex');
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
+  let difference = 0;
+  for (let index = 0; index < signature.length; index += 1) {
+    difference |= signature[index] ^ provided[index];
   }
+  return difference === 0;
 }
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
-export function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const response = NextResponse.next();
 
@@ -115,7 +121,7 @@ export function middleware(request: NextRequest) {
   if (isProtectedPath) {
     const cookieValue = request.cookies.get(COOKIE_NAME)?.value;
 
-    if (!isValidPortalCookie(cookieValue)) {
+    if (!(await isValidPortalCookie(cookieValue))) {
       // Clear any stale / forged cookie before redirecting
       const redirectResponse = NextResponse.redirect(
         new URL('/portal-auth', request.url)

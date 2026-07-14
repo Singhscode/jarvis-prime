@@ -3,6 +3,10 @@
 ║                     JARVIS PRIME v2.0 — July 6, 2026                      ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 
+CURRENT PATH NOTE: This is a historical verification record. The current
+canonical database source is `database/supabase/migrations/`; API configuration is
+`apps/api/.env`. Do not use the legacy `engine/` paths below for setup.
+
 All tests PASSED ✅
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

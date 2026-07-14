@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config({
-  path: path.join(__dirname, "../apps/.env.local"),
+  path: path.join(__dirname, "../apps/api/.env"),
 });
 
 // Parse command line arguments
@@ -34,7 +34,7 @@ const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 const APOLLO_BASE_URL = "https://api.apollo.io/v1";
 
 if (!APOLLO_API_KEY) {
-  console.error("❌ APOLLO_API_KEY not configured in .env.local");
+  console.error("❌ APOLLO_API_KEY not configured in apps/api/.env");
   process.exit(1);
 }
 
