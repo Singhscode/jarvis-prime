@@ -204,6 +204,31 @@ export function getClientConfig(client) {
   };
 }
 
+/**
+ * Fail-fast validation for secrets required by the HTTP server (auth layer).
+ * Throws a single error listing every missing variable, rather than allowing
+ * the app to boot with an insecure empty-string JWT secret or no database.
+ * Called by createApp() — not by CLI-only tasks, which already handle a
+ * missing Supabase config gracefully via the in-memory fallback in db.js.
+ */
+export function validateRequiredSecrets() {
+  const required = {
+    JWT_SECRET: config.jwtSecret,
+    SUPABASE_URL: config.supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: config.supabaseKey,
+  };
+  const missing = Object.entries(required)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variable(s): ${missing.join(', ')}. ` +
+      'The server cannot start without these — see apps/api/.env.example.'
+    );
+  }
+}
+
 // Returns which providers are configured (helps the "doctor" command).
 export function providerStatus() {
   return {

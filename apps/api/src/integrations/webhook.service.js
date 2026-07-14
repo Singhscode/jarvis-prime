@@ -4,7 +4,7 @@
 
 import { log } from '../utils/logger.js';
 import { handleReply } from '../ai/agents/inbound-agent.js';
-import * as calendarService from './calendar-service.js';
+import * as calendarService from '../modules/meetings/calendar.service.js';
 import { getDb, _memory as mem } from '../database/db.js';
 
 // In-memory webhook event log

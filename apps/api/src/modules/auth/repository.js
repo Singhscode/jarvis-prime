@@ -365,6 +365,28 @@ export async function getRefreshToken(tokenHash) {
   return data || null;
 }
 
+// Looks up a refresh token regardless of revoked/expired status.
+// Used only to detect reuse of an already-revoked token (theft detection).
+export async function findRefreshTokenByHash(tokenHash) {
+  const { data, error } = await client()
+    .from('refresh_tokens')
+    .select('*')
+    .eq('token_hash', tokenHash)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error;
+  return data || null;
+}
+
+export async function revokeRefreshToken(tokenHash) {
+  const { error } = await client()
+    .from('refresh_tokens')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('token_hash', tokenHash);
+
+  if (error) throw error;
+}
+
 // ── Audit Logs ─────────────────────────────────────────────────────────────
 
 /**

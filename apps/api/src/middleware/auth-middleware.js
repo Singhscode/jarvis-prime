@@ -5,7 +5,7 @@
 import { extractBearerToken } from '../modules/auth/jwt-service.js';
 import { verifyToken } from '../modules/auth/auth-service.js';
 import { statusCodes, authMessages } from '../modules/auth/constants.js';
-import { log } from 'jarvis-logger';
+import { log } from '../utils/logger.js';
 
 /**
  * Authentication middleware
