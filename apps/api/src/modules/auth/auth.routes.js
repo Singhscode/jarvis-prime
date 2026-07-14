@@ -10,7 +10,9 @@ import {
   initiatePasswordReset,
   resetPassword,
   rotateRefreshToken,
+  sanitizeUser,
 } from './auth-service.js';
+import * as repo from './repository.js';
 import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
 import { createRateLimiter } from '../../middleware/rate-limiter.js';
 import { statusCodes, auth } from './constants.js';
@@ -341,8 +343,18 @@ router.get('/me', createAuthMiddleware(), async (req, res) => {
       });
     }
 
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User no longer exists.',
+        },
+      });
+    }
+
     return res.status(statusCodes.OK).json({
-      user: req.user,
+      user: sanitizeUser(user),
     });
   } catch (error) {
     log.error('Get user endpoint error:', error);
