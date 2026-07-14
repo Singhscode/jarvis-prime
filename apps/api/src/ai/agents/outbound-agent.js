@@ -6,9 +6,9 @@
 
 import { config, getClientConfig } from '../../config/config.js';
 import { log } from '../../utils/logger.js';
-import { findProspects } from '../modules/prospects/prospect-finder.js';
-import { scoreProspect } from '../modules/prospects/icp-scorer.js';
-import { writeEmail } from '../ai/prompts/personalizer.js';
+import { findProspects } from '../../modules/prospects/prospect-finder.js';
+import { scoreProspect } from '../../modules/prospects/icp-scorer.js';
+import { writeEmail } from '../prompts/personalizer.js';
 import { sendEmail, telegramAlert } from '../../integrations/email-sender.js';
 import {
   insertProspects,

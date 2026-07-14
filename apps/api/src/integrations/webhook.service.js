@@ -2,10 +2,10 @@
 // Processes inbound webhooks from external services (Resend, Cal.com, CRM, n8n).
 // Routes events to the appropriate handlers and logs everything for debugging.
 
-import { log } from '../../utils/logger.js';
-import { handleReply } from '../../ai/agents/inbound-agent.js';
+import { log } from '../utils/logger.js';
+import { handleReply } from '../ai/agents/inbound-agent.js';
 import * as calendarService from './calendar-service.js';
-import { getDb, _memory as mem } from '../../database/db.js';
+import { getDb, _memory as mem } from '../database/db.js';
 
 // In-memory webhook event log
 const webhookLog = [];

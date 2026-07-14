@@ -3,9 +3,9 @@
 // Includes: unsubscribe page, unsubscribe handler, and open tracking pixel.
 
 import express from 'express';
-import { addSuppression, isSuppressed, insertEvent } from '../../database/db.js';
-import { config } from '../../config/config.js';
-import { log } from '../../utils/logger.js';
+import { addSuppression, isSuppressed, insertEvent } from '../database/db.js';
+import { config } from '../config/config.js';
+import { log } from '../utils/logger.js';
 
 const router = express.Router();
 

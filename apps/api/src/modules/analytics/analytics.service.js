@@ -7,7 +7,7 @@ import {
   listActiveClients,
   getProspectsByStage,
   _memory as mem,
-} from '../../lib/db.js';
+} from '../../database/db.js';
 
 /**
  * Get the full dashboard overview for a client (or all clients).

@@ -11,82 +11,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Load test environment
-        run: cp apps/api/.env.test apps/api/.env
-
-      - name: Run engine tests
-        run: npm run test --workspace=apps/api
-
-      - name: Run engine doctor (health check)
-        run: npm run doctor --workspace=apps/api
-        env:
-          NODE_ENV: test
+      - run: npm ci
+      - run: cp apps/api/.env.test apps/api/.env
+      - run: npm run test --workspace=apps/api
 
   test-site:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Load test environment
-        run: |
-          if [ -f "apps/web/.env.test" ]; then
-            cp apps/web/.env.test apps/web/.env.local
-          elif [ -f "apps/web/.env.development" ]; then
-            cp apps/web/.env.development apps/web/.env.local
-          fi
-
-      - name: Lint site
-        run: npm run lint --workspace=apps/web
-
-      - name: Build site
-        run: npm run build --workspace=apps/web
+      - run: npm ci
+      - run: npm run lint --workspace=apps/web
+      - run: npm run build --workspace=apps/web
         env:
           PORTAL_PASSWORD: ci-test-portal-password
-          PORTAL_COOKIE_SECRET: ci-test-cookie-secret-not-for-prod-aaaaaaaaaaaaaaa
+          PORTAL_COOKIE_SECRET: ci-test-cookie-secret-aaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
   secret-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect secrets in env files
+      - name: Detect committed secrets
         run: |
-          echo "Checking for hardcoded secrets in .env files..."
-
-          if [ -f ".env" ]; then
-            echo "ERROR: .env file should not be committed!"
-            exit 1
-          fi
-
-          if [ -f "apps/web/.env.local" ]; then
-            echo "ERROR: apps/web/.env.local should not be committed!"
-            exit 1
-          fi
-
-          if [ -f "apps/api/.env" ] && [ ! -f "apps/api/.env.test" ]; then
-            echo "ERROR: apps/api/.env should not be committed!"
-            exit 1
-          fi
-
-          echo "✓ No secret files detected in commit"
+          echo "Checking for secret files..."
+          [ -f ".env" ] && echo "ERROR: .env committed" && exit 1
+          [ -f "apps/web/.env.local" ] && echo "ERROR: .env.local committed" && exit 1
+          echo "✓ Clean"

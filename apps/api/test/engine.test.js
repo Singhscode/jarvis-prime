@@ -12,8 +12,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreProspect } from '../src/scoring/icp-scorer.js';
-import { classifyReply } from '../src/agents/inbound-agent.js';
+import { scoreProspect } from '../src/modules/prospects/icp-scorer.js';
+import { classifyReply } from '../src/ai/agents/inbound-agent.js';
 
 const client = {
   name: 'Demo Agency',
@@ -240,7 +240,7 @@ describe('Rate Limiter', () => {
 
 describe('Event Bus', () => {
   test('emits and receives events', async () => {
-    const { eventBus } = await import('../src/lib/event-bus.js');
+    const { eventBus } = await import('../src/utils/event-bus.js');
 
     let received = null;
     eventBus.on('test.event', (data) => { received = data; });
@@ -251,7 +251,7 @@ describe('Event Bus', () => {
   });
 
   test('once-listener fires only once', async () => {
-    const { eventBus } = await import('../src/lib/event-bus.js');
+    const { eventBus } = await import('../src/utils/event-bus.js');
 
     let count = 0;
     eventBus.once('test.once', () => { count++; });
@@ -262,7 +262,7 @@ describe('Event Bus', () => {
   });
 
   test('unsubscribe works', async () => {
-    const { eventBus } = await import('../src/lib/event-bus.js');
+    const { eventBus } = await import('../src/utils/event-bus.js');
 
     let count = 0;
     const unsub = eventBus.on('test.unsub', () => { count++; });
@@ -278,7 +278,7 @@ describe('Event Bus', () => {
 
 describe('Queue', () => {
   test('enqueue and process jobs', async () => {
-    const { queue } = await import('../src/lib/queue.js');
+    const { queue } = await import('../src/jobs/queue.js');
 
     let processedPayload = null;
     queue.process('test_job', async (job) => {
@@ -294,7 +294,7 @@ describe('Queue', () => {
   });
 
   test('tracks queue stats', async () => {
-    const { queue } = await import('../src/lib/queue.js');
+    const { queue } = await import('../src/jobs/queue.js');
     const stats = queue.stats();
     assert.equal(typeof stats.total, 'number');
     assert.equal(typeof stats.pending, 'number');
@@ -306,7 +306,7 @@ describe('Queue', () => {
 
 describe('Config', () => {
   test('getClientConfig merges defaults with client overrides', async () => {
-    const { getClientConfig } = await import('../src/config.js');
+    const { getClientConfig } = await import('../src/config/config.js');
 
     const clientWithConfig = {
       config: {
@@ -322,7 +322,7 @@ describe('Config', () => {
   });
 
   test('getClientConfig returns defaults for empty client', async () => {
-    const { getClientConfig } = await import('../src/config.js');
+    const { getClientConfig } = await import('../src/config/config.js');
 
     const cc = getClientConfig({});
     assert.equal(cc.maxSteps, 3);
@@ -335,14 +335,14 @@ describe('Config', () => {
 
 describe('Logger', () => {
   test('child logger preserves context', async () => {
-    const { log } = await import('../src/lib/logger.js');
+    const { log } = await import('../src/utils/logger.js');
     const childLog = log.child({ requestId: 'test-123', clientId: 'client-abc' });
     assert.ok(childLog.info, 'child logger should have info method');
     assert.ok(childLog.child, 'child logger should support further nesting');
   });
 
   test('timer works', async () => {
-    const { log } = await import('../src/lib/logger.js');
+    const { log } = await import('../src/utils/logger.js');
     log.time('test-timer');
     await new Promise((r) => setTimeout(r, 10));
     // Should not throw

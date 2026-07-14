@@ -4,11 +4,11 @@
 //   { name, isConfigured(), search(client, limit) }
 //
 // Usage:
-//   import { getSourceProvider } from '../providers/source/index.js';
+//   import { getSourceProvider } from './index.js';
 //   const source = await getSourceProvider();
 //   const prospects = await source.search(client, 25);
 
-import { config } from '../../config.js';
+import { config } from '../../../config/config.js';
 
 /**
  * Get the configured source provider.

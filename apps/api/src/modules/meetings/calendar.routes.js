@@ -2,8 +2,8 @@
 // Meeting booking, availability checks, and Cal.com webhook processing.
 
 import express from 'express';
-import { providerStatus } from '../../config.js';
-import * as calendarService from '../services/calendar-service.js';
+import { providerStatus } from '../../config/config.js';
+import * as calendarService from './calendar.service.js';
 
 const router = express.Router();
 

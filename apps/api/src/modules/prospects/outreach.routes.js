@@ -2,8 +2,8 @@
 // Wraps outreach-service for HTTP access
 
 import express from 'express';
-import { providerStatus } from '../../config.js';
-import * as outreachService from '../services/outreach-service.js';
+import { providerStatus } from '../../config/config.js';
+import * as outreachService from './outreach.service.js';
 import { validate } from '../../middleware/validate.js';
 
 const router = express.Router();

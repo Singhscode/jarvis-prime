@@ -2,7 +2,7 @@
 // View and manage scheduled automation jobs.
 
 import express from 'express';
-import { listJobs, getJobStatus, runJobNow, toggleJob } from '../../lib/scheduler.js';
+import { listJobs, getJobStatus, runJobNow, toggleJob } from './scheduler.js';
 
 const router = express.Router();
 
