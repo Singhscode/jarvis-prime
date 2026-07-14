@@ -453,6 +453,47 @@ router.get('/settings', createAuthMiddleware(), async (req, res) => {
 });
 
 /**
+ * PATCH /api/auth/settings
+ * Update current user settings (shallow merge)
+ * Requires: Authorization header with valid JWT
+ */
+router.patch('/settings', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    if (!req.body || typeof req.body !== 'object' || Object.keys(req.body).length === 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: { code: 'EMPTY_UPDATE', message: 'Request body must be a non-empty object.' },
+      });
+    }
+
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'USER_NOT_FOUND', message: 'User no longer exists.' },
+      });
+    }
+
+    // Shallow merge: new keys override, existing keys preserved
+    const merged = { ...(user.settings || {}), ...req.body };
+    await repo.updateUserProfile(req.user.sub, { settings: merged });
+
+    return res.status(statusCodes.OK).json({
+      settings: merged,
+    });
+  } catch (error) {
+    log.error('Update settings endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update settings.' },
+    });
+  }
+});
+
+/**
  * Refresh access token using refresh token
  * 
  * Request:
