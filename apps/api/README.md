@@ -57,8 +57,11 @@ see the whole thing work without any setup.
 Dry-run proves the logic works. To actually deliver to a paying client, you need
 to set these up — in this order:
 
-1. **Database** — create the tables: run `engine/sql/schema.sql` in your Supabase
-   SQL editor. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
+1. **Database** — install the Supabase CLI, then run `npm run db:reset` from
+   the repository root to initialize a local database from the versioned
+   migrations. Link a remote project and run `npm run db:push` only after
+   reviewing `npm run db:status`. Set `SUPABASE_URL` and
+   `SUPABASE_SERVICE_ROLE_KEY` in `apps/api/.env`.
 2. **A sending domain with deliverability** — use a dedicated/subdomain (e.g.
    `mail.jarvisprime.me`), set up **SPF, DKIM, and DMARC**, and **warm it up**
    for 2–3 weeks before volume sending. Skipping this = spam folder + blacklisting.
@@ -110,7 +113,7 @@ engine/
     agents/
       outbound-agent.js     source→score→send sequence loop
       inbound-agent.js      reply classification + handling
-  sql/schema.sql            database tables
+  ../../database/supabase/migrations/20260715000000_create_outreach_schema.sql  database tables
   test/engine.test.js       unit tests
   .env.example              configuration template
 ```

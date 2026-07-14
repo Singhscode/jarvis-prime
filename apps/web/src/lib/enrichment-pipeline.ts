@@ -344,9 +344,11 @@ Total prospects ready for outreach: ${result.highQualityCount}
   `;
 }
 
-export default {
+const enrichmentPipeline = {
   runEnrichmentPipeline,
   findMarketingAgencyLeads,
   findProspectsAtCompanies,
   generateReport,
 };
+
+export default enrichmentPipeline;

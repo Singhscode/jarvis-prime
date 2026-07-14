@@ -1,5 +1,7 @@
 # 📋 QUICK STATUS: JARVIS PRIME Monorepo
 
+> Historical Phase 0 status snapshot. It is not the current architecture or remediation plan.
+
 ## 📊 **OVERALL: 93% COMPLETE**
 
 | Area | Status | Progress |

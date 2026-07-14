@@ -10,7 +10,8 @@
 //   const { app } = await createApp();
 //   app.listen(3001);
 
-import { config, providerStatus } from './config/config.js';
+import cookieParser from 'cookie-parser';
+import { config, providerStatus, validateRequiredSecrets } from './config/config.js';
 import { log } from './utils/logger.js';
 import { listActiveClients } from './database/db.js';
 import { sourceAndScore, runOutreach } from './ai/agents/outbound-agent.js';
@@ -36,13 +37,18 @@ export async function createApp(options = {}) {
     enableRateLimit = true,
   } = options;
 
+  validateRequiredSecrets();
+
   const express = await import('express');
   const app = express.default();
 
   // ---- Core middleware ----
   app.use(express.json({ limit: '2mb' }));
+  app.use(cookieParser());
 
-  if (enableCors) app.use(createCors());
+  // credentials: true is required so browsers send/accept the HttpOnly
+  // refreshToken cookie set by /api/auth/login and /api/auth/refresh.
+  if (enableCors) app.use(createCors({ credentials: true }));
   if (enableRateLimit) app.use(createRateLimiter());
   app.use(createRequestLogger());
 

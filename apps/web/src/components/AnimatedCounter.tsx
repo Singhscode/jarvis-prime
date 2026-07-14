@@ -23,6 +23,55 @@ export default function AnimatedCounter({
     const el = ref.current;
     if (!el) return;
 
+    const animateSingle = (target: number, format: (n: number) => string) => {
+      const start = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplayed(format(Math.round(eased * target)));
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+
+    const animateDouble = (
+      targetA: number,
+      targetB: number,
+      format: (a: number, b: number) => string
+    ) => {
+      const start = performance.now();
+      const step = (now: number) => {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setDisplayed(format(Math.round(eased * targetA), Math.round(eased * targetB)));
+        if (progress < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+
+    const animate = () => {
+      const rangeMatch = value.match(/^([\d,]+)\s*-\s*([\d,]+)$/);
+      const percentMatch = value.match(/^~?([\d,]+)%$/);
+      const plainMatch = value.match(/^([\d,]+)$/);
+      const daysMatch = value.match(/^([\d,]+)\s+(.+)$/);
+
+      if (rangeMatch) {
+        animateDouble(
+          parseInt(rangeMatch[1].replace(/,/g, '')),
+          parseInt(rangeMatch[2].replace(/,/g, '')),
+          (a, b) => `${a}-${b}`
+        );
+      } else if (percentMatch) {
+        const prefix = value.startsWith('~') ? '~' : '';
+        animateSingle(parseInt(percentMatch[1].replace(/,/g, '')), (n) => `${prefix}${n}%`);
+      } else if (daysMatch) {
+        const suffix = daysMatch[2];
+        animateSingle(parseInt(daysMatch[1].replace(/,/g, '')), (n) => `${n} ${suffix}`);
+      } else if (plainMatch) {
+        animateSingle(parseInt(plainMatch[1].replace(/,/g, '')), (n) => n.toLocaleString());
+      }
+    };
+
     const reducedMotion = window.matchMedia?.(
       '(prefers-reduced-motion: reduce)'
     ).matches;
@@ -43,65 +92,6 @@ export default function AnimatedCounter({
     observer.observe(el);
     return () => observer.disconnect();
   }, [value, duration]);
-
-  function animate() {
-    // Parse the value to figure out what to animate
-    const rangeMatch = value.match(/^([\d,]+)\s*-\s*([\d,]+)$/);
-    const percentMatch = value.match(/^~?([\d,]+)%$/);
-    const plainMatch = value.match(/^([\d,]+)$/);
-    const daysMatch = value.match(/^([\d,]+)\s+(.+)$/);
-
-    if (rangeMatch) {
-      // Range like "8-30"
-      const from = parseInt(rangeMatch[1].replace(/,/g, ''));
-      const to = parseInt(rangeMatch[2].replace(/,/g, ''));
-      animateDouble(from, to, (a, b) => `${a}-${b}`);
-    } else if (percentMatch) {
-      const prefix = value.startsWith('~') ? '~' : '';
-      const num = parseInt(percentMatch[1].replace(/,/g, ''));
-      animateSingle(num, (n) => `${prefix}${n}%`);
-    } else if (daysMatch) {
-      const num = parseInt(daysMatch[1].replace(/,/g, ''));
-      const suffix = daysMatch[2];
-      animateSingle(num, (n) => `${n} ${suffix}`);
-    } else if (plainMatch) {
-      const num = parseInt(plainMatch[1].replace(/,/g, ''));
-      animateSingle(num, (n) => n.toLocaleString());
-    }
-  }
-
-  function animateSingle(target: number, format: (n: number) => string) {
-    const start = performance.now();
-    function step(now: number) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = easeOutCubic(progress);
-      const current = Math.round(eased * target);
-      setDisplayed(format(current));
-      if (progress < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  function animateDouble(
-    targetA: number,
-    targetB: number,
-    format: (a: number, b: number) => string
-  ) {
-    const start = performance.now();
-    function step(now: number) {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = easeOutCubic(progress);
-      const currentA = Math.round(eased * targetA);
-      const currentB = Math.round(eased * targetB);
-      setDisplayed(format(currentA, currentB));
-      if (progress < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  function easeOutCubic(t: number) {
-    return 1 - Math.pow(1 - t, 3);
-  }
 
   return (
     <span ref={ref} className={className}>

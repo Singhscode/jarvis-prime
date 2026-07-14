@@ -9,12 +9,23 @@ import {
   logoutUser,
   initiatePasswordReset,
   resetPassword,
+  rotateRefreshToken,
+  sanitizeUser,
 } from './auth-service.js';
+import * as repo from './repository.js';
 import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
+import { createRateLimiter } from '../../middleware/rate-limiter.js';
 import { statusCodes, auth } from './constants.js';
-import { log } from 'jarvis-logger';
+import { log } from '../../utils/logger.js';
 
 export const router = Router();
+
+// Per-endpoint rate limiters (values per requirements.md R1.6, R2.7, R4.3).
+// Reuses the existing createRateLimiter() factory — no new middleware.
+const registerLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 3, message: 'Too many registration attempts. Try again later.' });
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 5, message: 'Too many login attempts. Try again later.' });
+const resetLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 3, message: 'Too many password reset attempts. Try again later.' });
+const refreshLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: 'Too many refresh attempts. Try again later.' });
 
 /**
  * POST /api/auth/register
@@ -34,7 +45,7 @@ export const router = Router();
  *   409: { error: { code: 'EMAIL_EXISTS' } }
  *   429: { error: { code: 'RATE_LIMITED' } }
  */
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { email, password, full_name, username } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
@@ -94,7 +105,7 @@ router.post('/register', async (req, res) => {
  *   401: { error: { code: 'INVALID_CREDENTIALS' } }
  *   429: { error: { code: 'RATE_LIMITED' } }
  */
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { email, password, deviceName } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
@@ -217,7 +228,7 @@ router.post('/logout', createAuthMiddleware(), async (req, res) => {
  *   400: { error: { code: 'INVALID_REQUEST' } }
  *   429: { error: { code: 'RATE_LIMITED' } }
  */
-router.post('/password-reset', async (req, res) => {
+router.post('/password-reset', resetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
@@ -269,7 +280,7 @@ router.post('/password-reset', async (req, res) => {
  *   400: { error: { code: 'INVALID_REQUEST' | 'WEAK_PASSWORD' } }
  *   401: { error: { code: 'INVALID_TOKEN' } }
  */
-router.post('/password-reset/confirm', async (req, res) => {
+router.post('/password-reset/confirm', resetLimiter, async (req, res) => {
   try {
     const { email, resetToken, newPassword } = req.body;
     const ipAddress = req.ip || req.connection.remoteAddress;
@@ -332,8 +343,18 @@ router.get('/me', createAuthMiddleware(), async (req, res) => {
       });
     }
 
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: {
+          code: 'USER_NOT_FOUND',
+          message: 'User no longer exists.',
+        },
+      });
+    }
+
     return res.status(statusCodes.OK).json({
-      user: req.user,
+      user: sanitizeUser(user),
     });
   } catch (error) {
     log.error('Get user endpoint error:', error);
@@ -347,7 +368,132 @@ router.get('/me', createAuthMiddleware(), async (req, res) => {
 });
 
 /**
- * POST /api/auth/refresh
+ * PATCH /api/auth/me
+ * Update current user profile (full_name, username only)
+ * Requires: Authorization header with valid JWT
+ */
+router.patch('/me', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    const allowedFields = ['full_name', 'username'];
+    const updates = {};
+    const rejected = [];
+
+    for (const key of Object.keys(req.body)) {
+      if (allowedFields.includes(key)) {
+        updates[key] = req.body[key];
+      } else {
+        rejected.push(key);
+      }
+    }
+
+    if (rejected.length > 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: {
+          code: 'INVALID_FIELDS',
+          message: `Fields not allowed: ${rejected.join(', ')}. Allowed: ${allowedFields.join(', ')}.`,
+        },
+      });
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: { code: 'EMPTY_UPDATE', message: 'No valid fields provided.' },
+      });
+    }
+
+    await repo.updateUserProfile(req.user.sub, updates);
+    const user = await repo.getUserById(req.user.sub);
+
+    return res.status(statusCodes.OK).json({
+      user: sanitizeUser(user),
+    });
+  } catch (error) {
+    log.error('Update user endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update user.' },
+    });
+  }
+});
+
+/**
+ * GET /api/auth/settings
+ * Get current user settings (preferences)
+ * Requires: Authorization header with valid JWT
+ */
+router.get('/settings', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'USER_NOT_FOUND', message: 'User no longer exists.' },
+      });
+    }
+
+    return res.status(statusCodes.OK).json({
+      settings: user.settings || {},
+    });
+  } catch (error) {
+    log.error('Get settings endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to get settings.' },
+    });
+  }
+});
+
+/**
+ * PATCH /api/auth/settings
+ * Update current user settings (shallow merge)
+ * Requires: Authorization header with valid JWT
+ */
+router.patch('/settings', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    if (!req.body || typeof req.body !== 'object' || Object.keys(req.body).length === 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: { code: 'EMPTY_UPDATE', message: 'Request body must be a non-empty object.' },
+      });
+    }
+
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'USER_NOT_FOUND', message: 'User no longer exists.' },
+      });
+    }
+
+    // Shallow merge: new keys override, existing keys preserved
+    const merged = { ...(user.settings || {}), ...req.body };
+    await repo.updateUserProfile(req.user.sub, { settings: merged });
+
+    return res.status(statusCodes.OK).json({
+      settings: merged,
+    });
+  } catch (error) {
+    log.error('Update settings endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update settings.' },
+    });
+  }
+});
+
+/**
  * Refresh access token using refresh token
  * 
  * Request:
@@ -357,9 +503,9 @@ router.get('/me', createAuthMiddleware(), async (req, res) => {
  *   200: { accessToken: string, expiresIn: number }
  *   401: { error: { code: 'INVALID_REFRESH_TOKEN' } }
  */
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', refreshLimiter, async (req, res) => {
   try {
-    const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
+    const refreshToken = req.body.refreshToken || req.cookies?.refreshToken;
 
     if (!refreshToken) {
       return res.status(statusCodes.UNAUTHORIZED).json({
@@ -370,15 +516,31 @@ router.post('/refresh', async (req, res) => {
       });
     }
 
-    // TODO: Implement refresh token verification and new access token generation
-    // 1. Verify refresh token hash matches database
-    // 2. Check for reuse (token family tracking)
-    // 3. Generate new access token
-    // 4. Return new token
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const result = await rotateRefreshToken(refreshToken, ipAddress);
+
+    if (!result.success) {
+      res.clearCookie('refreshToken');
+      return res.status(result.status || statusCodes.UNAUTHORIZED).json({
+        error: {
+          code: 'INVALID_REFRESH_TOKEN',
+          message: result.message,
+        },
+      });
+    }
+
+    // Rotate the cookie to the new refresh token (same options as /login).
+    res.cookie('refreshToken', result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: auth.login.refreshTokenExpiryMs,
+      path: '/api/auth',
+    });
 
     return res.status(statusCodes.OK).json({
-      accessToken: 'new-access-token',
-      expiresIn: auth.jwt.accessTokenExpirySeconds,
+      accessToken: result.tokens.accessToken,
+      expiresIn: result.tokens.expiresIn,
     });
   } catch (error) {
     log.error('Refresh token endpoint error:', error);

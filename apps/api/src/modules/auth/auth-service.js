@@ -20,7 +20,7 @@ import {
 } from './jwt-service.js';
 import * as repo from './repository.js';
 import { auth, authMessages, statusCodes } from './constants.js';
-import { log } from 'jarvis-logger';
+import { log } from '../../utils/logger.js';
 
 /**
  * Registers a new user account
@@ -465,6 +465,105 @@ export async function logoutUser(sessionId, userId, ipAddress) {
 }
 
 /**
+ * Rotates a refresh token: verifies it, issues new access + refresh tokens,
+ * and revokes the old refresh token.
+ *
+ * If the presented token is not found among valid (non-revoked, non-expired)
+ * tokens but DOES exist in the table (i.e. it was already used or revoked),
+ * this is treated as token theft — all sessions and refresh tokens for that
+ * user are revoked and the caller must re-authenticate.
+ *
+ * @param {string} rawToken - The refresh token from the client
+ * @param {string} ipAddress - Client IP (for audit)
+ * @returns {object} { success, tokens, message, status }
+ */
+export async function rotateRefreshToken(rawToken, ipAddress) {
+  try {
+    const tokenHash = hashToken(rawToken);
+    const validRecord = await repo.getRefreshToken(tokenHash);
+
+    if (!validRecord) {
+      // Token not currently valid — check if it existed at all (reuse/theft signal).
+      const anyRecord = await repo.findRefreshTokenByHash(tokenHash);
+      if (anyRecord) {
+        await repo.revokeAllUserSessions(anyRecord.user_id, 'refresh_token_reuse_detected');
+        await repo.createAuditLog({
+          user_id: anyRecord.user_id,
+          event_type: 'session.revoked',
+          action: 'update',
+          resource_type: 'refresh_token',
+          success: false,
+          error_message: 'Refresh token reuse detected',
+          ip_address: ipAddress,
+        });
+        log.warn(`Refresh token reuse detected for user: ${anyRecord.user_id}`);
+      }
+
+      return {
+        success: false,
+        status: statusCodes.UNAUTHORIZED,
+        message: authMessages.SESSION_EXPIRED,
+      };
+    }
+
+    const user = await repo.getUserById(validRecord.user_id);
+    if (!user) {
+      return {
+        success: false,
+        status: statusCodes.UNAUTHORIZED,
+        message: authMessages.SESSION_EXPIRED,
+      };
+    }
+
+    const session = await repo.getSession(validRecord.session_id);
+    if (!session) {
+      return {
+        success: false,
+        status: statusCodes.UNAUTHORIZED,
+        message: authMessages.SESSION_EXPIRED,
+      };
+    }
+
+    // Revoke the old refresh token before issuing a new one (rotation).
+    await repo.revokeRefreshToken(tokenHash);
+
+    const newAccessToken = createAccessToken(user, session, config.jwtSecret);
+    const newRefreshTokenRaw = generateToken();
+    await repo.createRefreshToken({
+      user_id: user.id,
+      session_id: session.id,
+      token_hash: hashToken(newRefreshTokenRaw),
+    });
+
+    await repo.createAuditLog({
+      user_id: user.id,
+      event_type: auth.auditEvents.TOKEN_REFRESHED,
+      action: 'update',
+      resource_type: 'refresh_token',
+      success: true,
+      ip_address: ipAddress,
+    });
+
+    return {
+      success: true,
+      status: statusCodes.OK,
+      tokens: {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshTokenRaw,
+        expiresIn: auth.jwt.accessTokenExpirySeconds,
+      },
+    };
+  } catch (error) {
+    log.error('Refresh token rotation error:', error);
+    return {
+      success: false,
+      status: statusCodes.INTERNAL_ERROR,
+      message: 'Token refresh failed.',
+    };
+  }
+}
+
+/**
  * Initiates password reset flow
  * Sends reset token via email
  * 
@@ -505,12 +604,19 @@ export async function initiatePasswordReset(email, ipAddress) {
 
     log.info(`Password reset initiated for user: ${user.id}`);
 
-    return {
+    const result = {
       success: true,
       message: 'If an account exists with this email, a reset link has been sent.',
-      // In production client: provide reset token via secure email link
-      resetToken: token, // TODO: Remove in production (send via email only)
     };
+
+    // Never return the raw reset token in production. It must only ever
+    // reach the user via the email link. Exposed here only in development
+    // to allow local testing without an email provider configured.
+    if (config.env === 'development') {
+      result.resetToken = token;
+    }
+
+    return result;
   } catch (error) {
     log.error('Password reset initiation error:', error);
     return {

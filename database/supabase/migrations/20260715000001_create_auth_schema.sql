@@ -22,6 +22,9 @@ create table if not exists public.users (
   updated_at            timestamptz not null default now()
 );
 
+-- Add settings column (idempotent — safe to run on existing tables)
+alter table public.users add column if not exists settings jsonb default '{}';
+
 -- 2. SESSIONS
 create table if not exists public.sessions (
   id               uuid primary key default gen_random_uuid(),

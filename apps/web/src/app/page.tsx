@@ -1,4 +1,5 @@
 import Header from '@/components/Header';
+import Image from 'next/image';
 import Reveal from '@/components/Reveal';
 import FaqSection from '@/components/FaqSection';
 import GlowButton from '@/components/GlowButton';
@@ -574,7 +575,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-6xl">
           <div className="mb-12 grid gap-12 md:grid-cols-4">
             <div>
-              <img src="/logo-white.svg" alt="JARVIS PRIME" className="mb-4 h-8 w-auto" />
+              <Image src="/logo-white.svg" alt="JARVIS PRIME" width={300} height={64} className="mb-4 h-8 w-auto" />
               <p className="text-sm text-slate-500">
                 AI-powered outbound automation for agencies and B2B companies that want to scale.
               </p>

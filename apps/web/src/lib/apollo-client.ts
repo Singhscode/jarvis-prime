@@ -321,7 +321,7 @@ export async function verifyEmail(email: string): Promise<boolean> {
   }
 }
 
-export default {
+const apolloClient = {
   searchProspects,
   enrichProspect,
   enrichProspects,
@@ -330,3 +330,5 @@ export default {
   getCompanyInfo,
   verifyEmail,
 };
+
+export default apolloClient;

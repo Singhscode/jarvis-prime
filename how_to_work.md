@@ -1,3 +1,7 @@
+# Historical Repository Reorganization Plan
+
+> This is a historical planning record. The current architecture is defined by the root `README.md`, `database/README.md`, and the active workspace configuration; do not apply the migration commands below to the current repository.
+
 Your repository is usable, but the folder structure is inconsistent and should be cleaned before adding more features.
 
 The biggest problem is not missing folders. It is that the same type of code is stored in different places and the README no longer matches the actual repository.
@@ -212,7 +216,6 @@ jarvis-prime/
 ├── .kiro/
 ├── .env.example
 ├── .gitignore
-├── docker-compose.yml
 ├── package.json
 ├── turbo.json
 └── README.md
@@ -280,29 +283,18 @@ Once AI becomes reusable across multiple applications, move shared parts into:
 packages/ai/
 Database
 
-Keep database source definitions in:
+Keep version-controlled database source definitions in the root `database/` directory:
 
-packages/database/
-
-Recommended structure:
-
-packages/database/
-├── src/
-│   ├── client.ts
-│   ├── repositories/
-│   │   ├── client.repository.ts
-│   │   ├── prospect.repository.ts
-│   │   ├── campaign.repository.ts
-│   │   └── meeting.repository.ts
-│   └── types/
-├── migrations/
-├── seeds/
+```text
+database/
 ├── schema/
-│   └── schema.sql
-├── tests/
-└── package.json
+│   ├── outreach-schema.sql
+│   └── auth-schema.sql
+├── migrations/
+└── README.md
+```
 
-The actual production data remains in Supabase/PostgreSQL. Only schema, migrations and database code belong in GitHub.
+The actual production data remains in Supabase/PostgreSQL. SQL schemas and migrations belong in `database/`; API database clients, repositories, and runtime configuration remain in `apps/api/`.
 
 Authentication
 
@@ -480,18 +472,19 @@ git mv packages/github-icp-scorer apps/icp-scorer
 
 Create shared package folders:
 
-mkdir -p packages/{ui,database,auth,ai,config,logger,types,validation}/src
+mkdir -p packages/{ui,auth,ai,config,logger,types,validation}/src
 
 Git does not track empty folders, so add placeholder files:
 
 touch packages/ui/src/index.ts
-touch packages/database/src/index.ts
 touch packages/auth/src/index.ts
 touch packages/ai/src/index.ts
 touch packages/config/src/index.ts
 touch packages/logger/src/index.ts
 touch packages/types/src/index.ts
 touch packages/validation/src/index.ts
+
+Database schemas and migrations are already rooted at `database/`; do not create a second SQL source under `packages/database/`.
 
 Create infrastructure and script folders:
 

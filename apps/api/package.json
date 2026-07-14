@@ -7,9 +7,7 @@
   "main": "src/runner.js",
   "scripts": {
     "run": "node src/runner.js",
-    "run:once": "node src/runner.js --once",
     "source": "node src/runner.js --task=source",
-    "score": "node src/runner.js --task=score",
     "outbound": "node src/runner.js --task=outbound",
     "inbound": "node src/runner.js --task=inbound",
     "doctor": "node src/runner.js --doctor",
@@ -17,12 +15,11 @@
     "server:dev": "node --watch src/runner.js --server",
     "dev": "node --watch src/runner.js --server",
     "test": "node --test",
-    "test:watch": "node --test --watch",
-    "migrate": "node scripts/migrate.js",
-    "migrate:status": "node scripts/migrate.js --status"
+    "test:watch": "node --test --watch"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "cookie-parser": "1.4.7",
     "express": "^4.22.2"
   },
   "engines": {

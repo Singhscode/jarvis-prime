@@ -1,6 +1,7 @@
 'use client';
 
 import CalendlyBooking from '@/components/CalendlyBooking';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function BookCallPage() {
@@ -11,7 +12,7 @@ export default function BookCallPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center">
-              <img src="/logo.svg" alt="JARVIS PRIME" className="h-9 w-auto" />
+              <Image src="/logo.svg" alt="JARVIS PRIME" width={300} height={64} priority className="h-9 w-auto" />
             </Link>
 
             <Link 

@@ -331,6 +331,94 @@ describe('Config', () => {
   });
 });
 
+// ---- Auth: JWT Service ----
+
+describe('JWT Service', () => {
+  const secret = 'test-secret-for-jwt-unit-tests';
+  const user = { id: 'user-123', email: 'test@example.com', role: 'client' };
+  const session = { id: 'session-456', device_id: 'device-abc' };
+
+  test('creates and verifies a valid access token', async () => {
+    const { createAccessToken, verifyAccessToken } = await import('../src/modules/auth/jwt-service.js');
+    const token = createAccessToken(user, session, secret);
+    const payload = verifyAccessToken(token, secret);
+
+    assert.ok(payload, 'token should verify successfully');
+    assert.equal(payload.sub, user.id);
+    assert.equal(payload.email, user.email);
+    assert.equal(payload.session_id, session.id);
+  });
+
+  test('rejects a token signed with the wrong secret', async () => {
+    const { createAccessToken, verifyAccessToken } = await import('../src/modules/auth/jwt-service.js');
+    const token = createAccessToken(user, session, secret);
+    const payload = verifyAccessToken(token, 'wrong-secret');
+    assert.equal(payload, null);
+  });
+
+  test('rejects a tampered token payload', async () => {
+    const { createAccessToken, verifyAccessToken } = await import('../src/modules/auth/jwt-service.js');
+    const token = createAccessToken(user, session, secret);
+    const [header, payload, signature] = token.split('.');
+    const tamperedPayload = Buffer.from(JSON.stringify({ sub: 'attacker-id' })).toString('base64url');
+    const tamperedToken = `${header}.${tamperedPayload}.${signature}`;
+    const result = verifyAccessToken(tamperedToken, secret);
+    assert.equal(result, null);
+  });
+
+  test('extracts bearer token from Authorization header', async () => {
+    const { extractBearerToken } = await import('../src/modules/auth/jwt-service.js');
+    assert.equal(extractBearerToken('Bearer abc123'), 'abc123');
+    assert.equal(extractBearerToken('abc123'), null);
+    assert.equal(extractBearerToken(null), null);
+  });
+});
+
+// ---- Auth: Crypto ----
+
+describe('Auth Crypto', () => {
+  test('hashes and verifies a password correctly', async () => {
+    const { hashPassword, verifyPassword } = await import('../src/modules/auth/crypto.js');
+    const password = 'CorrectHorse123!';
+    const hash = await hashPassword(password);
+
+    assert.ok(hash, 'hash should be produced');
+    assert.equal(await verifyPassword(password, hash), true);
+    assert.equal(await verifyPassword('WrongPassword456!', hash), false);
+  });
+
+  test('generates and verifies token hashes', async () => {
+    const { generateToken, hashToken, verifyTokenHash } = await import('../src/modules/auth/crypto.js');
+    const token = generateToken();
+    const hash = hashToken(token);
+
+    assert.equal(verifyTokenHash(token, hash), true);
+    assert.equal(verifyTokenHash('wrong-token', hash), false);
+  });
+});
+
+// ---- Auth: Middleware ----
+
+describe('Auth Middleware', () => {
+  test('rejects requests with no Authorization header', async () => {
+    const { createAuthMiddleware } = await import('../src/middleware/auth-middleware.js');
+    const middleware = createAuthMiddleware();
+
+    const req = { headers: {}, path: '/protected' };
+    let statusCode = null;
+    let responseBody = null;
+    const res = {
+      status(code) { statusCode = code; return this; },
+      json(body) { responseBody = body; return this; },
+    };
+
+    middleware(req, res, () => { throw new Error('next() should not be called'); });
+
+    assert.equal(statusCode, 401);
+    assert.equal(responseBody.error.code, 'MISSING_TOKEN');
+  });
+});
+
 // ---- Logger ----
 
 describe('Logger', () => {

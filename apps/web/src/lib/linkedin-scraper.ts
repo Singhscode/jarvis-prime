@@ -546,7 +546,7 @@ All tools play together - use whichever fits your budget and timeline.
 `;
 }
 
-export default {
+const linkedInScraper = {
   buildLinkedInSearchURL,
   parseLinkedInProfile,
   enrichLinkedInProspect,
@@ -555,3 +555,5 @@ export default {
   generateSourceComparison,
   convertLocationToGeoUrn,
 };
+
+export default linkedInScraper;

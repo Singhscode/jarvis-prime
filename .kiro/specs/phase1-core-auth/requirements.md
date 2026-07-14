@@ -9,15 +9,14 @@ Phase 1 Core Authentication for the Jarvis Prime platform. This is the foundatio
 - **Auth_Service**: The authentication business logic layer at `apps/api/src/modules/auth/auth-service.js` that orchestrates registration, login, logout, password reset, and email verification flows.
 - **JWT_Service**: The token creation and verification layer at `apps/api/src/modules/auth/jwt-service.js` that signs and validates HS256 access tokens.
 - **Auth_Middleware**: The Express middleware at `apps/api/src/middleware/auth-middleware.js` that extracts Bearer tokens, verifies claims, and populates `req.user`.
-- **RBAC_Service**: The authorization service that resolves user roles and permissions from the database and enforces access control on protected routes.
+- **Authorization_Middleware**: The `createAuthorizationMiddleware()` function in `auth-middleware.js` that checks a user's `role` column value against a required role list on protected routes.
 - **User_Service**: The service layer handling user profile retrieval and updates, and user settings management.
 - **Session_Manager**: The component responsible for creating, validating, revoking, and rotating sessions and refresh tokens.
 - **Rate_Limiter**: The Express middleware that enforces per-endpoint request rate limits to prevent brute-force and abuse.
 - **Input_Validator**: The middleware or utility that validates and sanitizes all request bodies, params, and query strings before they reach service logic.
 - **Access_Token**: A short-lived (15-minute) JWT issued on login and refresh, used to authenticate API requests.
 - **Refresh_Token**: A long-lived (30-day) opaque token stored as a SHA-256 hash in the database, used to obtain new Access_Tokens without re-authenticating.
-- **Role**: A named authorization level (super_admin, admin, employee, client) assigned to a user via the `user_roles` join table.
-- **Permission**: A granular capability string (e.g., `users:read`, `settings:write`) assigned to roles via the `role_permissions` join table and resolved at request time.
+- **Role**: A named authorization level (super_admin, admin, employee, client) stored directly as a `role text` column on the `users` table, defaulting to `client`.
 
 ## Requirements
 
@@ -113,26 +112,24 @@ Phase 1 Core Authentication for the Jarvis Prime platform. This is the foundatio
 
 ### Requirement 9: Protected Routes and Authorization Middleware
 
-**User Story:** As a platform developer, I want middleware that verifies tokens and checks permissions, so that routes are protected with minimal boilerplate.
+**User Story:** As a platform developer, I want middleware that verifies tokens and checks roles, so that routes are protected with minimal boilerplate.
 
 #### Acceptance Criteria
 
 1. THE Auth_Middleware SHALL extract the Bearer token from the Authorization header, verify the signature and expiry via JWT_Service, and populate `req.user` with the decoded claims.
-2. WHEN a route requires a specific permission, THE RBAC_Service SHALL check that the user has at least one role that grants the required permission; if not, THE Auth_Middleware SHALL return HTTP 403.
-3. WHEN a route requires a specific role, THE RBAC_Service SHALL check that the user holds that role; if not, THE Auth_Middleware SHALL return HTTP 403.
-4. IF the Access_Token is missing or expired, THEN THE Auth_Middleware SHALL return HTTP 401 with error code `TOKEN_EXPIRED` or `MISSING_TOKEN`.
+2. WHEN a route requires a specific role, THE Authorization_Middleware SHALL check that `req.user.role` matches one of the required roles; if not, it SHALL return HTTP 403.
+3. IF the Access_Token is missing or expired, THEN THE Auth_Middleware SHALL return HTTP 401 with error code `TOKEN_EXPIRED` or `MISSING_TOKEN`.
 
 ### Requirement 10: Role-Based Access Control (RBAC)
 
-**User Story:** As a platform administrator, I want a flexible role and permission system, so that access can be extended without code changes.
+**User Story:** As a platform administrator, I want a simple role system, so that access can be restricted by user type without unnecessary complexity.
 
 #### Acceptance Criteria
 
-1. THE RBAC_Service SHALL resolve user permissions by joining the `users`, `user_roles`, `roles`, and `permissions` tables at authorization time.
-2. THE database schema SHALL define four initial roles: `super_admin`, `admin`, `employee`, and `client`, stored in the `roles` table.
-3. THE database schema SHALL store permissions as rows in the `permissions` table, each with a unique `key` string (e.g., `users:read`, `users:write`, `settings:read`, `settings:write`).
-4. THE database schema SHALL associate roles with permissions via a `role_permissions` join table, allowing new permissions and roles to be added via database inserts without code changes.
-5. THE RBAC_Service SHALL assign the default role `client` to newly registered users via an insert into `user_roles`.
+1. THE database schema SHALL define a `role text` column on the `users` table with a default value of `client`.
+2. THE platform SHALL support four static roles: `super_admin`, `admin`, `employee`, and `client`. These roles are fixed in application code (not database-driven) since Phase 1 does not require runtime-configurable permissions.
+3. THE JWT access token SHALL include the user's `role` as a single string claim (not an array), matching the single-role-per-user model.
+4. Newly registered users SHALL receive the default role `client` via the `users.role` column default — no separate assignment step or table insert is required.
 
 ### Requirement 11: User Profile Management
 
@@ -190,17 +187,14 @@ Phase 1 Core Authentication for the Jarvis Prime platform. This is the foundatio
 
 ### Requirement 16: Database Schema for Auth Tables
 
-**User Story:** As a platform developer, I want a well-defined schema for auth tables, so that user data, roles, sessions, and tokens are stored securely and efficiently.
+**User Story:** As a platform developer, I want a well-defined schema for auth tables, so that user data, sessions, and tokens are stored securely and efficiently.
 
 #### Acceptance Criteria
 
-1. THE database schema SHALL define the following tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `sessions`, `refresh_tokens`, `email_verifications`, `password_resets`.
-2. THE `users` table SHALL include columns: id (uuid PK), email (unique), email_normalized, username, full_name, password_hash, status, email_verified_at, settings (jsonb), failed_login_attempts, account_locked_until, created_at, updated_at.
-3. THE `roles` table SHALL include columns: id (uuid PK), name (unique), description, created_at.
-4. THE `permissions` table SHALL include columns: id (uuid PK), key (unique), description, created_at.
-5. THE `user_roles` table SHALL include columns: user_id (FK to users), role_id (FK to roles), assigned_at, with a composite unique constraint on (user_id, role_id).
-6. THE `sessions` table SHALL include columns: id (uuid PK), user_id (FK), device_id, ip_address, user_agent, created_at, last_activity_at, expires_at, revoked_at, revoked_reason.
-7. THE `refresh_tokens` table SHALL include columns: id (uuid PK), user_id (FK), session_id (FK), token_hash (unique), expires_at, revoked_at, created_at.
-8. THE `email_verifications` table SHALL include columns: id (uuid PK), user_id (FK), token_hash, expires_at, verified_at, created_at.
-9. THE `password_resets` table SHALL include columns: id (uuid PK), user_id (FK), token_hash, expires_at, used_at, created_at.
-10. THE database schema SHALL enable Row Level Security on all auth tables and create service-role policies for server-side access.
+1. THE database schema SHALL define the following tables: `users`, `sessions`, `refresh_tokens`, `email_verification_tokens`, `password_resets`, `audit_logs`, `password_history`.
+2. THE `users` table SHALL include columns: id (uuid PK), email (unique), email_normalized (unique), username (unique), full_name, password_hash, status, role (default `client`), email_verified_at, failed_login_attempts, last_failed_login_at, account_locked_until, created_at, updated_at.
+3. THE `sessions` table SHALL include columns: id (uuid PK), user_id (FK), device_id, device_name, ip_address, user_agent, created_at, last_activity_at, expires_at, revoked_at, revoked_reason.
+4. THE `refresh_tokens` table SHALL include columns: id (uuid PK), user_id (FK), session_id (FK), token_hash (unique), expires_at, revoked_at, created_at.
+5. THE `email_verification_tokens` table SHALL include columns: id (uuid PK), user_id (FK), token_hash, attempts, expires_at, verified_at, verification_ip, created_at.
+6. THE `password_resets` table SHALL include columns: id (uuid PK), user_id (FK), token_hash, attempts, expires_at, used_at, used_ip, created_at.
+7. THE database schema SHALL enable Row Level Security on all auth tables with no client-facing policies (fail-secure); the service role bypasses RLS for all server-side access.

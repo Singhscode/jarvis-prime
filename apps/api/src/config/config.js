@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Loads in order: .env.{NODE_ENV} → .env (allows overrides per environment)
 function loadEnvFile() {
   const nodeEnv = process.env.NODE_ENV || 'development';
-  const baseDir = path.join(__dirname, '..');
+  const baseDir = path.join(__dirname, '..', '..');
   
   // Files to try in order (later ones override earlier ones)
   const filesToLoad = [
@@ -202,6 +202,31 @@ export function getClientConfig(client) {
     hotThreshold: clientOverrides.hotThreshold ?? config.defaultHotThreshold,
     disqualifiers: clientOverrides.disqualifiers ?? null, // null = use defaults
   };
+}
+
+/**
+ * Fail-fast validation for secrets required by the HTTP server (auth layer).
+ * Throws a single error listing every missing variable, rather than allowing
+ * the app to boot with an insecure empty-string JWT secret or no database.
+ * Called by createApp() — not by CLI-only tasks, which already handle a
+ * missing Supabase config gracefully via the in-memory fallback in db.js.
+ */
+export function validateRequiredSecrets() {
+  const required = {
+    JWT_SECRET: config.jwtSecret,
+    SUPABASE_URL: config.supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: config.supabaseKey,
+  };
+  const missing = Object.entries(required)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variable(s): ${missing.join(', ')}. ` +
+      'The server cannot start without these — see apps/api/.env.example.'
+    );
+  }
 }
 
 // Returns which providers are configured (helps the "doctor" command).

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import Link from 'next/link';
 
 export default function LeadGenerationPage() {
@@ -14,7 +15,7 @@ export default function LeadGenerationPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link href="/" className="flex items-center">
-              <img src="/logo.svg" alt="JARVIS PRIME" className="h-9 w-auto" />
+              <Image src="/logo.svg" alt="JARVIS PRIME" width={300} height={64} priority className="h-9 w-auto" />
             </Link>
             <nav className="hidden md:flex items-center gap-8">
               <Link href="/#services" className="text-gray-600 hover:text-blue-600 transition-colors font-medium">Services</Link>
@@ -824,7 +825,7 @@ export default function LeadGenerationPage() {
       {/* Footer */}
       <footer className="relative z-10 bg-gray-900 text-gray-300 py-12 px-4 border-t border-gray-800">
         <div className="max-w-6xl mx-auto text-center">
-          <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-10 w-auto mx-auto mb-6" />
+          <Image src="/logo-white.svg" alt="JARVIS PRIME" width={300} height={64} className="h-10 w-auto mx-auto mb-6" />
           <p className="text-gray-400 mb-6">
             AI-powered outbound and appointment-setting for agencies and B2B companies
           </p>

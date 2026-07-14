@@ -1,5 +1,7 @@
 # JARVIS PRIME Monorepo Completion Status
-*Generated from current structure vs. how_to_work.md specification*
+> Historical Phase 0 status snapshot. Current architecture is defined by the root `README.md` and `database/README.md`.
+
+*Generated from the structure at the time against the historical how_to_work.md specification*
 
 ## 📊 Overall Completion: **85% Complete**
 
@@ -19,7 +21,7 @@
 | **packages/ai/** | AI provider abstractions | ✅ **DONE** | Has package.json + src/index.ts |
 | **packages/ui/** | Shared React components | ✅ **DONE** | Has package.json + src/index.ts |
 | **packages/validation/** | Validation schemas (Zod) | ✅ **DONE** | Has package.json + src/index.ts |
-| **packages/database/** | Shared DB client (Supabase) | ✅ **DONE** | Has package.json + src/index.ts |
+| **database/** | SQL schema and migration source of truth | ✅ **DONE** | Contains version-controlled schemas and migrations |
 | **packages/auth/** | Shared auth helpers | ✅ **DONE** | Has package.json + src/index.ts |
 | **automation/** | n8n workflows, cron jobs, integrations | ✅ **DONE** | Exists from original structure |
 | **infrastructure/** | Docker, Terraform, nginx, monitoring | ✅ **DONE** | Exists from original structure |

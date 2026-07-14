@@ -76,7 +76,7 @@ function validateConfig() {
 async function taskSource() {
   const clients = await listActiveClients();
   if (clients.length === 0) {
-    log.warn('No active clients found. Add a client row (see apps/api/sql/schema.sql) to begin.');
+    log.warn('No active clients found. Apply database migrations with npm run db:reset, then add a client row.');
     return;
   }
   for (const client of clients) await sourceAndScore(client);
