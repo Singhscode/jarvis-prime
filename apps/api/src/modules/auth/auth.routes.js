@@ -368,7 +368,60 @@ router.get('/me', createAuthMiddleware(), async (req, res) => {
 });
 
 /**
- * POST /api/auth/refresh
+ * PATCH /api/auth/me
+ * Update current user profile (full_name, username only)
+ * Requires: Authorization header with valid JWT
+ */
+router.patch('/me', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    const allowedFields = ['full_name', 'username'];
+    const updates = {};
+    const rejected = [];
+
+    for (const key of Object.keys(req.body)) {
+      if (allowedFields.includes(key)) {
+        updates[key] = req.body[key];
+      } else {
+        rejected.push(key);
+      }
+    }
+
+    if (rejected.length > 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: {
+          code: 'INVALID_FIELDS',
+          message: `Fields not allowed: ${rejected.join(', ')}. Allowed: ${allowedFields.join(', ')}.`,
+        },
+      });
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(statusCodes.BAD_REQUEST).json({
+        error: { code: 'EMPTY_UPDATE', message: 'No valid fields provided.' },
+      });
+    }
+
+    await repo.updateUserProfile(req.user.sub, updates);
+    const user = await repo.getUserById(req.user.sub);
+
+    return res.status(statusCodes.OK).json({
+      user: sanitizeUser(user),
+    });
+  } catch (error) {
+    log.error('Update user endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to update user.' },
+    });
+  }
+});
+
+/**
  * Refresh access token using refresh token
  * 
  * Request:
