@@ -422,6 +422,37 @@ router.patch('/me', createAuthMiddleware(), async (req, res) => {
 });
 
 /**
+ * GET /api/auth/settings
+ * Get current user settings (preferences)
+ * Requires: Authorization header with valid JWT
+ */
+router.get('/settings', createAuthMiddleware(), async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'UNAUTHORIZED', message: 'Not authenticated.' },
+      });
+    }
+
+    const user = await repo.getUserById(req.user.sub);
+    if (!user) {
+      return res.status(statusCodes.UNAUTHORIZED).json({
+        error: { code: 'USER_NOT_FOUND', message: 'User no longer exists.' },
+      });
+    }
+
+    return res.status(statusCodes.OK).json({
+      settings: user.settings || {},
+    });
+  } catch (error) {
+    log.error('Get settings endpoint error:', error);
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Failed to get settings.' },
+    });
+  }
+});
+
+/**
  * Refresh access token using refresh token
  * 
  * Request:
