@@ -52,6 +52,43 @@ see the whole thing work without any setup.
 
 ---
 
+## CRM Foundation
+
+The authenticated CRM is available only at `/api/crm`. It stores owner-scoped
+companies, contacts, and CRM lead markers; it does not use the website intake
+`leads` table. Send a valid access token with every request:
+
+```bash
+curl -H "Authorization: Bearer <access-token>" http://localhost:3001/api/crm/companies
+```
+
+### Manual verification
+
+1. Run `npm run db:reset` from the repository root, start the API, then register
+   or log in through `/api/auth` to obtain an access token.
+2. Replace `API` with `http://localhost:3001/api/crm` and send the bearer token
+   shown above for each check.
+
+| Endpoint | Manual check |
+|---|---|
+| `GET /companies` | Verify `{ success: true, data: [] }` before creating a company. |
+| `POST /companies` | Send `{ "name": "Acme" }`; verify `201` and save the returned company ID. |
+| `PATCH /companies/:id` | Change the company name; verify the returned record has the new name. |
+| `DELETE /companies/:id` | Delete a disposable company; verify `{ success: true }`. |
+| `GET /contacts` | Verify only contacts created by the authenticated user are returned. |
+| `POST /contacts` | Send a name and optional saved `company_id`; verify `201` and save the contact ID. |
+| `PATCH /contacts/:id` | Change the contact title or clear an optional field with `null`; verify the response. |
+| `DELETE /contacts/:id` | Delete a contact without a CRM lead; verify `{ success: true }`. |
+| `GET /leads` | Verify only the authenticated user's CRM lead markers are returned. |
+| `POST /leads` | Send `{ "contact_id": "<saved-contact-id>" }`; verify `201`. |
+| `DELETE /leads/:id` | Delete the CRM lead marker; verify the contact remains and `{ success: true }` is returned. |
+
+Verify that a second user cannot list, update, or delete the first user's CRM
+records. Also verify that deleting a company clears `company_id` on its contacts,
+and that a contact with a CRM lead returns `409` until the lead is deleted.
+
+---
+
 ## Going live (the honest checklist)
 
 Dry-run proves the logic works. To actually deliver to a paying client, you need

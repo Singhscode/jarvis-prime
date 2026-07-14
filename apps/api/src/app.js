@@ -111,6 +111,10 @@ export async function createApp(options = {}) {
   const { router: authRouter } = await import('./modules/auth/auth.routes.js');
   app.use('/api/auth', authRouter);
 
+  // ---- JWT-authenticated CRM routes (must precede shared-secret API auth) ----
+  const { default: crmRouter } = await import('./modules/crm/crm.routes.js');
+  app.use('/api/crm', crmRouter);
+
   // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());
 

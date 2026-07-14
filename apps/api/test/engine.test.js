@@ -437,3 +437,37 @@ describe('Logger', () => {
     log.timeEnd('test-timer');
   });
 });
+
+// ---- CRM Foundation ----
+
+describe('CRM Foundation', () => {
+  test('rejects unsupported contact fields before database access', async () => {
+    const { updateContact } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      updateContact('user-123', 'contact-123', { unexpected: 'value' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
+
+  test('requires bearer authentication for CRM routes', async () => {
+    const express = (await import('express')).default;
+    const { default: crmRouter } = await import('../src/modules/crm/crm.routes.js');
+    const app = express();
+    app.use('/crm', crmRouter);
+    const server = await new Promise((resolve) => {
+      const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+    });
+
+    try {
+      const { port } = server.address();
+      const response = await fetch(`http://127.0.0.1:${port}/crm/companies`);
+      const body = await response.json();
+
+      assert.equal(response.status, 401);
+      assert.equal(body.error.code, 'MISSING_TOKEN');
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  });
+});
