@@ -36,9 +36,7 @@ export async function createUser(userData) {
       full_name: userData.full_name || null,
       password_hash: userData.password_hash || null,
       status: auth.accountStatus.PENDING_VERIFICATION,
-      email_verification_attempts: 0,
       failed_login_attempts: 0,
-      mfa_enabled: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }])
@@ -284,7 +282,6 @@ export async function createSession(sessionData) {
       user_id: sessionData.user_id,
       device_id: sessionData.device_id,
       device_name: sessionData.device_name || null,
-      device_type: sessionData.device_type || auth.deviceType.WEB,
       ip_address: sessionData.ip_address,
       user_agent: sessionData.user_agent || null,
       created_at: new Date().toISOString(),
@@ -309,18 +306,6 @@ export async function getSession(sessionId) {
 
   if (error && error.code !== 'PGRST116') throw error;
   return data || null;
-}
-
-export async function getUserSessions(userId) {
-  const { data, error } = await client()
-    .from('sessions')
-    .select('*')
-    .eq('user_id', userId)
-    .is('revoked_at', null)
-    .gt('expires_at', new Date().toISOString());
-
-  if (error) throw error;
-  return data || [];
 }
 
 export async function revokeSession(sessionId, reason = 'user_logout') {
@@ -357,8 +342,6 @@ export async function createRefreshToken(tokenData) {
       user_id: tokenData.user_id,
       session_id: tokenData.session_id,
       token_hash: tokenData.token_hash,
-      device_id: tokenData.device_id,
-      token_family_id: null,
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + auth.login.refreshTokenExpiryMs).toISOString(),
     }])
@@ -406,51 +389,4 @@ export async function createAuditLog(auditData) {
     }]);
 
   if (error) throw error;
-}
-
-export async function getUserAuditLogs(userId, limit = 50) {
-  const { data, error } = await client()
-    .from('audit_logs')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return data || [];
-}
-
-// ── OAuth Accounts ─────────────────────────────────────────────────────────
-
-export async function linkOAuthAccount(oauthData) {
-  const { data, error } = await client()
-    .from('oauth_accounts')
-    .insert([{
-      user_id: oauthData.user_id,
-      provider: oauthData.provider,
-      provider_user_id: oauthData.provider_user_id,
-      email: oauthData.email || null,
-      name: oauthData.name || null,
-      picture_url: oauthData.picture_url || null,
-      raw_data: oauthData.raw_data || {},
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function getOAuthAccount(provider, providerUserId) {
-  const { data, error } = await client()
-    .from('oauth_accounts')
-    .select('*')
-    .eq('provider', provider)
-    .eq('provider_user_id', providerUserId)
-    .single();
-
-  if (error && error.code !== 'PGRST116') throw error;
-  return data || null;
 }
