@@ -161,6 +161,49 @@ export async function convertLeadToClient(ownerUserId, leadId, contactId, name) 
   return data;
 }
 
+export async function listProjects(ownerUserId) {
+  const { data, error } = await client()
+    .from('crm_projects')
+    .select('*')
+    .eq('owner_user_id', ownerUserId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createProject(ownerUserId, values) {
+  const { data, error } = await client()
+    .from('crm_projects')
+    .insert({ owner_user_id: ownerUserId, ...values })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateProject(ownerUserId, id, values) {
+  const { data, error } = await client()
+    .from('crm_projects')
+    .update(values)
+    .eq('id', id)
+    .eq('owner_user_id', ownerUserId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteProject(ownerUserId, id) {
+  const { data, error } = await client()
+    .from('crm_projects')
+    .delete()
+    .eq('id', id)
+    .eq('owner_user_id', ownerUserId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function updateClient(ownerUserId, id, values) {
   const { data, error } = await client()
     .from('crm_clients')
