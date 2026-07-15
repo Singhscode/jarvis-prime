@@ -134,4 +134,28 @@ projectsRouter.delete('/:id', handle(async (req, res) => {
   res.json({ success: true });
 }));
 
+projectsRouter.get('/:projectId/tasks', handle(async (req, res) => {
+  const data = await crm.listTasks(req.user.sub, req.params.projectId);
+  res.json({ success: true, data });
+}));
+
+projectsRouter.post('/:projectId/tasks', validate({ name: 'string' }), handle(async (req, res) => {
+  const data = await crm.createTask(req.user.sub, req.params.projectId, req.body);
+  res.status(201).json({ success: true, data });
+}));
+
+projectsRouter.patch('/:projectId/tasks/:taskId', validate({
+  name: 'string?', completed: 'boolean?',
+}), handle(async (req, res) => {
+  const data = await crm.updateTask(
+    req.user.sub, req.params.projectId, req.params.taskId, req.body
+  );
+  res.json({ success: true, data });
+}));
+
+projectsRouter.delete('/:projectId/tasks/:taskId', handle(async (req, res) => {
+  await crm.deleteTask(req.user.sub, req.params.projectId, req.params.taskId);
+  res.json({ success: true });
+}));
+
 export default router;

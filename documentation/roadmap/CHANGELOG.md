@@ -2,6 +2,30 @@
 
 All notable changes to JARVIS PRIME are documented in this file.
 
+## [0.8.0] — 2026-07-15
+
+### Added
+
+- Owner-scoped Task Management nested under `/api/projects/:projectId/tasks`.
+- Task list, creation, rename, completion/reopening, and deletion operations.
+- `crm_tasks` with a required owner, project relationship, nonblank name, and minimal `completed` lifecycle state.
+
+### Improved
+
+- Project deletion now returns `409 PROJECT_HAS_TASKS` while tasks exist.
+- The implemented customer lifecycle now extends through Task Management: Website Lead → CRM Lead → Client → Project → Task.
+
+### Security
+
+- Task access uses existing JWT authentication and direct `owner_user_id` plus `project_id` scoping.
+- Every task operation verifies ownership of the parent project before access or mutation.
+
+### Architecture
+
+- Extended the existing CRM repository, service, and route files.
+- Added no separate Tasks module, generic CRUD, generic repository, generic service, or unnecessary abstraction.
+- Kept the API project-nested and the schema limited to the current runtime requirements.
+
 ## [0.7.0] — 2026-07-15
 
 ### Added

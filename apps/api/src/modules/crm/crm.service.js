@@ -210,7 +210,55 @@ export async function updateProject(ownerUserId, id, values) {
 }
 
 export async function deleteProject(ownerUserId, id) {
-  return requireRecord(await repo.deleteProject(ownerUserId, id), 'Project');
+  try {
+    return requireRecord(await repo.deleteProject(ownerUserId, id), 'Project');
+  } catch (error) {
+    if (error.code === '23503') {
+      throw new AppError('Delete the tasks before deleting this project.', 409, 'PROJECT_HAS_TASKS');
+    }
+    throw error;
+  }
+}
+
+async function verifyProjectOwnership(ownerUserId, projectId) {
+  if (!(await repo.ownedProjectExists(ownerUserId, projectId))) {
+    throw new AppError('Project not found.', 404, 'PROJECT_NOT_FOUND');
+  }
+}
+
+function taskValues(values) {
+  assertAllowedFields(values, ['name', 'completed']);
+  const result = {};
+  if (Object.hasOwn(values, 'name')) result.name = requiredText(values.name, 'name');
+  if (Object.hasOwn(values, 'completed')) {
+    if (typeof values.completed !== 'boolean') {
+      throw new AppError("Field 'completed' must be a boolean.", 400, 'VALIDATION_ERROR');
+    }
+    result.completed = values.completed;
+  }
+  return result;
+}
+
+export async function listTasks(ownerUserId, projectId) {
+  await verifyProjectOwnership(ownerUserId, projectId);
+  return repo.listTasks(ownerUserId, projectId);
+}
+
+export async function createTask(ownerUserId, projectId, values) {
+  const task = nameValues(values);
+  await verifyProjectOwnership(ownerUserId, projectId);
+  return repo.createTask(ownerUserId, projectId, task);
+}
+
+export async function updateTask(ownerUserId, projectId, taskId, values) {
+  const task = taskValues(values);
+  await verifyProjectOwnership(ownerUserId, projectId);
+  return requireRecord(await repo.updateTask(ownerUserId, projectId, taskId, task), 'Task');
+}
+
+export async function deleteTask(ownerUserId, projectId, taskId) {
+  await verifyProjectOwnership(ownerUserId, projectId);
+  return requireRecord(await repo.deleteTask(ownerUserId, projectId, taskId), 'Task');
 }
 
 export async function listClientContacts(ownerUserId, clientId) {
