@@ -120,6 +120,26 @@ read or mutate the first user's records. Also verify unknown fields such as
 
 ---
 
+## Project Management
+
+Project Management completes the implemented Website Lead → CRM Lead → Client →
+Project workflow. Projects belong to existing owner-scoped CRM clients and are
+available at `/api/projects` with the same JWT bearer token.
+
+| Endpoint | Manual check |
+|---|---|
+| `GET /api/projects` | Verify only the authenticated user's projects are returned. |
+| `POST /api/projects` | Send `{ "client_id": "<client-id>", "name": "Website Redesign" }`; verify `201` and a trimmed name. |
+| `PATCH /api/projects/:id` | Rename the project; verify client reassignment and unknown fields return `400`. |
+| `DELETE /api/projects/:id` | Delete a disposable project and verify `{ success: true }`. |
+
+Verify another user's client cannot be used to create a project and another
+user cannot update or delete the project. Verify client deletion returns
+`409 CLIENT_HAS_PROJECTS` until its projects are deleted. There is intentionally
+no project detail endpoint and no Task Management in Phase 4.
+
+---
+
 ## Going live (the honest checklist)
 
 Dry-run proves the logic works. To actually deliver to a paying client, you need

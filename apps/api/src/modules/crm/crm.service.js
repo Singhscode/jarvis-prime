@@ -183,7 +183,34 @@ export async function updateClient(ownerUserId, id, values) {
 }
 
 export async function deleteClient(ownerUserId, id) {
-  return requireRecord(await repo.deleteClient(ownerUserId, id), 'Client');
+  try {
+    return requireRecord(await repo.deleteClient(ownerUserId, id), 'Client');
+  } catch (error) {
+    if (error.code === '23503') {
+      throw new AppError('Delete the projects before deleting this client.', 409, 'CLIENT_HAS_PROJECTS');
+    }
+    throw error;
+  }
+}
+
+export function listProjects(ownerUserId) {
+  return repo.listProjects(ownerUserId);
+}
+
+export async function createProject(ownerUserId, values) {
+  assertAllowedFields(values, ['client_id', 'name']);
+  const clientId = requiredText(values.client_id, 'client_id');
+  const name = requiredText(values.name, 'name');
+  await verifyClientOwnership(ownerUserId, clientId);
+  return repo.createProject(ownerUserId, { client_id: clientId, name });
+}
+
+export async function updateProject(ownerUserId, id, values) {
+  return requireRecord(await repo.updateProject(ownerUserId, id, nameValues(values)), 'Project');
+}
+
+export async function deleteProject(ownerUserId, id) {
+  return requireRecord(await repo.deleteProject(ownerUserId, id), 'Project');
 }
 
 export async function listClientContacts(ownerUserId, clientId) {

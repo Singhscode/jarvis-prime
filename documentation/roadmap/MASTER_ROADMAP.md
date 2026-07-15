@@ -1,8 +1,8 @@
-# JARVIS PRIME Roadmap
+# JARVIS PRIME Master Roadmap
 
-## Current release
+## Phase 4 — Project Management
 
-✅ **Phase 4 — Project Management Complete**
+✅ **Complete**
 **Version:** `v0.7.0-project-management`
 **Status:** Complete
 **Completion Date:** July 15, 2026
@@ -13,9 +13,9 @@
 Website Lead → CRM Lead → Client → Project
 ```
 
-This workflow is fully implemented through Phase 4. Tasks remain a separate Phase 5 concern.
+The workflow is fully implemented. Task Management begins only after separate Phase 5 approval.
 
-## Phase 4 delivery
+### Major features
 
 - Project Management and Project CRUD
 - Client → Project relationship
@@ -23,14 +23,14 @@ This workflow is fully implemented through Phase 4. Tasks remain a separate Phas
 - Client deletion protection
 - Minimal project architecture
 
-## Architecture decisions
+### Architecture decisions
 
-- Added one `crm_projects` table.
-- Kept explicit repository and service methods in the existing CRM module.
-- Added no generic CRUD, generic repository, or unnecessary abstraction.
-- Kept Projects separate from Tasks.
+- One `crm_projects` table with direct owner and client relationships.
+- Explicit repository and service methods in the existing CRM module.
+- No generic CRUD, generic repository, or unnecessary abstractions.
+- Projects remain separate from Tasks.
 
-## Delivery roadmap
+## Roadmap status
 
 ✅ Phase 0 Repository Cleanup
 ✅ Phase 0.5 Database Audit

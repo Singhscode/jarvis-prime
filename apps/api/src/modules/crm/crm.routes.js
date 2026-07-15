@@ -4,12 +4,14 @@ import { validate } from '../../middleware/validate.js';
 import * as crm from './crm.service.js';
 
 const router = Router();
+export const projectsRouter = Router();
 
 function handle(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
 }
 
 router.use(createAuthMiddleware());
+projectsRouter.use(createAuthMiddleware());
 
 router.get('/companies', handle(async (req, res) => {
   const data = await crm.listCompanies(req.user.sub);
@@ -109,6 +111,26 @@ router.patch('/clients/:clientId/contacts/:contactId', handle(async (req, res) =
 
 router.delete('/clients/:clientId/contacts/:contactId', handle(async (req, res) => {
   await crm.deleteClientContact(req.user.sub, req.params.clientId, req.params.contactId);
+  res.json({ success: true });
+}));
+
+projectsRouter.get('/', handle(async (req, res) => {
+  const data = await crm.listProjects(req.user.sub);
+  res.json({ success: true, data });
+}));
+
+projectsRouter.post('/', validate({ client_id: 'string', name: 'string' }), handle(async (req, res) => {
+  const data = await crm.createProject(req.user.sub, req.body);
+  res.status(201).json({ success: true, data });
+}));
+
+projectsRouter.patch('/:id', handle(async (req, res) => {
+  const data = await crm.updateProject(req.user.sub, req.params.id, req.body);
+  res.json({ success: true, data });
+}));
+
+projectsRouter.delete('/:id', handle(async (req, res) => {
+  await crm.deleteProject(req.user.sub, req.params.id);
   res.json({ success: true });
 }));
 

@@ -488,4 +488,22 @@ describe('CRM Foundation', () => {
       { code: 'INVALID_FIELDS' }
     );
   });
+
+  test('rejects unsupported project fields before database access', async () => {
+    const { createProject } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createProject('user-123', { client_id: 'client-123', name: 'Website', status: 'active' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
+
+  test('rejects whitespace-only project names before database access', async () => {
+    const { createProject } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createProject('user-123', { client_id: 'client-123', name: '   ' }),
+      { code: 'VALIDATION_ERROR' }
+    );
+  });
 });
