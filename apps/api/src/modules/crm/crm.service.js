@@ -1,8 +1,9 @@
 import { AppError } from '../../middleware/error-handler.js';
 import * as repo from './crm.repository.js';
 
-const COMPANY_FIELDS = ['name'];
+const NAME_FIELDS = ['name'];
 const CONTACT_FIELDS = ['name', 'email', 'phone', 'title', 'company_id'];
+const CLIENT_CONTACT_FIELDS = ['name', 'email', 'phone', 'title'];
 
 function assertAllowedFields(values, allowedFields) {
   const invalid = Object.keys(values).filter((field) => !allowedFields.includes(field));
@@ -25,8 +26,8 @@ function optionalText(value, field) {
   return value === null ? null : requiredText(value, field);
 }
 
-function companyValues(values) {
-  assertAllowedFields(values, COMPANY_FIELDS);
+function nameValues(values) {
+  assertAllowedFields(values, NAME_FIELDS);
   return { name: requiredText(values.name, 'name') };
 }
 
@@ -51,9 +52,29 @@ function contactValues(values, requireName) {
   return result;
 }
 
+function clientContactValues(values, requireName) {
+  assertAllowedFields(values, CLIENT_CONTACT_FIELDS);
+  if (requireName && !Object.hasOwn(values, 'name')) {
+    throw new AppError("Missing required field: 'name'", 400, 'VALIDATION_ERROR');
+  }
+
+  const result = {};
+  if (Object.hasOwn(values, 'name')) result.name = requiredText(values.name, 'name');
+  for (const field of ['email', 'phone', 'title']) {
+    if (Object.hasOwn(values, field)) result[field] = optionalText(values[field], field);
+  }
+  return result;
+}
+
 async function verifyCompanyOwnership(ownerUserId, companyId) {
   if (companyId && !(await repo.ownedCompanyExists(ownerUserId, companyId))) {
     throw new AppError('Company not found.', 404, 'COMPANY_NOT_FOUND');
+  }
+}
+
+async function verifyClientOwnership(ownerUserId, clientId) {
+  if (!(await repo.ownedClientExists(ownerUserId, clientId))) {
+    throw new AppError('Client not found.', 404, 'CLIENT_NOT_FOUND');
   }
 }
 
@@ -72,11 +93,11 @@ export function listCompanies(ownerUserId) {
 }
 
 export function createCompany(ownerUserId, values) {
-  return repo.createCompany(ownerUserId, companyValues(values));
+  return repo.createCompany(ownerUserId, nameValues(values));
 }
 
 export async function updateCompany(ownerUserId, id, values) {
-  return requireRecord(await repo.updateCompany(ownerUserId, id, companyValues(values)), 'Company');
+  return requireRecord(await repo.updateCompany(ownerUserId, id, nameValues(values)), 'Company');
 }
 
 export async function deleteCompany(ownerUserId, id) {
@@ -135,4 +156,62 @@ export async function createLead(ownerUserId, contactId) {
 
 export async function deleteLead(ownerUserId, id) {
   return requireRecord(await repo.deleteLead(ownerUserId, id), 'Lead');
+}
+
+export function listClients(ownerUserId) {
+  return repo.listClients(ownerUserId);
+}
+
+export async function createClient(ownerUserId, values) {
+  assertAllowedFields(values, ['lead_id', 'name']);
+  const leadId = requiredText(values.lead_id, 'lead_id');
+  const lead = await repo.getOwnedUnconvertedLead(ownerUserId, leadId);
+  if (!lead) throw new AppError('Lead not found.', 404, 'LEAD_NOT_FOUND');
+
+  try {
+    return await repo.convertLeadToClient(ownerUserId, lead.id, lead.contact_id, requiredText(values.name, 'name'));
+  } catch (error) {
+    if (error.code === 'P0001') {
+      throw new AppError('Lead conversion could not be completed.', 409, 'LEAD_CONVERSION_CONFLICT');
+    }
+    throw error;
+  }
+}
+
+export async function updateClient(ownerUserId, id, values) {
+  return requireRecord(await repo.updateClient(ownerUserId, id, nameValues(values)), 'Client');
+}
+
+export async function deleteClient(ownerUserId, id) {
+  return requireRecord(await repo.deleteClient(ownerUserId, id), 'Client');
+}
+
+export async function listClientContacts(ownerUserId, clientId) {
+  await verifyClientOwnership(ownerUserId, clientId);
+  return repo.listClientContacts(ownerUserId, clientId);
+}
+
+export async function createClientContact(ownerUserId, clientId, values) {
+  const contact = clientContactValues(values, true);
+  await verifyClientOwnership(ownerUserId, clientId);
+  try {
+    return await repo.createClientContact(ownerUserId, clientId, contact);
+  } catch (error) {
+    rethrowDuplicate(error, 'A contact with that email already exists.', 'CONTACT_EMAIL_EXISTS');
+  }
+}
+
+export async function updateClientContact(ownerUserId, clientId, contactId, values) {
+  const contact = clientContactValues(values, false);
+  await verifyClientOwnership(ownerUserId, clientId);
+  try {
+    return requireRecord(await repo.updateClientContact(ownerUserId, clientId, contactId, contact), 'Contact');
+  } catch (error) {
+    rethrowDuplicate(error, 'A contact with that email already exists.', 'CONTACT_EMAIL_EXISTS');
+  }
+}
+
+export async function deleteClientContact(ownerUserId, clientId, contactId) {
+  await verifyClientOwnership(ownerUserId, clientId);
+  return requireRecord(await repo.detachClientContact(ownerUserId, clientId, contactId), 'Contact');
 }

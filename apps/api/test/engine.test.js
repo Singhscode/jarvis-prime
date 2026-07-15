@@ -470,4 +470,22 @@ describe('CRM Foundation', () => {
       await new Promise((resolve) => server.close(resolve));
     }
   });
+
+  test('rejects unsupported client conversion fields before database access', async () => {
+    const { createClient } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createClient('user-123', { lead_id: 'lead-123', name: 'Acme', status: 'won' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
+
+  test('rejects company assignment through client-contact input', async () => {
+    const { createClientContact } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createClientContact('user-123', 'client-123', { name: 'Jane', company_id: 'company-123' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
 });
