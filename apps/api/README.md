@@ -52,6 +52,74 @@ see the whole thing work without any setup.
 
 ---
 
+## CRM Foundation
+
+The authenticated CRM is available only at `/api/crm`. It stores owner-scoped
+companies, contacts, and CRM lead markers; it does not use the website intake
+`leads` table. Send a valid access token with every request:
+
+```bash
+curl -H "Authorization: Bearer <access-token>" http://localhost:3001/api/crm/companies
+```
+
+### Manual verification
+
+1. Run `npm run db:reset` from the repository root, start the API, then register
+   or log in through `/api/auth` to obtain an access token.
+2. Replace `API` with `http://localhost:3001/api/crm` and send the bearer token
+   shown above for each check.
+
+| Endpoint | Manual check |
+|---|---|
+| `GET /companies` | Verify `{ success: true, data: [] }` before creating a company. |
+| `POST /companies` | Send `{ "name": "Acme" }`; verify `201` and save the returned company ID. |
+| `PATCH /companies/:id` | Change the company name; verify the returned record has the new name. |
+| `DELETE /companies/:id` | Delete a disposable company; verify `{ success: true }`. |
+| `GET /contacts` | Verify only contacts created by the authenticated user are returned. |
+| `POST /contacts` | Send a name and optional saved `company_id`; verify `201` and save the contact ID. |
+| `PATCH /contacts/:id` | Change the contact title or clear an optional field with `null`; verify the response. |
+| `DELETE /contacts/:id` | Delete a contact without a CRM lead; verify `{ success: true }`. |
+| `GET /leads` | Verify only the authenticated user's CRM lead markers are returned. |
+| `POST /leads` | Send `{ "contact_id": "<saved-contact-id>" }`; verify `201`. |
+| `DELETE /leads/:id` | Delete the CRM lead marker; verify the contact remains and `{ success: true }` is returned. |
+
+Verify that a second user cannot list, update, or delete the first user's CRM
+records. Also verify that deleting a company clears `company_id` on its contacts,
+and that a contact with a CRM lead returns `409` until the lead is deleted.
+
+---
+
+## Client Management
+
+Client Management converts an active CRM lead into an owner-scoped client at the
+same `/api/crm` base path. The conversion preserves the CRM lead and links it to
+the new client; converted leads are excluded from the active CRM lead list. The
+migration includes `convert_crm_lead_to_client` solely because the Supabase
+JavaScript client does not provide application-level transactions; it atomically
+creates the client and sets the two client relationships.
+
+### Manual verification
+
+Create a CRM contact and active CRM lead first, then use the same bearer token
+for each of these checks:
+
+| Endpoint | Manual check |
+|---|---|
+| `GET /clients` | Verify `{ success: true, data: [] }` before conversion. |
+| `POST /clients` | Send `{ "lead_id": "<lead-id>", "name": "Acme" }`; verify `201`, a client, and the preserved lead no longer appears in `GET /leads`. |
+| `PATCH /clients/:id` | Change only the client name and verify the response. |
+| `DELETE /clients/:id` | Delete a disposable client; verify `{ success: true }`, cleared contact association, and the preserved lead appears in `GET /leads` again. |
+| `GET /clients/:clientId/contacts` | Verify the converted lead contact is returned. |
+| `POST /clients/:clientId/contacts` | Create a second client contact; verify `201` and association with the client. |
+| `PATCH /clients/:clientId/contacts/:contactId` | Change a title or clear an optional field; verify the response. |
+| `DELETE /clients/:clientId/contacts/:contactId` | Verify the contact remains in general CRM contacts but is disassociated from the client. |
+
+Use a second user's token to verify no client or client-contact operation can
+read or mutate the first user's records. Also verify unknown fields such as
+`status`, `stage`, `pipeline`, `company_id`, and `client_id` return `400`.
+
+---
+
 ## Going live (the honest checklist)
 
 Dry-run proves the logic works. To actually deliver to a paying client, you need
