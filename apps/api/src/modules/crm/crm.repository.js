@@ -298,3 +298,53 @@ export function ownedContactExists(ownerUserId, id) {
 export function ownedClientExists(ownerUserId, id) {
   return ownedRecordExists('crm_clients', ownerUserId, id);
 }
+
+export function ownedProjectExists(ownerUserId, id) {
+  return ownedRecordExists('crm_projects', ownerUserId, id);
+}
+
+export async function listTasks(ownerUserId, projectId) {
+  const { data, error } = await client()
+    .from('crm_tasks')
+    .select('*')
+    .eq('owner_user_id', ownerUserId)
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createTask(ownerUserId, projectId, values) {
+  const { data, error } = await client()
+    .from('crm_tasks')
+    .insert({ owner_user_id: ownerUserId, project_id: projectId, ...values })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTask(ownerUserId, projectId, taskId, values) {
+  const { data, error } = await client()
+    .from('crm_tasks')
+    .update(values)
+    .eq('id', taskId)
+    .eq('owner_user_id', ownerUserId)
+    .eq('project_id', projectId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteTask(ownerUserId, projectId, taskId) {
+  const { data, error } = await client()
+    .from('crm_tasks')
+    .delete()
+    .eq('id', taskId)
+    .eq('owner_user_id', ownerUserId)
+    .eq('project_id', projectId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}

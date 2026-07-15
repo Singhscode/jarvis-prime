@@ -2,33 +2,36 @@
 
 ## Current release
 
-✅ **Phase 4 — Project Management Complete**
-**Version:** `v0.7.0-project-management`
+✅ **Phase 5 — Task Management Complete**
+**Version:** `v0.8.0-task-management`
+**Git Tag:** `v0.8.0-task-management`
 **Status:** Complete
 **Completion Date:** July 15, 2026
 
 ## Implemented business workflow
 
 ```text
-Website Lead → CRM Lead → Client → Project
+Website Lead → CRM Lead → Client → Project → Task
 ```
 
-This workflow is fully implemented through Phase 4. Tasks remain a separate Phase 5 concern.
+This workflow is fully implemented through Phase 5.
 
-## Phase 4 delivery
+## Phase 5 delivery
 
-- Project Management and Project CRUD
-- Client → Project relationship
-- Owner-scoped project access
-- Client deletion protection
-- Minimal project architecture
+- Task Management with project-nested task create, list, update, and delete operations.
+- Task completion and reopening through the minimal `completed` workflow state.
+- Required Project → Task relationship.
+- Owner-scoped task isolation.
+- Project deletion protection while tasks exist.
+- Minimal Task lifecycle with no speculative metadata or workflow features.
 
 ## Architecture decisions
 
-- Added one `crm_projects` table.
+- Extended the existing CRM module; no separate Tasks module was created.
+- Added one minimal `crm_tasks` table.
 - Kept explicit repository and service methods in the existing CRM module.
-- Added no generic CRUD, generic repository, or unnecessary abstraction.
-- Kept Projects separate from Tasks.
+- Added no generic CRUD, generic repository, generic service, or unnecessary abstraction.
+- Kept the REST API nested under projects.
 
 ## Delivery roadmap
 
@@ -39,7 +42,7 @@ This workflow is fully implemented through Phase 4. Tasks remain a separate Phas
 ✅ Phase 2 CRM Foundation
 ✅ Phase 3 Client Management
 ✅ Phase 4 Project Management
-⏳ Phase 5 Task Management
+✅ Phase 5 Task Management
 ⏳ Phase 6 Employee Portal
 ⏳ Phase 7 Client Portal
 ⏳ Phase 8 Finance & Billing

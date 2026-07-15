@@ -1,34 +1,37 @@
 # JARVIS PRIME Master Roadmap
 
-## Phase 4 — Project Management
+## Phase 5 — Task Management
 
 ✅ **Complete**
-**Version:** `v0.7.0-project-management`
+**Version:** `v0.8.0-task-management`
+**Git Tag:** `v0.8.0-task-management`
 **Status:** Complete
 **Completion Date:** July 15, 2026
 
 ## Implemented business workflow
 
 ```text
-Website Lead → CRM Lead → Client → Project
+Website Lead → CRM Lead → Client → Project → Task
 ```
 
-The workflow is fully implemented. Task Management begins only after separate Phase 5 approval.
+The complete customer-lifecycle workflow is implemented through Task Management.
 
 ### Major features
 
-- Project Management and Project CRUD
-- Client → Project relationship
-- Owner-scoped project access
-- Client deletion protection
-- Minimal project architecture
+- Task Management with project-nested task create, list, update, and delete operations.
+- Task completion and reopening through the `completed` boolean.
+- Required Project → Task relationship.
+- Owner-scoped task isolation.
+- Project deletion protection while tasks exist.
+- Minimal Task lifecycle with no speculative workflow features.
 
 ### Architecture decisions
 
-- One `crm_projects` table with direct owner and client relationships.
+- Extended the existing CRM module; no separate Tasks module was created.
+- One `crm_tasks` table with direct owner and project relationships.
 - Explicit repository and service methods in the existing CRM module.
-- No generic CRUD, generic repository, or unnecessary abstractions.
-- Projects remain separate from Tasks.
+- No generic CRUD, generic repository, generic service, or unnecessary abstractions.
+- Nested REST API under `/api/projects/:projectId/tasks`.
 
 ## Roadmap status
 
@@ -39,7 +42,7 @@ The workflow is fully implemented. Task Management begins only after separate Ph
 ✅ Phase 2 CRM Foundation
 ✅ Phase 3 Client Management
 ✅ Phase 4 Project Management
-⏳ Phase 5 Task Management
+✅ Phase 5 Task Management
 ⏳ Phase 6 Employee Portal
 ⏳ Phase 7 Client Portal
 ⏳ Phase 8 Finance & Billing
