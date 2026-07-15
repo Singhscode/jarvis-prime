@@ -25,4 +25,4 @@ All notable changes to JARVIS PRIME are documented in this file.
 - Reused the CRM module and contacts table.
 - Avoided generic CRUD, generic repositories, and unnecessary abstractions.
 
-[0.6.0]: https://github.com/anujsingh/Jarvis-ai-company/releases/tag/v0.6.0-client-management
+[0.6.0]: https://github.com/Singhscode/jarvis-prime/releases/tag/v0.6.0-client-management
