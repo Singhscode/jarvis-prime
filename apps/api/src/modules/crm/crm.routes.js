@@ -1,10 +1,14 @@
 import { Router } from 'express';
-import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
+import {
+  createAuthMiddleware,
+  createAuthorizationMiddleware,
+} from '../../middleware/auth-middleware.js';
 import { validate } from '../../middleware/validate.js';
 import * as crm from './crm.service.js';
 
 const router = Router();
 export const projectsRouter = Router();
+export const employeePortalRouter = Router();
 
 function handle(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
@@ -12,6 +16,20 @@ function handle(handler) {
 
 router.use(createAuthMiddleware());
 projectsRouter.use(createAuthMiddleware());
+employeePortalRouter.use(createAuthMiddleware());
+employeePortalRouter.use(createAuthorizationMiddleware('employee'));
+
+employeePortalRouter.get('/', handle(async (req, res) => {
+  const data = await crm.getEmployeePortal(req.user.sub);
+  res.json({ success: true, data });
+}));
+
+employeePortalRouter.patch('/tasks/:taskId', validate({
+  completed: 'boolean', justification: 'string',
+}), handle(async (req, res) => {
+  const data = await crm.completeEmployeeTask(req.user.sub, req.params.taskId, req.body);
+  res.json({ success: true, data });
+}));
 
 router.get('/companies', handle(async (req, res) => {
   const data = await crm.listCompanies(req.user.sub);

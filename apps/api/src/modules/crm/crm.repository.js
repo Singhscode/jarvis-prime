@@ -348,3 +348,68 @@ export async function deleteTask(ownerUserId, projectId, taskId) {
   if (error) throw error;
   return data;
 }
+
+export async function getActiveEmployeeById(employeeUserId) {
+  const { data, error } = await client()
+    .from('users')
+    .select('id, role, status, portal_owner_user_id')
+    .eq('id', employeeUserId)
+    .eq('role', 'employee')
+    .eq('status', 'active')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function listAssignedTasks(ownerUserId, assignedUserId) {
+  const { data, error } = await client()
+    .from('crm_tasks')
+    .select('id, project_id, name, completed')
+    .eq('owner_user_id', ownerUserId)
+    .eq('assigned_user_id', assignedUserId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listEmployeeProjects(ownerUserId, projectIds) {
+  if (projectIds.length === 0) return [];
+  const { data, error } = await client()
+    .from('crm_projects')
+    .select('id, client_id, name')
+    .eq('owner_user_id', ownerUserId)
+    .in('id', projectIds);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listEmployeeClients(ownerUserId) {
+  const { data, error } = await client()
+    .from('crm_clients')
+    .select('id, name, created_at')
+    .eq('owner_user_id', ownerUserId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listEmployeeLeads(ownerUserId) {
+  const { data, error } = await client()
+    .from('crm_leads')
+    .select('id, contact_id, created_at')
+    .eq('owner_user_id', ownerUserId)
+    .is('client_id', null)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function completeTask(employeeUserId, taskId, completed, justification) {
+  const { data, error } = await client().rpc('complete_employee_portal_task', {
+    p_employee_user_id: employeeUserId,
+    p_task_id: taskId,
+    p_completed: completed,
+    p_justification: justification,
+  });
+  if (error) throw error;
+  return data;
+}
