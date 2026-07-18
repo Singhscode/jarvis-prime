@@ -14,21 +14,31 @@ const API_URL = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:3001';
 
 export default function EmployeePage() {
   const accessToken = useRef<string | null>(null);
+  const refreshPromise = useRef<Promise<string> | null>(null);
   const [snapshot, setSnapshot] = useState<PortalSnapshot | null>(null);
   const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [needsLogin, setNeedsLogin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const refreshAccessToken = useCallback(async () => {
-    const response = await fetch(`${API_URL}/api/auth/refresh`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }, body: '{}',
-    });
-    if (!response.ok) throw new Error('Authentication required.');
-    const body = await response.json();
-    accessToken.current = body.accessToken;
-    return body.accessToken as string;
+  const refreshAccessToken = useCallback(() => {
+    if (refreshPromise.current) return refreshPromise.current;
+    const refresh = (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/refresh`, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }, body: '{}',
+        });
+        if (!response.ok) throw new Error('Authentication required.');
+        const body = await response.json();
+        accessToken.current = body.accessToken;
+        return body.accessToken as string;
+      } finally {
+        refreshPromise.current = null;
+      }
+    })();
+    refreshPromise.current = refresh;
+    return refresh;
   }, []);
 
   const request = useCallback(async (path: string, init: RequestInit = {}) => {

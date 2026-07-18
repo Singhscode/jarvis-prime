@@ -320,6 +320,16 @@ export async function revokeSession(sessionId, reason = 'user_logout') {
   if (error) throw error;
 }
 
+export async function revokeSessionRefreshTokens(sessionId) {
+  const { error } = await client()
+    .from('refresh_tokens')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('session_id', sessionId)
+    .is('revoked_at', null);
+
+  if (error) throw error;
+}
+
 export async function revokeAllUserSessions(userId, reason = 'user_logout') {
   const { error } = await client()
     .from('sessions')

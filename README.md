@@ -108,14 +108,20 @@ npm run lint       # lint all packages
 
 ## Current Release and Roadmap
 
-✅ **Phase 4 — Project Management Complete**
-**Version:** `v0.7.0-project-management` · **Status:** Complete · **Completion Date:** July 15, 2026
+✅ **Phase 6 — Employee Portal Complete**
+**Version:** `v0.9.0` · **Git Tag:** `v0.9.0-employee-portal` · **Status:** Complete · **Completion Date:** July 18, 2026
 
-The fully implemented business workflow is **Website Lead → CRM Lead → Client → Project**. Phase 4 adds owner-scoped Project Management, Project CRUD, the Client → Project relationship, and client deletion protection. It uses one `crm_projects` table and explicit methods in the existing CRM module, with no generic CRUD, generic repository, or unnecessary abstraction. Projects remain separate from Tasks.
+The implemented business workflow is:
 
-**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ⏳ Phase 5 Task Management · ⏳ Phase 6 Employee Portal · ⏳ Phase 7 Client Portal · ⏳ Phase 8 Finance & Billing · ⏳ Phase 9 Communication Hub · ⏳ Phase 10 Automation Platform · ⏳ Phase 11 Analytics & Reporting · ⏳ Phase 12 Production & DevOps · ⏳ Phase 13 AI Foundation · ⏳ Phase 14 AI Sales Agents · ⏳ Phase 15 AI Operations · ⏳ Phase 16 Enterprise Security · 🚀 Version 1.0 Release
+```text
+Website Lead → CRM Lead → Client → Project → Task → Employee Portal
+```
 
-See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), [changelog](./documentation/roadmap/CHANGELOG.md), and [Phase 4 release notes](./docs/releases/v0.7.0-project-management.md).
+The Employee Portal provides active employees with JWT/session authentication, a database-scoped portal snapshot, and directly assigned task completion or reopening with a required justification. Scope is derived from the employee record rather than client input, and task completion is atomic through the PostgreSQL audit RPC.
+
+**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ⏳ Phase 7 Client Portal · ⏳ Phase 8 Finance & Billing · ⏳ Phase 9 Communication Hub · ⏳ Phase 10 Automation Platform · ⏳ Phase 11 Analytics & Reporting · ⏳ Phase 12 Production & DevOps · ⏳ Phase 13 AI Foundation · ⏳ Phase 14 AI Sales Agents · ⏳ Phase 15 AI Operations · ⏳ Phase 16 Enterprise Security · 🚀 Version 1.0 Release
+
+See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), [changelog](./documentation/roadmap/CHANGELOG.md), and [Phase 6 release notes](./docs/releases/v0.9.0-employee-portal.md).
 
 ---
 

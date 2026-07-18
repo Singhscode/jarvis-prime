@@ -15,6 +15,7 @@
  * @param {Function} [options.keyFn]           Custom key extraction function (req) => string
  * @param {string} [options.message]           Custom 429 error message
  * @param {boolean} [options.skipFailedRequests=false]  Don't count failed requests
+ * @param {boolean} [options.skipSuccessfulRequests=false]  Count only client failures
  */
 export function createRateLimiter(options = {}) {
   const {
@@ -23,6 +24,7 @@ export function createRateLimiter(options = {}) {
     keyFn = defaultKeyFn,
     message = 'Too many requests. Try again later.',
     skipFailedRequests = false,
+    skipSuccessfulRequests = false,
   } = options;
 
   const store = new Map();
@@ -40,41 +42,50 @@ export function createRateLimiter(options = {}) {
   // Allow cleanup interval to be unref'd so it doesn't keep the process alive
   if (cleanupInterval.unref) cleanupInterval.unref();
 
+  function setHeaders(res, entry) {
+    res.setHeader('X-RateLimit-Limit', String(max));
+    res.setHeader('X-RateLimit-Remaining', String(Math.max(max - entry.count, 0)));
+    res.setHeader('X-RateLimit-Reset', new Date(entry.resetAt).toISOString());
+  }
+
+  function release(key, entry) {
+    const current = store.get(key);
+    if (current !== entry || current.count === 0) return;
+    current.count--;
+    if (current.count === 0) store.delete(key);
+  }
+
+  function shouldRelease(statusCode) {
+    if (skipSuccessfulRequests && (statusCode < 400 || statusCode >= 500)) return true;
+    return skipFailedRequests && statusCode >= 400;
+  }
+
   function rateLimiterMiddleware(req, res, next) {
     const key = keyFn(req);
     const now = Date.now();
+    let entry = store.get(key);
 
-    if (!store.has(key)) {
-      store.set(key, { count: 1, resetAt: now + windowMs });
-      return next();
+    if (!entry || now > entry.resetAt) {
+      entry = { count: 0, resetAt: now + windowMs };
+      store.set(key, entry);
     }
 
-    const entry = store.get(key);
-
-    // Window expired — reset
-    if (now > entry.resetAt) {
-      entry.count = 1;
-      entry.resetAt = now + windowMs;
-      return next();
-    }
-
-    entry.count++;
-
-    if (entry.count > max) {
+    if (entry.count >= max) {
       const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
       res.setHeader('Retry-After', String(retryAfter));
-      res.setHeader('X-RateLimit-Limit', String(max));
-      res.setHeader('X-RateLimit-Remaining', '0');
-      res.setHeader('X-RateLimit-Reset', new Date(entry.resetAt).toISOString());
+      setHeaders(res, entry);
       return res.status(429).json({
         error: { code: 'RATE_LIMITED', message },
       });
     }
 
-    // Add rate limit headers to every response
-    res.setHeader('X-RateLimit-Limit', String(max));
-    res.setHeader('X-RateLimit-Remaining', String(Math.max(max - entry.count, 0)));
-    res.setHeader('X-RateLimit-Reset', new Date(entry.resetAt).toISOString());
+    entry.count++;
+    setHeaders(res, entry);
+    if ((skipSuccessfulRequests || skipFailedRequests) && typeof res.once === 'function') {
+      res.once('finish', () => {
+        if (shouldRelease(res.statusCode)) release(key, entry);
+      });
+    }
 
     next();
   }

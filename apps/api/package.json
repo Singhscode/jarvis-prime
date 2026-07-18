@@ -16,6 +16,8 @@
     "dev": "node --watch src/runner.js --server",
     "test": "node --test",
     "test:integration:db": "node --test integration/employee-portal.postgres.integration.js",
+    "provision:employee": "node scripts/provision-employee.js",
+    "seed:employee-portal": "node scripts/seed-employee-portal.js",
     "test:watch": "node --test --watch"
   },
   "dependencies": {

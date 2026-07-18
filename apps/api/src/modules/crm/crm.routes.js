@@ -163,7 +163,7 @@ projectsRouter.post('/:projectId/tasks', validate({ name: 'string' }), handle(as
 }));
 
 projectsRouter.patch('/:projectId/tasks/:taskId', validate({
-  name: 'string?', completed: 'boolean?',
+  name: 'string?', completed: 'boolean?', assigned_user_id: 'string?',
 }), handle(async (req, res) => {
   const data = await crm.updateTask(
     req.user.sub, req.params.projectId, req.params.taskId, req.body
