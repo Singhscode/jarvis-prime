@@ -21,6 +21,9 @@ jobs:
           version: 2.109.1
       - run: npm run db:reset
       - run: cp apps/api/.env.test apps/api/.env
+      - run: npm run test:integration:db --workspace=apps/api
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       - run: npm run test --workspace=apps/api
 
   test-site:

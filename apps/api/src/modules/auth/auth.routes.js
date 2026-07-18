@@ -197,8 +197,13 @@ router.post('/logout', createAuthMiddleware(), async (req, res) => {
 
     const result = await logoutUser(sessionId, userId, ipAddress);
 
-    // Clear refresh token cookie
-    res.clearCookie('refreshToken');
+    // Clear the same scoped cookie created by login and refresh.
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/api/auth',
+    });
 
     return res.status(statusCodes.OK).json({
       success: result.success,
@@ -520,7 +525,12 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
     const result = await rotateRefreshToken(refreshToken, ipAddress);
 
     if (!result.success) {
-      res.clearCookie('refreshToken');
+      res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/api/auth',
+      });
       return res.status(result.status || statusCodes.UNAUTHORIZED).json({
         error: {
           code: 'INVALID_REFRESH_TOKEN',

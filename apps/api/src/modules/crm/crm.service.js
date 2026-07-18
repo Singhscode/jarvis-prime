@@ -4,6 +4,7 @@ import * as repo from './crm.repository.js';
 const NAME_FIELDS = ['name'];
 const CONTACT_FIELDS = ['name', 'email', 'phone', 'title', 'company_id'];
 const CLIENT_CONTACT_FIELDS = ['name', 'email', 'phone', 'title'];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function assertAllowedFields(values, allowedFields) {
   const invalid = Object.keys(values).filter((field) => !allowedFields.includes(field));
@@ -289,4 +290,69 @@ export async function updateClientContact(ownerUserId, clientId, contactId, valu
 export async function deleteClientContact(ownerUserId, clientId, contactId) {
   await verifyClientOwnership(ownerUserId, clientId);
   return requireRecord(await repo.detachClientContact(ownerUserId, clientId, contactId), 'Contact');
+}
+
+export async function getEmployeePortal(employeeUserId) {
+  try {
+    const employee = await repo.getActiveEmployeeById(employeeUserId);
+    if (!employee) {
+      throw new AppError('Employee access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+    }
+    if (!employee.portal_owner_user_id) {
+      throw new AppError('Employee portal scope is not configured.', 403, 'EMPLOYEE_SCOPE_MISSING');
+    }
+
+    const ownerUserId = employee.portal_owner_user_id;
+    const [tasks, clients, leads] = await Promise.all([
+      repo.listAssignedTasks(ownerUserId, employee.id),
+      repo.listEmployeeClients(ownerUserId),
+      repo.listEmployeeLeads(ownerUserId),
+    ]);
+    const projectIds = [...new Set(tasks.map((task) => task.project_id))];
+    const projects = await repo.listEmployeeProjects(ownerUserId, projectIds);
+    return { projects, tasks, clients, leads };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('Employee portal load failed.', 500, 'INTERNAL_ERROR', false);
+  }
+}
+
+export async function completeEmployeeTask(employeeUserId, taskId, values) {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    throw new AppError('Request body must be an object.', 400, 'VALIDATION_ERROR');
+  }
+  assertAllowedFields(values, ['completed', 'justification']);
+  if (!Object.hasOwn(values, 'completed') || !Object.hasOwn(values, 'justification')) {
+    throw new AppError('Completed and justification are required.', 400, 'VALIDATION_ERROR');
+  }
+  if (typeof values.completed !== 'boolean') {
+    throw new AppError("Field 'completed' must be a boolean.", 400, 'VALIDATION_ERROR');
+  }
+  const justification = requiredText(values.justification, 'justification');
+  if (justification.length > 1000) {
+    throw new AppError("Field 'justification' must be at most 1000 characters.", 400, 'VALIDATION_ERROR');
+  }
+  if (typeof taskId !== 'string' || !UUID_PATTERN.test(taskId)) {
+    throw new AppError('Task id must be a valid UUID.', 400, 'VALIDATION_ERROR');
+  }
+
+  try {
+    return await repo.completeTask(employeeUserId, taskId, values.completed, justification);
+  } catch (error) {
+    if (error.code === 'P0001') {
+      if (error.message === 'INSUFFICIENT_PERMISSIONS') {
+        throw new AppError('Employee access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+      }
+      if (error.message === 'EMPLOYEE_SCOPE_MISSING') {
+        throw new AppError('Employee portal scope is not configured.', 403, 'EMPLOYEE_SCOPE_MISSING');
+      }
+      if (error.message === 'TASK_NOT_FOUND') {
+        throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
+      }
+      if (error.message === 'VALIDATION_ERROR') {
+        throw new AppError('Completion update is invalid.', 400, 'VALIDATION_ERROR');
+      }
+    }
+    throw new AppError('Task completion failed.', 500, 'INTERNAL_ERROR', false);
+  }
 }

@@ -15,6 +15,7 @@
     "server:dev": "node --watch src/runner.js --server",
     "dev": "node --watch src/runner.js --server",
     "test": "node --test",
+    "test:integration:db": "node --test integration/employee-portal.postgres.integration.js",
     "test:watch": "node --test --watch"
   },
   "dependencies": {
@@ -24,5 +25,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "pg": "8.16.3"
   }
 }
