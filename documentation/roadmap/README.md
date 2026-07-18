@@ -2,36 +2,40 @@
 
 ## Current release
 
-✅ **Phase 5 — Task Management Complete**
-**Version:** `v0.8.0-task-management`
-**Git Tag:** `v0.8.0-task-management`
+✅ **Phase 6 — Employee Portal Complete**
+**Version:** `v0.9.0`
+**Git Tag:** `v0.9.0-employee-portal`
 **Status:** Complete
-**Completion Date:** July 15, 2026
+**Completion Date:** July 18, 2026
 
 ## Implemented business workflow
 
 ```text
-Website Lead → CRM Lead → Client → Project → Task
+Website Lead → CRM Lead → Client → Project → Task → Employee Portal
 ```
 
-This workflow is fully implemented through Phase 5.
+This workflow is fully implemented through the Employee Portal.
 
-## Phase 5 delivery
+## Phase 6 delivery
 
-- Task Management with project-nested task create, list, update, and delete operations.
-- Task completion and reopening through the minimal `completed` workflow state.
-- Required Project → Task relationship.
-- Owner-scoped task isolation.
-- Project deletion protection while tasks exist.
-- Minimal Task lifecycle with no speculative metadata or workflow features.
+- Employee Portal snapshot for active employees and directly assigned owner-scoped work.
+- Existing JWT/session authentication with HttpOnly refresh cookies.
+- Employee task completion and reopening with justification and an atomic completion audit.
+- Controlled employee provisioning and validated owner task assignment.
+- Fresh-install lifecycle coverage for login, refresh, portal access, task completion, logout, and re-login.
 
-## Architecture decisions
+## Architecture and database decisions
 
-- Extended the existing CRM module; no separate Tasks module was created.
-- Added one minimal `crm_tasks` table.
-- Kept explicit repository and service methods in the existing CRM module.
-- Added no generic CRUD, generic repository, generic service, or unnecessary abstraction.
-- Kept the REST API nested under projects.
+- Extended the existing CRM module; no HR, employee-management, assignment, generic CRUD, or generic service module was created.
+- Kept exactly two Employee Portal endpoints: `GET /api/employee-portal` and `PATCH /api/employee-portal/tasks/:taskId`.
+- Added employee owner scope and task assignment fields plus one atomic PostgreSQL RPC.
+- Derived owner scope, employee role, active status, and assignment eligibility from the database.
+
+## Phase 6.1 stabilization
+
+- Least-privilege server-role database permissions.
+- Response-aware login rate limiting and single-flight refresh handling.
+- Truthful logout revocation errors and lifecycle integration coverage.
 
 ## Delivery roadmap
 
@@ -43,7 +47,7 @@ This workflow is fully implemented through Phase 5.
 ✅ Phase 3 Client Management
 ✅ Phase 4 Project Management
 ✅ Phase 5 Task Management
-⏳ Phase 6 Employee Portal
+✅ Phase 6 Employee Portal
 ⏳ Phase 7 Client Portal
 ⏳ Phase 8 Finance & Billing
 ⏳ Phase 9 Communication Hub

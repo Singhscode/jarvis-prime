@@ -41,6 +41,10 @@ export async function createApp(options = {}) {
 
   const express = await import('express');
   const app = express.default();
+  const trustedProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS || '0', 10);
+  if (Number.isSafeInteger(trustedProxyHops) && trustedProxyHops > 0) {
+    app.set('trust proxy', trustedProxyHops);
+  }
 
   // ---- Core middleware ----
   app.use(express.json({ limit: '2mb' }));

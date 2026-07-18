@@ -10,6 +10,7 @@
 //   - Queue
 //   - Config client overrides
 
+import { EventEmitter } from 'node:events';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { scoreProspect } from '../src/modules/prospects/icp-scorer.js';
@@ -505,5 +506,47 @@ describe('CRM Foundation', () => {
       createProject('user-123', { client_id: 'client-123', name: '   ' }),
       { code: 'VALIDATION_ERROR' }
     );
+  });
+});
+
+
+describe('Response-aware Rate Limiter', () => {
+  function response() {
+    const res = new EventEmitter();
+    res.statusCode = 200;
+    res.setHeader = () => {};
+    res.status = (code) => {
+      res.statusCode = code;
+      return { json: () => {} };
+    };
+    return res;
+  }
+
+  test('counts wrong credentials but releases successful and server-error logins', async () => {
+    const { createRateLimiter } = await import('../src/middleware/rate-limiter.js');
+    const limiter = createRateLimiter({ windowMs: 60_000, max: 1, skipSuccessfulRequests: true });
+    const req = { ip: '127.0.0.2' };
+    let passed = 0;
+
+    const successful = response();
+    limiter(req, successful, () => { passed++; });
+    successful.statusCode = 200;
+    successful.emit('finish');
+
+    const infrastructureFailure = response();
+    limiter(req, infrastructureFailure, () => { passed++; });
+    infrastructureFailure.statusCode = 500;
+    infrastructureFailure.emit('finish');
+
+    const wrongCredentials = response();
+    limiter(req, wrongCredentials, () => { passed++; });
+    wrongCredentials.statusCode = 401;
+    wrongCredentials.emit('finish');
+
+    const blocked = response();
+    limiter(req, blocked, () => { passed++; });
+    assert.equal(passed, 3);
+    assert.equal(blocked.statusCode, 429);
+    limiter._cleanup();
   });
 });

@@ -2,6 +2,37 @@
 
 All notable changes to JARVIS PRIME are documented in this file.
 
+## [0.9.0] — 2026-07-18
+
+**Git Tag:** `v0.9.0-employee-portal`
+
+### Added
+
+- Employee Portal with a database-scoped portal snapshot.
+- Directly assigned employee task completion and reopening.
+- Atomic completion audit records through a PostgreSQL RPC.
+- Employee task isolation by active employee, owner scope, and assignment.
+
+### Improved
+
+- Employee authentication lifecycle with fresh-install validation.
+- Controlled employee provisioning for development and production bootstrap.
+- Login rate limiter behavior, refresh concurrency handling, and logout reliability.
+- PostgreSQL and endpoint lifecycle integration coverage.
+
+### Security
+
+- Database-derived owner scope and validated employee assignment.
+- `SECURITY DEFINER` task-completion RPC with a restricted search path.
+- Least-privilege `service_role` permissions for the Phase 6 lifecycle.
+- Hardened refresh rotation and server-side logout revocation behavior.
+
+### Tests
+
+- API and focused Employee Portal tests passed.
+- PostgreSQL RPC and Employee lifecycle integration tests passed.
+- Build, lint, diagnostics, and diff checks passed.
+
 ## [0.8.0] — 2026-07-15
 
 ### Added

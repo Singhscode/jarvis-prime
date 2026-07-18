@@ -227,8 +227,14 @@ async function verifyProjectOwnership(ownerUserId, projectId) {
   }
 }
 
+async function verifyEmployeeAssignment(ownerUserId, employeeUserId) {
+  if (!(await repo.getActiveEmployeeById(employeeUserId, ownerUserId))) {
+    throw new AppError('Employee not found.', 404, 'EMPLOYEE_NOT_FOUND');
+  }
+}
+
 function taskValues(values) {
-  assertAllowedFields(values, ['name', 'completed']);
+  assertAllowedFields(values, ['name', 'completed', 'assigned_user_id']);
   const result = {};
   if (Object.hasOwn(values, 'name')) result.name = requiredText(values.name, 'name');
   if (Object.hasOwn(values, 'completed')) {
@@ -236,6 +242,12 @@ function taskValues(values) {
       throw new AppError("Field 'completed' must be a boolean.", 400, 'VALIDATION_ERROR');
     }
     result.completed = values.completed;
+  }
+  if (Object.hasOwn(values, 'assigned_user_id')) {
+    if (typeof values.assigned_user_id !== 'string' || !UUID_PATTERN.test(values.assigned_user_id)) {
+      throw new AppError("Field 'assigned_user_id' must be a valid UUID.", 400, 'VALIDATION_ERROR');
+    }
+    result.assigned_user_id = values.assigned_user_id;
   }
   return result;
 }
@@ -254,6 +266,7 @@ export async function createTask(ownerUserId, projectId, values) {
 export async function updateTask(ownerUserId, projectId, taskId, values) {
   const task = taskValues(values);
   await verifyProjectOwnership(ownerUserId, projectId);
+  if (task.assigned_user_id) await verifyEmployeeAssignment(ownerUserId, task.assigned_user_id);
   return requireRecord(await repo.updateTask(ownerUserId, projectId, taskId, task), 'Task');
 }
 

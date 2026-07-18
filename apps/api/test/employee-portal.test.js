@@ -190,3 +190,60 @@ describe('Employee Portal', () => {
     assert.doesNotMatch(migration, /\bcommit\b|\bcreate table\b|\bcreate trigger\b/i);
   });
 });
+
+
+test('returns an error when logout session revocation fails', async () => {
+  databaseFetch = () => json({ code: 'XX000', message: 'session write failed' }, 500);
+  const express = (await import('express')).default;
+  const { router: authRouter } = await import('../src/modules/auth/auth.routes.js');
+  const { createAccessToken } = await import('../src/modules/auth/jwt-service.js');
+  const app = express();
+  app.use(express.json());
+  app.use('/auth', authRouter);
+  const server = await new Promise((resolve) => {
+    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+  });
+  try {
+    const token = createAccessToken(
+      { id: employee.id, email: 'employee@example.test', role: 'employee' },
+      { id: '60000000-0000-4000-8000-000000000006', device_id: 'test' },
+      process.env.JWT_SECRET
+    );
+    const response = await nativeFetch(`http://127.0.0.1:${server.address().port}/auth/logout`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).error.code, 'INTERNAL_ERROR');
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('allows an owner to assign only an active employee in that owner scope', async () => {
+  const crm = await import('../src/modules/crm/crm.service.js');
+  const ownerId = employee.portal_owner_user_id;
+  calls.length = 0;
+  databaseFetch = (rawUrl, _method, body) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_projects') && url.searchParams.get('select') === 'id') {
+      return json({ id: 'project-1' });
+    }
+    if (url.pathname.endsWith('/users')) return json(employee);
+    if (url.pathname.endsWith('/crm_tasks')) {
+      return json({ id: taskId, project_id: 'project-1', assigned_user_id: body.assigned_user_id });
+    }
+    throw new Error(`Unexpected database path: ${url.pathname}`);
+  };
+
+  const updated = await crm.updateTask(ownerId, 'project-1', taskId, {
+    assigned_user_id: employee.id,
+  });
+  assert.equal(updated.assigned_user_id, employee.id);
+  const employeeQuery = new URL(calls.find((call) => call.url.includes('/users?')).url);
+  assert.equal(employeeQuery.searchParams.get('portal_owner_user_id'), `eq.${ownerId}`);
+
+  await assert.rejects(
+    crm.updateTask(ownerId, 'project-1', taskId, { assigned_user_id: 'not-a-uuid' }),
+    { code: 'VALIDATION_ERROR', statusCode: 400 }
+  );
+});

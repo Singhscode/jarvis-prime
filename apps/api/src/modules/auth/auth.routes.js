@@ -23,7 +23,12 @@ export const router = Router();
 // Per-endpoint rate limiters (values per requirements.md R1.6, R2.7, R4.3).
 // Reuses the existing createRateLimiter() factory — no new middleware.
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 3, message: 'Too many registration attempts. Try again later.' });
-const loginLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 5, message: 'Too many login attempts. Try again later.' });
+const loginLimiter = createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 5,
+  message: 'Too many login attempts. Try again later.',
+  skipSuccessfulRequests: true,
+});
 const resetLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 3, message: 'Too many password reset attempts. Try again later.' });
 const refreshLimiter = createRateLimiter({ windowMs: 60_000, max: 10, message: 'Too many refresh attempts. Try again later.' });
 

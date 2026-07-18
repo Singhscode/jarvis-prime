@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import pg from 'pg';
+import { provisionEmployee } from '../scripts/provision-employee.js';
 
 const { Client } = pg;
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -150,5 +152,135 @@ describe('Employee Portal PostgreSQL RPC', { concurrency: false }, () => {
       { id: ids.unassignedTask, completed: false },
       { id: ids.otherOwnerTask, completed: false },
     ]);
+  });
+});
+
+
+function refreshCookie(response) {
+  const header = response.headers.getSetCookie?.()[0] || response.headers.get('set-cookie');
+  const match = header?.match(/refreshToken=[^;]+/);
+  assert.ok(match, 'refresh response must set a refresh cookie');
+  return match[0];
+}
+
+describe('Employee Portal clean-install lifecycle', { concurrency: false }, () => {
+  const apiUrl = process.env.EMPLOYEE_PORTAL_TEST_API_URL;
+  let lifecycleDb;
+  let server;
+  let baseUrl;
+  let ownerId;
+  let employeeId;
+
+  before(async () => {
+    if (!apiUrl) throw new Error('EMPLOYEE_PORTAL_TEST_API_URL is required.');
+    const apiTarget = new URL(apiUrl);
+    if (!['127.0.0.1', 'localhost'].includes(apiTarget.hostname)) {
+      throw new Error('Employee Portal lifecycle tests require a local API URL.');
+    }
+
+    ownerId = randomUUID();
+    const ownerEmail = `owner-${ownerId}@phase6.test`;
+    const employeeEmail = `employee-${randomUUID()}@phase6.test`;
+    const lifecyclePassword = 'PortalLifecycle!2026';
+    const clientId = randomUUID();
+    const projectId = randomUUID();
+    const taskId = randomUUID();
+    lifecycleDb = new Client({ connectionString });
+    await lifecycleDb.connect();
+    await lifecycleDb.query(`insert into public.users
+      (id, email, email_normalized, status, role, email_verified_at)
+      values ($1, $2, $2, 'active', 'client', now())`, [ownerId, ownerEmail]);
+    const employee = await provisionEmployee({
+      connectionString,
+      email: employeeEmail,
+      password: lifecyclePassword,
+      ownerUserId: ownerId,
+      fullName: 'Lifecycle Employee',
+    });
+    employeeId = employee.id;
+    await lifecycleDb.query(`insert into public.crm_clients (id, owner_user_id, name)
+      values ($1, $2, 'Lifecycle Client')`, [clientId, ownerId]);
+    await lifecycleDb.query(`insert into public.crm_projects (id, owner_user_id, client_id, name)
+      values ($1, $2, $3, 'Lifecycle Project')`, [projectId, ownerId, clientId]);
+    await lifecycleDb.query(`insert into public.crm_tasks
+      (id, owner_user_id, project_id, name, assigned_user_id)
+      values ($1, $2, $3, 'Lifecycle Task', $4)`, [taskId, ownerId, projectId, employeeId]);
+
+    const { createApp } = await import('../src/app.js');
+    const { app } = await createApp({ enableScheduler: false, enableRateLimit: false });
+    server = await new Promise((resolve) => {
+      const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+    });
+    baseUrl = `http://127.0.0.1:${server.address().port}`;
+  });
+
+  after(async () => {
+    if (server) await new Promise((resolve) => server.close(resolve));
+    if (!lifecycleDb) return;
+    await lifecycleDb.query('delete from public.audit_logs where user_id = any($1::uuid[])', [[ownerId, employeeId]]);
+    await lifecycleDb.query('delete from public.refresh_tokens where user_id = any($1::uuid[])', [[ownerId, employeeId]]);
+    await lifecycleDb.query('delete from public.sessions where user_id = any($1::uuid[])', [[ownerId, employeeId]]);
+    await lifecycleDb.query('delete from public.crm_tasks where owner_user_id = $1', [ownerId]);
+    await lifecycleDb.query('delete from public.crm_projects where owner_user_id = $1', [ownerId]);
+    await lifecycleDb.query('delete from public.crm_clients where owner_user_id = $1', [ownerId]);
+    await lifecycleDb.query('delete from public.users where id = any($1::uuid[])', [[employeeId, ownerId]]);
+    await lifecycleDb.end();
+  });
+
+  test('logs in, refreshes concurrently, loads work, completes a task, logs out, and logs in again', async () => {
+    const { rows: [employeeRecord] } = await lifecycleDb.query(
+      'select email from public.users where id = $1', [employeeId]
+    );
+    const email = employeeRecord.email;
+    const login = async () => fetch(`${baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: 'PortalLifecycle!2026', deviceName: 'Lifecycle Test' }),
+    });
+
+    const loginResponse = await login();
+    assert.equal(loginResponse.status, 200);
+    const loginBody = await loginResponse.json();
+    assert.ok(loginBody.tokens.accessToken);
+    const originalCookie = refreshCookie(loginResponse);
+
+    const [firstRefresh, secondRefresh] = await Promise.all([
+      fetch(`${baseUrl}/api/auth/refresh`, { method: 'POST', headers: { cookie: originalCookie } }),
+      fetch(`${baseUrl}/api/auth/refresh`, { method: 'POST', headers: { cookie: originalCookie } }),
+    ]);
+    assert.equal(firstRefresh.status, 200);
+    assert.equal(secondRefresh.status, 200);
+    const refreshBody = await firstRefresh.json();
+    const refreshedCookie = refreshCookie(firstRefresh);
+
+    const snapshotResponse = await fetch(`${baseUrl}/api/employee-portal`, {
+      headers: { authorization: `Bearer ${refreshBody.accessToken}` },
+    });
+    assert.equal(snapshotResponse.status, 200);
+    const snapshot = await snapshotResponse.json();
+    assert.equal(snapshot.data.tasks.length, 1);
+    const task = snapshot.data.tasks[0];
+
+    const completeResponse = await fetch(`${baseUrl}/api/employee-portal/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: {
+        authorization: `Bearer ${refreshBody.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ completed: true, justification: 'Lifecycle verification complete.' }),
+    });
+    assert.equal(completeResponse.status, 200);
+    assert.equal((await completeResponse.json()).data.completed, true);
+
+    const logoutResponse = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${refreshBody.accessToken}`, cookie: refreshedCookie },
+    });
+    assert.equal(logoutResponse.status, 200);
+    assert.match(logoutResponse.headers.get('set-cookie') || '', /refreshToken=;/);
+
+    const secondLoginResponse = await login();
+    assert.equal(secondLoginResponse.status, 200);
+    assert.ok((await secondLoginResponse.json()).tokens.accessToken);
   });
 });

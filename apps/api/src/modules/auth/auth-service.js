@@ -22,6 +22,8 @@ import * as repo from './repository.js';
 import { auth, authMessages, statusCodes } from './constants.js';
 import { log } from '../../utils/logger.js';
 
+const refreshInFlight = new Map();
+
 /**
  * Registers a new user account
  * Implements: account creation, password hashing, email verification setup, audit logging
@@ -444,24 +446,20 @@ function generateDeviceId(ipAddress, userAgent) {
  * @param {string} ipAddress - Client IP
  */
 export async function logoutUser(sessionId, userId, ipAddress) {
-  try {
-    await repo.revokeSession(sessionId, 'user_logout');
+  await repo.revokeSession(sessionId, 'user_logout');
+  await repo.revokeSessionRefreshTokens(sessionId);
 
-    await repo.createAuditLog({
-      user_id: userId,
-      event_type: auth.auditEvents.USER_LOGOUT,
-      action: 'update',
-      resource_type: 'session',
-      resource_id: sessionId,
-      success: true,
-      ip_address: ipAddress,
-    });
+  await repo.createAuditLog({
+    user_id: userId,
+    event_type: auth.auditEvents.USER_LOGOUT,
+    action: 'update',
+    resource_type: 'session',
+    resource_id: sessionId,
+    success: true,
+    ip_address: ipAddress,
+  });
 
-    return { success: true, message: authMessages.LOGOUT_SUCCESS };
-  } catch (error) {
-    log.error('Logout error:', error);
-    return { success: false, message: 'Logout failed.' };
-  }
+  return { success: true, message: authMessages.LOGOUT_SUCCESS };
 }
 
 /**
@@ -477,9 +475,22 @@ export async function logoutUser(sessionId, userId, ipAddress) {
  * @param {string} ipAddress - Client IP (for audit)
  * @returns {object} { success, tokens, message, status }
  */
-export async function rotateRefreshToken(rawToken, ipAddress) {
+export function rotateRefreshToken(rawToken, ipAddress) {
+  const tokenHash = hashToken(rawToken);
+  const existing = refreshInFlight.get(tokenHash);
+  if (existing) return existing;
+
+  const operation = rotateRefreshTokenOnce(tokenHash, ipAddress);
+  refreshInFlight.set(tokenHash, operation);
+  operation.then(
+    () => refreshInFlight.delete(tokenHash),
+    () => refreshInFlight.delete(tokenHash)
+  );
+  return operation;
+}
+
+async function rotateRefreshTokenOnce(tokenHash, ipAddress) {
   try {
-    const tokenHash = hashToken(rawToken);
     const validRecord = await repo.getRefreshToken(tokenHash);
 
     if (!validRecord) {

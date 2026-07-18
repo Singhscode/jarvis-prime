@@ -349,14 +349,15 @@ export async function deleteTask(ownerUserId, projectId, taskId) {
   return data;
 }
 
-export async function getActiveEmployeeById(employeeUserId) {
-  const { data, error } = await client()
+export async function getActiveEmployeeById(employeeUserId, ownerUserId = null) {
+  let query = client()
     .from('users')
     .select('id, role, status, portal_owner_user_id')
     .eq('id', employeeUserId)
     .eq('role', 'employee')
-    .eq('status', 'active')
-    .maybeSingle();
+    .eq('status', 'active');
+  if (ownerUserId) query = query.eq('portal_owner_user_id', ownerUserId);
+  const { data, error } = await query.maybeSingle();
   if (error) throw error;
   return data;
 }
