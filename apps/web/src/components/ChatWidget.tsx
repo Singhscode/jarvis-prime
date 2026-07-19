@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { MessageCircle, X, Send, Sparkles } from 'lucide-react';
 
 // Internal portal routes where the public assistant should NOT appear.
-const HIDDEN_PREFIXES = ['/dashboard', '/leads', '/tasks', '/portal-auth'];
+const HIDDEN_PREFIXES = ['/dashboard', '/leads', '/tasks', '/portal-auth', '/client'];
 
 type Msg = { role: 'user' | 'assistant'; content: string };
 

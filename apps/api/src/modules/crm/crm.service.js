@@ -369,3 +369,215 @@ export async function completeEmployeeTask(employeeUserId, taskId, values) {
     throw new AppError('Task completion failed.', 500, 'INTERNAL_ERROR', false);
   }
 }
+
+function requireUuid(value, field) {
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
+    throw new AppError(`Field '${field}' must be a valid UUID.`, 400, 'VALIDATION_ERROR');
+  }
+  return value;
+}
+
+function requireBodyObject(values) {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    throw new AppError('Request body must be an object.', 400, 'VALIDATION_ERROR');
+  }
+}
+
+function clientPortalActivationValues(values) {
+  requireBodyObject(values);
+  assertAllowedFields(values, ['invitation']);
+  return requiredText(values.invitation, 'invitation');
+}
+
+function clientPortalDocumentValues(values) {
+  requireBodyObject(values);
+  assertAllowedFields(values, ['title', 'document_type', 'project_id']);
+  const title = requiredText(values.title, 'title');
+  const documentType = requiredText(values.document_type, 'document_type');
+  if (!['deliverable', 'report'].includes(documentType)) {
+    throw new AppError("Field 'document_type' must be 'deliverable' or 'report'.", 400, 'VALIDATION_ERROR');
+  }
+  const projectId = Object.hasOwn(values, 'project_id')
+    ? requireUuid(values.project_id, 'project_id')
+    : null;
+  return { title, documentType, projectId };
+}
+
+function clientPortalFileValues(file) {
+  const allowedTypes = new Set([
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ]);
+  if (!file || !Buffer.isBuffer(file.buffer) || file.buffer.length === 0) {
+    throw new AppError('One document file is required.', 400, 'VALIDATION_ERROR');
+  }
+  if (file.buffer.length > 10 * 1024 * 1024 || !allowedTypes.has(file.mimeType)) {
+    throw new AppError('Document file is not permitted.', 400, 'VALIDATION_ERROR');
+  }
+  return file;
+}
+
+function ownerPortalError(error, message, code) {
+  if (error instanceof AppError) throw error;
+  if (error?.code === 'P0001') throw new AppError(message, 404, code);
+  throw new AppError('Client Portal operation failed.', 500, 'INTERNAL_ERROR', false);
+}
+
+async function resolveClientPortalMembership(userId) {
+  const memberships = await repo.listActiveClientPortalMemberships(userId);
+  if (memberships.length !== 1) {
+    throw new AppError('Client access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+  }
+  return memberships[0];
+}
+
+async function createInvitationCredentials() {
+  const { generateToken, hashToken } = await import('../auth/crypto.js');
+  const invitation = generateToken();
+  return { invitation, tokenHash: hashToken(invitation) };
+}
+
+async function deliverClientPortalInvitation(email, invitation) {
+  const { config } = await import('../../config/config.js');
+  const { sendTransactionalEmail } = await import('../../integrations/email-sender.js');
+  const origin = config.corsOrigins.split(',').map((value) => value.trim()).find(Boolean);
+  let activationUrl;
+  try {
+    activationUrl = new URL('/client/activate', origin);
+  } catch {
+    throw new AppError('Invitation delivery failed. Please resend.', 500, 'INTERNAL_ERROR', false);
+  }
+  activationUrl.searchParams.set('invitation', invitation);
+  const result = await sendTransactionalEmail({
+    to: email,
+    subject: 'Your JARVIS PRIME Client Portal invitation',
+    body: `Use this secure link to activate your Client Portal access:\n${activationUrl.toString()}\n\nThis link expires in 24 hours.`,
+  });
+  if (!['sent', 'dry_run'].includes(result.status)) {
+    throw new AppError('Invitation delivery failed. Please resend.', 500, 'INTERNAL_ERROR', false);
+  }
+}
+
+export async function getClientPortal(userId) {
+  try {
+    const membership = await resolveClientPortalMembership(userId);
+    const snapshot = await repo.getClientPortalSnapshot(membership.crm_client_id);
+    if (!snapshot.client) {
+      throw new AppError('Client access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+    }
+    return snapshot;
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('Client portal load failed.', 500, 'INTERNAL_ERROR', false);
+  }
+}
+
+export async function activateClientPortalMembership(userId, values) {
+  try {
+    const invitation = clientPortalActivationValues(values);
+    const { hashToken } = await import('../auth/crypto.js');
+    const result = await repo.activateClientPortalInvitation(userId, hashToken(invitation));
+    if (!result?.activated) {
+      throw new AppError('Invitation could not be activated.', 400, 'INVALID_ACTIVATION');
+    }
+    return { activated: true };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('Invitation could not be activated.', 400, 'INVALID_ACTIVATION');
+  }
+}
+
+export async function getClientPortalDocumentDownload(userId, documentId) {
+  try {
+    requireUuid(documentId, 'documentId');
+    const membership = await resolveClientPortalMembership(userId);
+    const document = await repo.getClientPortalDocument(membership.crm_client_id, documentId);
+    if (!document) {
+      await repo.recordClientPortalAudit(userId, 'download', 'client_portal_document', null, false);
+      throw new AppError('Document not found.', 404, 'DOCUMENT_NOT_FOUND');
+    }
+    const signed = await repo.createClientPortalDownload(document.storage_path);
+    if (!signed?.signedUrl) throw new Error('Signed URL was not created.');
+    await repo.recordClientPortalAudit(userId, 'download', 'client_portal_document', document.id, true);
+    return {
+      url: signed.signedUrl,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('Document download failed.', 500, 'INTERNAL_ERROR', false);
+  }
+}
+
+export async function inviteClientPortalMember(ownerUserId, clientId, values) {
+  try {
+    requireBodyObject(values);
+    assertAllowedFields(values, ['contact_id']);
+    const contactId = requireUuid(values.contact_id, 'contact_id');
+    const { invitation, tokenHash } = await createInvitationCredentials();
+    const result = await repo.reissueClientPortalInvitation(
+      ownerUserId, clientId, contactId, tokenHash, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    );
+    const membership = await repo.getClientPortalMembership(clientId, result.membership_id);
+    if (!membership) throw new Error('Membership was not created.');
+    await deliverClientPortalInvitation(membership.email_normalized, invitation);
+    return { membership: { id: result.membership_id, status: result.status, expires_at: result.expires_at } };
+  } catch (error) {
+    ownerPortalError(error, 'Client portal member not found.', 'PORTAL_MEMBER_NOT_FOUND');
+  }
+}
+
+export async function resendClientPortalInvitation(ownerUserId, clientId, membershipId) {
+  try {
+    requireUuid(membershipId, 'membershipId');
+    const membership = await repo.getClientPortalMembership(clientId, membershipId);
+    if (!membership) throw new AppError('Client portal member not found.', 404, 'PORTAL_MEMBER_NOT_FOUND');
+    const { invitation, tokenHash } = await createInvitationCredentials();
+    const result = await repo.reissueClientPortalInvitation(
+      ownerUserId, clientId, membership.contact_id, tokenHash, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    );
+    await deliverClientPortalInvitation(membership.email_normalized, invitation);
+    return { membership: { id: result.membership_id, status: result.status, expires_at: result.expires_at } };
+  } catch (error) {
+    ownerPortalError(error, 'Client portal member not found.', 'PORTAL_MEMBER_NOT_FOUND');
+  }
+}
+
+export async function revokeClientPortalMembership(ownerUserId, clientId, membershipId) {
+  try {
+    requireUuid(membershipId, 'membershipId');
+    await repo.revokeClientPortalMembership(ownerUserId, clientId, membershipId);
+  } catch (error) {
+    ownerPortalError(error, 'Client portal member not found.', 'PORTAL_MEMBER_NOT_FOUND');
+  }
+}
+
+export async function publishClientPortalDocument(ownerUserId, clientId, file, values) {
+  const document = clientPortalDocumentValues(values);
+  const upload = clientPortalFileValues(file);
+  const { randomUUID } = await import('node:crypto');
+  const path = `${clientId}/${randomUUID()}`;
+  try {
+    await repo.uploadClientPortalDocument(path, upload);
+    return await repo.publishClientPortalDocument(
+      ownerUserId, clientId, document.projectId, path, document.title, document.documentType
+    );
+  } catch (error) {
+    await repo.removeClientPortalDocument(path).catch(() => {});
+    ownerPortalError(error, 'Document not found.', 'PORTAL_DOCUMENT_NOT_FOUND');
+  }
+}
+
+export async function revokeClientPortalDocument(ownerUserId, clientId, documentId) {
+  try {
+    requireUuid(documentId, 'documentId');
+    await verifyClientOwnership(ownerUserId, clientId);
+    return requireRecord(await repo.revokeClientPortalDocument(clientId, documentId), 'Document');
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError('Client Portal operation failed.', 500, 'INTERNAL_ERROR', false);
+  }
+}

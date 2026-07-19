@@ -67,3 +67,25 @@ export async function telegramAlert(text) {
     log.warn(`telegramAlert wrapper failed: ${err.message}`);
   }
 }
+
+/**
+ * Send a transactional message without outreach marketing content.
+ * Invitation-bearing bodies never appear in logs or return values.
+ */
+export async function sendTransactionalEmail({ to, subject, body }) {
+  if (config.dryRun) {
+    log.dry(`Would send transactional email to ${to}`);
+    return { status: 'dry_run' };
+  }
+
+  const provider = await getProvider();
+  if (!provider.isConfigured()) return { status: 'failed' };
+
+  try {
+    const result = await provider.send(to, subject, body);
+    return { status: result.status, providerId: result.providerId };
+  } catch (error) {
+    log.warn(`Transactional email delivery failed: ${error.message}`);
+    return { status: 'failed' };
+  }
+}

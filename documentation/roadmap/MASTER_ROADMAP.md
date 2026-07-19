@@ -1,63 +1,45 @@
 # JARVIS PRIME Master Roadmap
 
-## Phase 6 — Employee Portal
+## Phase 7 — Client Portal
 
 ✅ **Complete**
-**Version:** `v0.9.0`
-**Git Tag:** `v0.9.0-employee-portal`
+**Version:** `v0.10.0`
+**Git Tag:** `v0.10.0-client-portal`
 **Status:** Complete
-**Completion Date:** July 18, 2026
+**Completion Date:** July 19, 2026
 
 ## Implemented business workflow
 
 ```text
-Website Lead → CRM Lead → Client → Project → Task → Employee Portal
+Website Lead → CRM Lead → Client → Project → Task → Employee Portal → Client Portal
 ```
 
-The Employee Portal gives active employees a focused view of their assigned work while preserving owner-controlled CRM scope.
+The Client Portal gives an external client member a minimal, read-only view of one server-derived CRM client scope without exposing internal CRM, owner, or employee operations.
 
 ### Major deliverables
 
-- Employee Portal snapshot for directly assigned tasks, related projects, clients, and CRM leads.
-- Employee authentication using the existing JWT access-token and session-backed refresh-token architecture.
-- Assigned task completion and reopening with a required justification.
-- Atomic completion audit records and nondisclosing task-isolation behavior.
+- `/client` workspace and `/client/activate` invitation flow using existing JWT access tokens, refresh cookies, login, and logout.
+- Read-only client-safe projects and tasks plus on-demand, approved private-document downloads.
+- Owner-controlled invitation issue/resend/revocation and document publication/revocation operations.
+- Additive memberships, hashed single-use invitations, document metadata, private Storage, RLS, indexes, and lifecycle RPCs.
 
-### Phase 6.1 stabilization
+### Security and privacy summary
 
-- Corrective least-privilege `service_role` permissions for the auth and portal lifecycle.
-- Response-aware login rate limiting, refresh single-flight handling, and truthful logout failures.
-- Controlled employee bootstrap provisioning and validated owner task assignment.
-- Fresh-install endpoint lifecycle coverage: login, refresh, portal, task completion, logout, and login again.
+- Exactly one active membership derives Client Scope on every protected request; browser-supplied identifiers never establish authorization.
+- Invitations are account-bound, hash-only at rest, single-use, 24-hour, and atomically activated or revoked.
+- Private documents use current membership-plus-document scope authorization and 60-second signed URLs; audit records exclude raw tokens, signed URLs, and document contents.
+- Client state stays in memory and clears on logout, refresh/protected-request failure, access denial, or user transition.
+- Credentialed CORS accepts explicit origins only and rejects wildcard configuration.
 
-### Architecture summary
+### Accessibility, testing, and CI summary
 
-- Extended the existing CRM module; no HR, employee-management, assignment, generic CRUD, or generic service module was created.
-- Employee Portal exposes exactly `GET /api/employee-portal` and `PATCH /api/employee-portal/tasks/:taskId`.
-- Owner scope and employee eligibility are reloaded from the database and never accepted from clients.
+- The workspace provides responsive, keyboard-operable sign-in, activation, refresh, logout, document-download, loading, error, and empty states with accessible announcements.
+- Added focused API security coverage, disposable PostgreSQL integration coverage, and route-local frontend testing.
+- CI now executes Client Portal PostgreSQL integration plus web lint, type-check, frontend tests, and production build.
 
-### Database summary
+### Deliberate scope limits
 
-- `portal_owner_user_id` scopes an employee to an owner and `assigned_user_id` scopes visible tasks.
-- `complete_employee_portal_task` is a `SECURITY DEFINER` RPC with a restricted search path and atomic audit insertion.
-- Canonical migration `20260718000009_grant_phase6_service_role_permissions.sql` supplies only required server-role permissions.
-
-### API and security summary
-
-- Employees can read only their scoped snapshot and complete only directly assigned owner-scoped tasks.
-- Owner task updates validate an assigned employee's active status, role, and owner relationship.
-- Refresh token rotation is safe for concurrent requests in a single application process; logout revokes the session and active session refresh tokens.
-
-### Testing summary
-
-- API tests: 51 passed.
-- PostgreSQL RPC and clean-install Employee lifecycle integration tests passed.
-- Root lint, build, diagnostics, and diff checks passed.
-
-### Known future improvements
-
-- Coordinate refresh rotation and rate limiting through shared infrastructure for multi-replica deployments.
-- Evaluate immediate bearer-token revocation if the existing 15-minute access-token validity window becomes insufficient.
+- No client writes, uploads, chat, comments, billing, analytics, employee tools, owner tools, or multi-client membership are included in Phase 7.
 
 ## Roadmap status
 
@@ -70,7 +52,7 @@ The Employee Portal gives active employees a focused view of their assigned work
 ✅ Phase 4 Project Management
 ✅ Phase 5 Task Management
 ✅ Phase 6 Employee Portal
-⏳ Phase 7 Client Portal
+✅ Phase 7 Client Portal
 ⏳ Phase 8 Finance & Billing
 ⏳ Phase 9 Communication Hub
 ⏳ Phase 10 Automation Platform
