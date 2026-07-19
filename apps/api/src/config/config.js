@@ -167,7 +167,11 @@ export const config = {
   unsubscribeUrl: env.UNSUBSCRIBE_URL || 'https://www.jarvisprime.me/unsubscribe',
 
   // CORS
-  corsOrigins: env.CORS_ORIGINS || 'http://localhost:3000,https://www.jarvisprime.me',
+  corsOrigins: env.CORS_ORIGINS || (env.NODE_ENV === 'production'
+    ? 'https://www.jarvisprime.me'
+    : ['development', 'test'].includes(env.NODE_ENV || 'development')
+      ? 'http://localhost:3000'
+      : ''),
 
   // Outreach sequence defaults (overridable per-client via DB config)
   defaultMaxSteps: num(env.DEFAULT_MAX_STEPS, 3),

@@ -2,40 +2,39 @@
 
 ## Current release
 
-✅ **Phase 6 — Employee Portal Complete**
-**Version:** `v0.9.0`
-**Git Tag:** `v0.9.0-employee-portal`
+✅ **Phase 7 — Client Portal Complete**
+**Version:** `v0.10.0`
+**Git Tag:** `v0.10.0-client-portal`
 **Status:** Complete
-**Completion Date:** July 18, 2026
+**Completion Date:** July 19, 2026
 
 ## Implemented business workflow
 
 ```text
-Website Lead → CRM Lead → Client → Project → Task → Employee Portal
+Website Lead → CRM Lead → Client → Project → Task → Employee Portal → Client Portal
 ```
 
-This workflow is fully implemented through the Employee Portal.
+This workflow now includes a dedicated, read-only external Client Portal.
 
-## Phase 6 delivery
+## Phase 7 delivery
 
-- Employee Portal snapshot for active employees and directly assigned owner-scoped work.
-- Existing JWT/session authentication with HttpOnly refresh cookies.
-- Employee task completion and reopening with justification and an atomic completion audit.
-- Controlled employee provisioning and validated owner task assignment.
-- Fresh-install lifecycle coverage for login, refresh, portal access, task completion, logout, and re-login.
+- Client authentication through existing login, JWT access-token, HttpOnly refresh-cookie, and logout behavior.
+- Account-bound invitation activation for one active client membership and one CRM client scope.
+- Client Workspace with read-only client-safe projects, tasks, and approved private-document downloads.
+- Owner invitation/document publication lifecycle controls kept inside the CRM boundary.
 
-## Architecture and database decisions
+## Architecture, security, and accessibility decisions
 
-- Extended the existing CRM module; no HR, employee-management, assignment, generic CRUD, or generic service module was created.
-- Kept exactly two Employee Portal endpoints: `GET /api/employee-portal` and `PATCH /api/employee-portal/tasks/:taskId`.
-- Added employee owner scope and task assignment fields plus one atomic PostgreSQL RPC.
-- Derived owner scope, employee role, active status, and assignment eligibility from the database.
+- Client Scope is derived only from exactly one active server-side membership for the JWT subject; request-supplied identifiers never authorize access.
+- Invitations are hashed, single-use, 24-hour, account-bound, and atomically activated or revoked; private documents use short-lived signed URLs after combined scope authorization.
+- Client data, tokens, invitations, and signed URLs are transient in browser memory; the UI clears state on logout and access failure.
+- Credentialed CORS requires exact allowed origins, with wildcard credentialed configuration rejected.
+- Responsive, keyboard-operable sign-in, activation, workspace, download, loading, error, and empty states include accessible names and announcements.
 
-## Phase 6.1 stabilization
+## Testing and CI
 
-- Least-privilege server-role database permissions.
-- Response-aware login rate limiting and single-flight refresh handling.
-- Truthful logout revocation errors and lifecycle integration coverage.
+- Added focused API security coverage, disposable PostgreSQL integration coverage, and route-local frontend tests.
+- CI now runs the Client Portal integration target alongside web lint, type-check, frontend tests, and production build.
 
 ## Delivery roadmap
 
@@ -48,7 +47,7 @@ This workflow is fully implemented through the Employee Portal.
 ✅ Phase 4 Project Management
 ✅ Phase 5 Task Management
 ✅ Phase 6 Employee Portal
-⏳ Phase 7 Client Portal
+✅ Phase 7 Client Portal
 ⏳ Phase 8 Finance & Billing
 ⏳ Phase 9 Communication Hub
 ⏳ Phase 10 Automation Platform

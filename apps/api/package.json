@@ -16,12 +16,14 @@
     "dev": "node --watch src/runner.js --server",
     "test": "node --test",
     "test:integration:db": "node --test integration/employee-portal.postgres.integration.js",
-    "provision:employee": "node scripts/provision-employee.js",
+    "test:integration:client-portal": "node --test integration/client-portal.postgres.integration.js",
+    "employee:create": "node scripts/provision-employee.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",
     "test:watch": "node --test --watch"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
+    "busboy": "1.6.0",
     "cookie-parser": "1.4.7",
     "express": "^4.22.2"
   },

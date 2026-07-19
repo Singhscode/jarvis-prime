@@ -120,10 +120,12 @@ export async function createApp(options = {}) {
     default: crmRouter,
     projectsRouter,
     employeePortalRouter,
+    clientPortalRouter,
   } = await import('./modules/crm/crm.routes.js');
   app.use('/api/crm', crmRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/employee-portal', employeePortalRouter);
+  app.use('/api/client-portal', clientPortalRouter);
 
   // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());

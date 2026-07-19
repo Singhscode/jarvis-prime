@@ -414,3 +414,165 @@ export async function completeTask(employeeUserId, taskId, completed, justificat
   if (error) throw error;
   return data;
 }
+
+export async function listActiveClientPortalMemberships(userId) {
+  const { data, error } = await client()
+    .from('client_portal_memberships')
+    .select('id, crm_client_id, user_id, status')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .limit(2);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getClientPortalSnapshot(clientId) {
+  const [clientResult, projectsResult, documentsResult] = await Promise.all([
+    client().from('crm_clients').select('id, name').eq('id', clientId).maybeSingle(),
+    client().from('crm_projects').select('id, name').eq('client_id', clientId),
+    client()
+      .from('client_portal_documents')
+      .select('id, project_id, title, document_type, created_at')
+      .eq('crm_client_id', clientId)
+      .eq('client_visible', true)
+      .is('revoked_at', null)
+      .order('created_at', { ascending: false }),
+  ]);
+  if (clientResult.error) throw clientResult.error;
+  if (projectsResult.error) throw projectsResult.error;
+  if (documentsResult.error) throw documentsResult.error;
+
+  const projects = projectsResult.data || [];
+  const projectIds = projects.map((project) => project.id);
+  let tasks = [];
+  if (projectIds.length > 0) {
+    const { data, error } = await client()
+      .from('crm_tasks')
+      .select('id, project_id, name, completed')
+      .in('project_id', projectIds);
+    if (error) throw error;
+    tasks = data || [];
+  }
+
+  return {
+    client: clientResult.data,
+    projects,
+    tasks,
+    documents: documentsResult.data || [],
+  };
+}
+
+export async function getClientPortalDocument(clientId, documentId) {
+  const { data, error } = await client()
+    .from('client_portal_documents')
+    .select('id, storage_path')
+    .eq('id', documentId)
+    .eq('crm_client_id', clientId)
+    .eq('client_visible', true)
+    .is('revoked_at', null)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function getClientPortalMembership(clientId, membershipId) {
+  const { data, error } = await client()
+    .from('client_portal_memberships')
+    .select('id, contact_id, email_normalized')
+    .eq('id', membershipId)
+    .eq('crm_client_id', clientId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function reissueClientPortalInvitation(ownerUserId, clientId, contactId, tokenHash, expiresAt) {
+  const { data, error } = await client().rpc('reissue_client_portal_invitation', {
+    p_owner_user_id: ownerUserId,
+    p_client_id: clientId,
+    p_contact_id: contactId,
+    p_token_hash: tokenHash,
+    p_expires_at: expiresAt,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function activateClientPortalInvitation(userId, tokenHash) {
+  const { data, error } = await client().rpc('activate_client_portal_invitation', {
+    p_user_id: userId,
+    p_token_hash: tokenHash,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function revokeClientPortalMembership(ownerUserId, clientId, membershipId) {
+  const { data, error } = await client().rpc('revoke_client_portal_membership', {
+    p_owner_user_id: ownerUserId,
+    p_client_id: clientId,
+    p_membership_id: membershipId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function uploadClientPortalDocument(path, file) {
+  const { error } = await client().storage
+    .from('client-portal-private')
+    .upload(path, file.buffer, { contentType: file.mimeType, upsert: false });
+  if (error) throw error;
+}
+
+export async function removeClientPortalDocument(path) {
+  const { error } = await client().storage.from('client-portal-private').remove([path]);
+  if (error) throw error;
+}
+
+export async function publishClientPortalDocument(ownerUserId, clientId, projectId, path, title, documentType) {
+  const { data, error } = await client().rpc('publish_client_portal_document', {
+    p_owner_user_id: ownerUserId,
+    p_client_id: clientId,
+    p_project_id: projectId,
+    p_storage_bucket: 'client-portal-private',
+    p_storage_path: path,
+    p_title: title,
+    p_document_type: documentType,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function revokeClientPortalDocument(clientId, documentId) {
+  const { data, error } = await client()
+    .from('client_portal_documents')
+    .update({ client_visible: false, revoked_at: new Date().toISOString() })
+    .eq('id', documentId)
+    .eq('crm_client_id', clientId)
+    .is('revoked_at', null)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function createClientPortalDownload(path, expiresIn = 60) {
+  const { data, error } = await client().storage
+    .from('client-portal-private')
+    .createSignedUrl(path, expiresIn);
+  if (error) throw error;
+  return data;
+}
+
+export async function recordClientPortalAudit(userId, action, resourceType, resourceId, success) {
+  const { error } = await client().from('audit_logs').insert({
+    user_id: userId,
+    event_type: 'client_portal_access',
+    action,
+    resource_type: resourceType,
+    resource_id: resourceId,
+    success,
+    details: { portal: 'client' },
+  });
+  if (error) throw error;
+}
