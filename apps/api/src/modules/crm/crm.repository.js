@@ -576,3 +576,108 @@ export async function recordClientPortalAudit(userId, action, resourceType, reso
   });
   if (error) throw error;
 }
+
+
+async function listPage(table, projection, ownerUserId, options, searchField, filters = {}) {
+  let query = client().from(table).select(projection).eq('owner_user_id', ownerUserId);
+  for (const [field, value] of Object.entries(filters)) {
+    if (value === null) query = query.is(field, null);
+    else if (value) query = query.eq(field, value);
+  }
+  if (options.q) query = query.ilike(searchField, `%${options.q}%`);
+  const { data, error } = await query
+    .order(options.sort.field, { ascending: options.sort.ascending })
+    .order('id', { ascending: options.sort.ascending })
+    .range(options.offset, options.offset + options.limit);
+  if (error) throw error;
+  const rows = data || [];
+  return { items: rows.slice(0, options.limit), nextOffset: rows.length > options.limit ? options.offset + options.limit : null };
+}
+
+async function getOwnerRecord(table, projection, ownerUserId, id, extra = {}) {
+  let query = client().from(table).select(projection).eq('id', id).eq('owner_user_id', ownerUserId);
+  for (const [field, value] of Object.entries(extra)) {
+    if (value === null) query = query.is(field, null);
+    else if (value !== undefined) query = query.eq(field, value);
+  }
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export function listOwnerCompaniesPage(ownerUserId, options) {
+  return listPage('companies', 'id,name,created_at,updated_at', ownerUserId, options, 'name');
+}
+
+export function getOwnerCompany(ownerUserId, id) {
+  return getOwnerRecord('companies', 'id,name,created_at,updated_at', ownerUserId, id);
+}
+
+export function listOwnerContactsPage(ownerUserId, options) {
+  return listPage('contacts', 'id,name,email,phone,title,company_id,client_id,created_at,updated_at', ownerUserId, options, 'name', options.filters);
+}
+
+export function getOwnerContact(ownerUserId, id) {
+  return getOwnerRecord('contacts', 'id,name,email,phone,title,company_id,client_id,created_at,updated_at', ownerUserId, id);
+}
+
+export function listOwnerLeadsPage(ownerUserId, options) {
+  return listPage('crm_leads', 'id,contact_id,created_at', ownerUserId, options, 'contact_id', { client_id: null });
+}
+
+export function getOwnerLead(ownerUserId, id) {
+  return getOwnerRecord('crm_leads', 'id,contact_id,created_at', ownerUserId, id, { client_id: null });
+}
+
+export function listOwnerClientsPage(ownerUserId, options) {
+  return listPage('crm_clients', 'id,name,created_at,updated_at', ownerUserId, options, 'name');
+}
+
+export function getOwnerClient(ownerUserId, id) {
+  return getOwnerRecord('crm_clients', 'id,name,created_at,updated_at', ownerUserId, id);
+}
+
+export function listOwnerClientContactsPage(ownerUserId, clientId, options) {
+  return listPage('contacts', 'id,name,email,phone,title,client_id,created_at,updated_at', ownerUserId, options, 'name', { client_id: clientId });
+}
+
+
+export function listOwnerProjectsPage(ownerUserId, options) {
+  return listPage('crm_projects', 'id,client_id,name', ownerUserId, options, 'name', options.filters);
+}
+
+export function getOwnerProject(ownerUserId, id) {
+  return getOwnerRecord('crm_projects', 'id,client_id,name', ownerUserId, id);
+}
+
+export function listOwnerTasksPage(ownerUserId, options) {
+  return listPage('crm_tasks', 'id,project_id,name,completed,assigned_user_id', ownerUserId, options, 'name', options.filters);
+}
+
+export function getOwnerTask(ownerUserId, id) {
+  return getOwnerRecord('crm_tasks', 'id,project_id,name,completed,assigned_user_id', ownerUserId, id);
+}
+
+export async function listOwnerProjectReferences(ownerUserId, projectIds) {
+  if (projectIds.length === 0) return [];
+  const { data, error } = await client().from('crm_projects')
+    .select('id,client_id,name').eq('owner_user_id', ownerUserId).in('id', projectIds);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listOwnerClientReferences(ownerUserId, clientIds) {
+  if (clientIds.length === 0) return [];
+  const { data, error } = await client().from('crm_clients')
+    .select('id,name').eq('owner_user_id', ownerUserId).in('id', clientIds);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function listOwnerEmployeeReferences(ownerUserId, employeeIds) {
+  if (employeeIds.length === 0) return [];
+  const { data, error } = await client().from('users')
+    .select('id,full_name,email').eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('id', employeeIds);
+  if (error) throw error;
+  return data || [];
+}
