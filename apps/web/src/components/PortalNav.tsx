@@ -13,12 +13,11 @@ const navItems = [
 export default function PortalNav() {
   const pathname = usePathname();
 
-  const isPortalPage = pathname.includes('/dashboard') || 
-                       pathname.includes('/leads') || 
-                       pathname.includes('/tasks');
+  const isDashboard = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+  const isPortalPage = pathname.startsWith('/leads') || pathname.startsWith('/tasks');
 
-  // Only show the portal nav on portal pages. The marketing homepage has its own nav.
-  if (!isPortalPage) {
+  // The Owner Workspace provides its own route-local navigation.
+  if (isDashboard || !isPortalPage) {
     return null;
   }
 

@@ -581,3 +581,151 @@ export async function revokeClientPortalDocument(ownerUserId, clientId, document
     throw new AppError('Client Portal operation failed.', 500, 'INTERNAL_ERROR', false);
   }
 }
+
+
+function textQuery(value, field, max = 80) {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length > max || /[%_\\]/.test(value)) {
+    throw new AppError(`Query '${field}' is invalid.`, 400, 'VALIDATION_ERROR');
+  }
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function queryString(query, field) {
+  const value = query?.[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new AppError(`Query '${field}' is invalid.`, 400, 'VALIDATION_ERROR');
+  return value;
+}
+
+function cursorOffset(value) {
+  if (!value) return 0;
+  try {
+    const decoded = Buffer.from(value, 'base64url').toString('utf8');
+    if (!/^\d+$/.test(decoded)) throw new Error('invalid');
+    const offset = Number.parseInt(decoded, 10);
+    if (!Number.isSafeInteger(offset) || offset > 1000) throw new Error('invalid');
+    return offset;
+  } catch {
+    throw new AppError('Query cursor is invalid.', 400, 'VALIDATION_ERROR');
+  }
+}
+
+function pageOptions(query, allowedSorts, filterFields = [], acceptsSearch = true) {
+  const rawLimit = queryString(query, 'limit');
+  const limit = rawLimit === undefined ? 20 : Number.parseInt(rawLimit, 10);
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 50 || (rawLimit !== undefined && String(limit) !== rawLimit)) {
+    throw new AppError('Query limit is invalid.', 400, 'VALIDATION_ERROR');
+  }
+  const sortValue = queryString(query, 'sort') || Object.keys(allowedSorts)[0];
+  const sort = allowedSorts[sortValue];
+  if (!sort) throw new AppError('Query sort is invalid.', 400, 'VALIDATION_ERROR');
+  const filters = {};
+  for (const field of filterFields) {
+    const value = queryString(query, field);
+    if (value !== undefined) filters[field] = requireUuid(value, field);
+  }
+  const q = textQuery(queryString(query, 'q'), 'q');
+  if (q && !acceptsSearch) throw new AppError('Query q is not supported for this resource.', 400, 'VALIDATION_ERROR');
+  return { q, limit, offset: cursorOffset(queryString(query, 'cursor')), sort, filters };
+}
+
+function pageResult(result) {
+  return {
+    items: result.items,
+    pageInfo: { nextCursor: result.nextOffset === null ? null : Buffer.from(String(result.nextOffset)).toString('base64url'), hasNextPage: result.nextOffset !== null },
+  };
+}
+
+const NAME_SORTS = { 'created_at:desc': { field: 'created_at', ascending: false }, 'name:asc': { field: 'name', ascending: true } };
+const LEAD_SORTS = { 'created_at:desc': { field: 'created_at', ascending: false } };
+
+export async function listOwnerCompanies(ownerUserId, query) {
+  return pageResult(await repo.listOwnerCompaniesPage(ownerUserId, pageOptions(query, NAME_SORTS)));
+}
+
+export async function getOwnerCompany(ownerUserId, id) {
+  return requireRecord(await repo.getOwnerCompany(ownerUserId, requireUuid(id, 'id')), 'Company');
+}
+
+export async function listOwnerContacts(ownerUserId, query) {
+  return pageResult(await repo.listOwnerContactsPage(ownerUserId, pageOptions(query, NAME_SORTS, ['company_id', 'client_id'])));
+}
+
+export async function getOwnerContact(ownerUserId, id) {
+  return requireRecord(await repo.getOwnerContact(ownerUserId, requireUuid(id, 'id')), 'Contact');
+}
+
+export async function listOwnerLeads(ownerUserId, query) {
+  return pageResult(await repo.listOwnerLeadsPage(ownerUserId, pageOptions(query, LEAD_SORTS, [], false)));
+}
+
+export async function getOwnerLead(ownerUserId, id) {
+  return requireRecord(await repo.getOwnerLead(ownerUserId, requireUuid(id, 'id')), 'Lead');
+}
+
+export async function listOwnerClients(ownerUserId, query) {
+  return pageResult(await repo.listOwnerClientsPage(ownerUserId, pageOptions(query, NAME_SORTS)));
+}
+
+export async function getOwnerClient(ownerUserId, id) {
+  return requireRecord(await repo.getOwnerClient(ownerUserId, requireUuid(id, 'clientId')), 'Client');
+}
+
+export async function listOwnerClientContacts(ownerUserId, clientId, query) {
+  await verifyClientOwnership(ownerUserId, requireUuid(clientId, 'clientId'));
+  return pageResult(await repo.listOwnerClientContactsPage(ownerUserId, clientId, pageOptions(query, NAME_SORTS)));
+}
+
+
+const PROJECT_SORTS = {
+  'name:asc': { field: 'name', ascending: true },
+  'name:desc': { field: 'name', ascending: false },
+};
+const TASK_SORTS = PROJECT_SORTS;
+
+export async function listOwnerProjects(ownerUserId, query) {
+  return pageResult(await repo.listOwnerProjectsPage(ownerUserId, pageOptions(query, PROJECT_SORTS, ['client_id'])));
+}
+
+export async function getOwnerProject(ownerUserId, id) {
+  return requireRecord(await repo.getOwnerProject(ownerUserId, requireUuid(id, 'projectId')), 'Project');
+}
+
+export async function listOwnerTasks(ownerUserId, query) {
+  const options = pageOptions(query, TASK_SORTS, ['project_id']);
+  if (options.filters.project_id) await verifyProjectOwnership(ownerUserId, options.filters.project_id);
+  return pageResult(await repo.listOwnerTasksPage(ownerUserId, options));
+}
+
+export async function getOwnerTask(ownerUserId, id) {
+  const task = requireRecord(await repo.getOwnerTask(ownerUserId, requireUuid(id, 'taskId')), 'Task');
+  if (!(await repo.getOwnerProject(ownerUserId, task.project_id))) {
+    throw new AppError('Task not found.', 404, 'TASK_NOT_FOUND');
+  }
+  return task;
+}
+
+export async function listOwnerProjectTasks(ownerUserId, projectId, query) {
+  const id = requireUuid(projectId, 'projectId');
+  await verifyProjectOwnership(ownerUserId, id);
+  const options = pageOptions(query, TASK_SORTS, ['project_id']);
+  if (options.filters.project_id && options.filters.project_id !== id) {
+    throw new AppError('Query project_id does not match the requested project.', 400, 'VALIDATION_ERROR');
+  }
+  options.filters.project_id = id;
+  return pageResult(await repo.listOwnerTasksPage(ownerUserId, options));
+}
+
+export function listOwnerProjectReferences(ownerUserId, projectIds) {
+  return repo.listOwnerProjectReferences(ownerUserId, projectIds);
+}
+
+export function listOwnerClientReferences(ownerUserId, clientIds) {
+  return repo.listOwnerClientReferences(ownerUserId, clientIds);
+}
+
+export function listOwnerEmployeeReferences(ownerUserId, employeeIds) {
+  return repo.listOwnerEmployeeReferences(ownerUserId, employeeIds);
+}
