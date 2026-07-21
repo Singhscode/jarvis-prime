@@ -1,5 +1,29 @@
 # JARVIS PRIME Master Roadmap
 
+## Phase 8 — Owner Workspace
+
+✅ **Complete**
+**Version:** `v0.11.0`
+**Git Tag:** `v0.11.0-owner-workspace`
+**Status:** Complete
+**Completion Date:** July 21, 2026
+
+### Major deliverables
+
+- One responsive `/dashboard` Owner Workspace for dashboard oversight, CRM, clients, projects, tasks, employees, documents, audit, settings, and global search.
+- A narrow `/api/owner-workspace` façade that preserves Repository → Service → Route boundaries and reuses existing CRM domain rules.
+- Client Portal membership and invitation administration plus document publication/revocation through existing lifecycle services.
+- Fixed metadata projections, bounded list/search queries, unavailable-source states, accessible loading/error/empty states, and route-local navigation.
+
+### Security, testing, and scope summary
+
+- Existing JWT access tokens, refresh cookies, sessions, login, refresh, and logout behavior are reused.
+- Every Owner Workspace request derives scope from `req.user.sub`; browser identifiers are locators only.
+- Server-side Owner Workspace authorization denies Employee Portal and Client Portal identities before protected handlers execute.
+- Owner responses do not expose storage paths, signed URLs, invitation values, raw audit contents, credentials, or persistent browser state.
+- API, Owner Workspace, Employee Portal, Client Portal, frontend, lint, type-check, diagnostics, and production-build release validation passed.
+- Phase 8 is frozen after release; only bug fixes are permitted.
+
 ## Phase 7 — Client Portal
 
 ✅ **Complete**
@@ -53,13 +77,14 @@ The Client Portal gives an external client member a minimal, read-only view of o
 ✅ Phase 5 Task Management
 ✅ Phase 6 Employee Portal
 ✅ Phase 7 Client Portal
-⏳ Phase 8 Finance & Billing
-⏳ Phase 9 Communication Hub
-⏳ Phase 10 Automation Platform
-⏳ Phase 11 Analytics & Reporting
-⏳ Phase 12 Production & DevOps
-⏳ Phase 13 AI Foundation
-⏳ Phase 14 AI Sales Agents
-⏳ Phase 15 AI Operations
-⏳ Phase 16 Enterprise Security
+✅ Phase 8 Owner Workspace
+⏳ Phase 9 Finance & Billing
+⏳ Phase 10 Communication Hub
+⏳ Phase 11 Automation Platform
+⏳ Phase 12 Analytics & Reporting
+⏳ Phase 13 Production & DevOps
+⏳ Phase 14 AI Foundation
+⏳ Phase 15 AI Sales Agents
+⏳ Phase 16 AI Operations
+⏳ Phase 17 Enterprise Security
 🚀 Version 1.0 Release

@@ -108,20 +108,13 @@ npm run lint       # lint all packages
 
 ## Current Release and Roadmap
 
-✅ **Phase 7 — Client Portal Complete**
-**Version:** `v0.10.0` · **Git Tag:** `v0.10.0-client-portal` · **Status:** Complete · **Completion Date:** July 19, 2026
+✅ **Phase 8 — Owner Workspace Complete**
+**Version:** `v0.11.0` · **Git Tag:** `v0.11.0-owner-workspace` · **Status:** Complete · **Completion Date:** July 21, 2026
 
-The implemented business workflow is:
+The Owner Workspace provides one responsive `/dashboard` operating surface for dashboard oversight, CRM, clients, projects, tasks, employees, documents, audit, settings, and global search. It reuses the existing CRM, Client Portal document lifecycle, JWT, refresh-cookie, and session platform while enforcing server-derived Owner Workspace scope and denying Client Portal and Employee Portal identities.
 
-```text
-Website Lead → CRM Lead → Client → Project → Task → Employee Portal → Client Portal
-```
-
-The read-only Client Portal gives an active client member one server-derived CRM client scope for safe project and task visibility and approved private-document downloads. It reuses existing JWT/session authentication and adds hashed, single-use invitation activation, private Storage signing, explicit credentialed CORS, focused API/PostgreSQL/frontend coverage, and CI execution targets. Accessible loading, error, empty, sign-in, activation, and keyboard-operable download states are included without adding client writes, chat, billing, or internal CRM access.
-
-**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ⏳ Phase 8 Finance & Billing · ⏳ Phase 9 Communication Hub · ⏳ Phase 10 Automation Platform · ⏳ Phase 11 Analytics & Reporting · ⏳ Phase 12 Production & DevOps · ⏳ Phase 13 AI Foundation · ⏳ Phase 14 AI Sales Agents · ⏳ Phase 15 AI Operations · ⏳ Phase 16 Enterprise Security · 🚀 Version 1.0 Release
-
-See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), and [changelog and Client Portal release notes](./documentation/roadmap/CHANGELOG.md).
+**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ✅ Phase 8 Owner Workspace · ⏳ Phase 9 Finance & Billing · ⏳ Phase 10 Communication Hub · ⏳ Phase 11 Automation Platform · ⏳ Phase 12 Analytics & Reporting · ⏳ Phase 13 Production & DevOps · ⏳ Phase 14 AI Foundation · ⏳ Phase 15 AI Sales Agents · ⏳ Phase 16 AI Operations · ⏳ Phase 17 Enterprise Security · 🚀 Version 1.0 Release
+See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), and [changelog and release notes](./documentation/roadmap/CHANGELOG.md).
 
 ---
 

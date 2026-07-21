@@ -2,6 +2,23 @@
 
 All notable changes to JARVIS PRIME are documented in this file.
 
+## [0.11.0] — 2026-07-21
+
+**Release:** Owner Workspace
+**Git Tag:** `v0.11.0-owner-workspace`
+
+### Added
+
+- One responsive `/dashboard` Owner Workspace for dashboard oversight, CRM, clients, projects, tasks, employees, documents, audit, settings, and global search.
+- Narrow `/api/owner-workspace` façade that reuses CRM domain services and Client Portal document lifecycle behavior.
+- Owner-scoped document publication/revocation, audit visibility, bounded search, fixed projections, loading states, and accessible recovery states.
+
+### Security and testing
+
+- Existing JWT, refresh-cookie, and session lifecycle reused with server-derived Owner Workspace authorization before every protected handler.
+- Client Portal membership and employee identities are denied from the Owner Workspace; browser identifiers remain locators only.
+- API, Owner Workspace, Employee Portal, Client Portal, frontend, lint, type-check, and production-build release validation passed.
+
 ## [0.10.0] — 2026-07-19
 
 **Release:** Client Portal
