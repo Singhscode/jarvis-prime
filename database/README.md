@@ -1,31 +1,30 @@
-# Database Source of Truth
+# Local database development
 
-This directory is the version-controlled Supabase project workspace for JARVIS PRIME. API data-access code remains in `apps/api/src/database/`; credentials remain in environment files or the deployment platform.
-
-## Layout
-
-- `supabase/config.toml` — Supabase CLI project configuration.
-- `supabase/migrations/` — ordered timestamped SQL migrations. This is the only canonical schema source.
-- `seed/` — optional local development data; currently empty.
+`database/supabase/migrations/` is the canonical schema source for JARVIS PRIME. Local development uses the Docker-managed Supabase CLI stack only.
 
 ## Prerequisites
 
-Install the official Supabase CLI and ensure Docker Desktop is running. On macOS, run:
+Install Docker Desktop and the Supabase CLI. On macOS:
 
 ```zsh
 brew install supabase/tap/supabase
+docker info
 ```
 
-See the [Supabase CLI installation guide](https://supabase.com/docs/guides/local-development) for other platforms.
+## Local-only commands
 
-## Commands
-
-From the repository root:
+Run from the repository root:
 
 ```zsh
-npm run db:reset   # recreate the local database from every migration
-npm run db:status  # compare local and linked remote migration history
-npm run db:push    # apply pending migrations to an explicitly linked remote
+supabase --workdir database start
+npm run db:status
+npm run db:reset
 ```
 
-`db:push` never runs automatically. Before using it against an existing project, link the project and review `npm run db:status`; reconcile any historical manual changes first. Do not commit secrets, backups, or production data.
+`db:reset` deletes and recreates the disposable Local Supabase database, then applies every migration. It is appropriate only for local data. Obtain local API keys and the local PostgreSQL URL with:
+
+```zsh
+supabase --workdir database status -o env
+```
+
+Put values only in ignored local environment files. Do not use `supabase link`, `db push`, or a remote database URL for the local Owner Workspace workflow. Continue with [Local Owner Workspace development](../documentation/LOCAL_DEVELOPMENT.md).

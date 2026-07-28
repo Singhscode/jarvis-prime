@@ -368,12 +368,21 @@ export async function loginUser(params, ipAddress, userAgent) {
  * @param {string} password - Password to validate
  * @returns {object} { valid, message }
  */
-function validatePasswordStrength(password) {
+export function validatePasswordStrength(password) {
   // Check length
   if (password.length < auth.password.minLength) {
     return {
       valid: false,
+      code: 'VALIDATION_PASSWORD_TOO_SHORT',
       message: `Password must be at least ${auth.password.minLength} characters.`,
+    };
+  }
+
+  if (password.length > auth.password.maxLength) {
+    return {
+      valid: false,
+      code: 'VALIDATION_PASSWORD_TOO_LONG',
+      message: `Password must be no more than ${auth.password.maxLength} characters.`,
     };
   }
 
@@ -381,6 +390,7 @@ function validatePasswordStrength(password) {
   if (auth.password.requireUppercase && !/[A-Z]/.test(password)) {
     return {
       valid: false,
+      code: 'VALIDATION_PASSWORD_UPPERCASE',
       message: 'Password must contain an uppercase letter.',
     };
   }
@@ -389,6 +399,7 @@ function validatePasswordStrength(password) {
   if (auth.password.requireLowercase && !/[a-z]/.test(password)) {
     return {
       valid: false,
+      code: 'VALIDATION_PASSWORD_LOWERCASE',
       message: 'Password must contain a lowercase letter.',
     };
   }
@@ -397,6 +408,7 @@ function validatePasswordStrength(password) {
   if (auth.password.requireNumbers && !/\d/.test(password)) {
     return {
       valid: false,
+      code: 'VALIDATION_PASSWORD_NUMBER',
       message: 'Password must contain a number.',
     };
   }
@@ -408,6 +420,7 @@ function validatePasswordStrength(password) {
     if (!hasSpecial) {
       return {
         valid: false,
+        code: 'VALIDATION_PASSWORD_SPECIAL',
         message: 'Password must contain a special character (!@#$%^&*).',
       };
     }
@@ -418,6 +431,7 @@ function validatePasswordStrength(password) {
     if (password.toLowerCase().includes(blacklistedPassword)) {
       return {
         valid: false,
+        code: 'VALIDATION_PASSWORD_COMMON',
         message: 'Password is too common. Choose a more unique password.',
       };
     }
@@ -745,6 +759,37 @@ export async function resetPassword(params, ipAddress) {
       status: statusCodes.INTERNAL_ERROR,
       message: 'Password reset failed.',
     };
+  }
+}
+
+export async function activateEmployeeInvitation(params) {
+  try {
+    if (!params || typeof params !== 'object' || Array.isArray(params)
+      || Object.keys(params).some((key) => !['invitation', 'password'].includes(key))) {
+      return { success: false, status: statusCodes.BAD_REQUEST, error: { code: 'INVALID_REQUEST' }, message: 'Activation request is invalid.' };
+    }
+    const { invitation, password } = params;
+    if (typeof invitation !== 'string' || invitation.length < 32 || invitation.length > 256
+      || typeof password !== 'string') {
+      return { success: false, status: statusCodes.BAD_REQUEST, error: { code: 'INVALID_EMPLOYEE_INVITATION' }, message: 'This activation link is invalid or expired.' };
+    }
+    const strength = validatePasswordStrength(password);
+    if (!strength.valid) {
+      return { success: false, status: statusCodes.BAD_REQUEST, error: { code: strength.code }, message: strength.message };
+    }
+    const passwordHash = await hashPassword(password);
+    const result = await repo.activateEmployeeInvitation(hashToken(invitation), passwordHash);
+    if (!result?.activated) {
+      return { success: false, status: statusCodes.BAD_REQUEST, error: { code: 'INVALID_EMPLOYEE_INVITATION' }, message: 'This activation link is invalid or expired.' };
+    }
+    return {
+      success: true,
+      status: statusCodes.OK,
+      message: 'Employee access activated.',
+      employee: { id: result.employee_id, status: result.status },
+    };
+  } catch {
+    return { success: false, status: statusCodes.INTERNAL_ERROR, error: { code: 'INTERNAL_ERROR' }, message: 'Employee activation failed. Please try again.' };
   }
 }
 

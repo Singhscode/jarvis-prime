@@ -1,0 +1,12 @@
+Production execution window activated
+Timestamp UTC: 2026-07-23T21:42:54Z
+Target project: fytnwpnnvqecjmyhrzcx
+Approval source: explicit production execution authorization in release-control conversation
+Maintenance window: active
+Write freeze: active
+Deployment freeze: active
+Operational controls retained: DRY_RUN=true and scheduler disabled
+Operator: Anuj Singh (Founder & CEO)
+Reviewer: Anuj Singh (Founder & CEO)
+Approver: Anuj Singh (Founder & CEO)
+Recovery Owner: Anuj Singh (Founder & CEO)

@@ -3,6 +3,7 @@
 
 import crypto from 'node:crypto';
 import { scryptSync } from 'node:crypto';
+import { auth } from './constants.js';
 
 // For Argon2id hashing (when available via native module or external package)
 let argon2 = null;
@@ -29,8 +30,11 @@ export async function hashPassword(password) {
     throw new Error('Password must be a non-empty string');
   }
 
-  if (password.length < 12 || password.length > 128) {
-    throw new Error('Password must be 12-128 characters');
+  if (password.length < auth.password.minLength
+    || password.length > auth.password.maxLength) {
+    throw new Error(
+      `Password must be ${auth.password.minLength}-${auth.password.maxLength} characters`
+    );
   }
 
   if (argon2) {

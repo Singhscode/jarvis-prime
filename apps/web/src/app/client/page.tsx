@@ -11,7 +11,13 @@ type Snapshot = {
   documents: { id: string; project_id: string | null; title: string; document_type: string; created_at: string }[];
 };
 type ApiBody<T> = { success: true; data: T };
-const API_URL = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_ENGINE_URL;
+const BACKEND_UNAVAILABLE_MESSAGE = 'Backend service is not running. Please start the API server.';
+
+function displayError(caught: unknown, fallback: string) {
+  if (caught instanceof TypeError) return BACKEND_UNAVAILABLE_MESSAGE;
+  return caught instanceof Error ? caught.message : fallback;
+}
 
 export default function ClientPage() {
   const accessToken = useRef<string | null>(null);
@@ -79,7 +85,7 @@ export default function ClientPage() {
       setSnapshot(body.data);
       setNeedsLogin(false);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to load the Client Portal.');
+      setError(displayError(caught, 'Unable to load the Client Portal.'));
     } finally {
       setLoading(false);
     }
@@ -103,7 +109,7 @@ export default function ClientPage() {
       await loadSnapshot();
     } catch (caught) {
       clearClientState();
-      setError(caught instanceof Error ? caught.message : 'Sign in failed.');
+      setError(displayError(caught, 'Sign in failed.'));
       setLoading(false);
     }
   }
@@ -121,7 +127,7 @@ export default function ClientPage() {
       const body = await request(`/api/client-portal/documents/${documentId}/download`) as ApiBody<{ url: string }>;
       window.location.assign(body.data.url);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Document download failed.');
+      setError(displayError(caught, 'Document download failed.'));
     }
   }
 

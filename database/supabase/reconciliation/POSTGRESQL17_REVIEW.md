@@ -1,0 +1,21 @@
+# PostgreSQL 17 compatibility review
+
+- Result: **PASS** for the isolated package rehearsal on official PostgreSQL 17.6.
+- Successful evidence: `evidence/20260723T182326Z/` (log, final schema, row counts, exact migration history, grant inventory, metadata, and SHA-256 manifest).
+- Rehearsal image is digest-pinned to `postgres:17.6-alpine`; container networking is disabled and readiness is bounded to 60 seconds.
+- The rehearsal executed the read-only preflight, committed containment, all 14 versioned migrations exactly once, local synthetic history recording, and final read-only verification.
+- Synthetic preservation proof retained two lead rows and one outreach row through reconciliation.
+- `gen_random_uuid()` is built in and compatible.
+- `jsonb`, arrays, GIN indexes, partial indexes, generated columns, PL/pgSQL, RLS, `SECURITY DEFINER`, and `SET search_path=''` are supported.
+- `EXECUTE PROCEDURE` in trigger declarations is a deprecated spelling but remains a supported alias for `EXECUTE FUNCTION` in PostgreSQL 17; normalize only in a future reviewed migration.
+- `CREATE TABLE IF NOT EXISTS` remains non-reconciling: it skips existing `leads` and cannot add missing columns/defaults/constraints. The package explicitly reconciles these differences.
+- Plain `CREATE TABLE`, `ADD COLUMN`, and `CREATE FUNCTION` statements in migrations 00004–00008 and 00010 are intentionally non-idempotent and must run once in canonical order.
+- `CREATE OR REPLACE FUNCTION handle_updated_at()` is compatible and behaviorally identical to production.
+- Nullable-column additions, dropping NOT NULL, and setting a default are metadata operations on the current empty table.
+- Candidate email uniqueness uses a regular transactional index, avoiding `CREATE INDEX CONCURRENTLY` transaction restrictions; current zero-row state makes lock time negligible.
+- `SECURITY DEFINER` employee/client RPCs fully qualify referenced objects while using an empty search path, preventing search-path substitution.
+- `convert_crm_lead_to_client` is security-invoker; package execution grants are therefore required on its underlying CRM tables.
+- Supabase Storage `buckets(id,name,public)` supports the canonical private-bucket upsert in the captured provider schema.
+- Production is PostgreSQL 17 while `database/supabase/config.toml` declares 15. This does not block reviewed SQL, but local/staging parity remains a configuration follow-up and must not be changed under this gate.
+- PostgreSQL 17 dump emits `transaction_timeout`; Supabase CLI handles this during dump. Canonical migrations do not depend on it.
+- No extension-version dependency is introduced by canonical migrations beyond capabilities already present in production.

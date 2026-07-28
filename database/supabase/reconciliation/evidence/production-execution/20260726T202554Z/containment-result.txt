@@ -1,0 +1,20 @@
+Operational browser-access containment — authorized controlled retry
+Start UTC: 2026-07-26T20:25:54Z
+End UTC: 2026-07-26T20:25:54Z
+Target project: fytnwpnnvqecjmyhrzcx
+Approved SQL file: database/supabase/reconciliation/01_contain_browser_access.sql
+Approved transport: psql --file
+Execution result: STOP before psql invocation
+Stop reason: PRODUCTION_DATABASE_URL unavailable to the execution process
+Exit code: 78
+PostgreSQL output: none
+Transaction status: not started
+Lock timeout result: not exercised
+Statement timeout result: not exercised
+Containment assertions: not exercised
+Grant verification: not exercised
+RLS verification: not exercised
+Production changes: none
+Containment applied: no
+Migrations executed: no
+Disposition: STOP; do not retry automatically; do not execute migrations

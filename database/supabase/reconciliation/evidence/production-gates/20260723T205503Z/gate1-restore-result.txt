@@ -1,0 +1,23 @@
+Gate 1: PASS
+Timestamp UTC: 2026-07-23T20:55:03Z
+Source project: fytnwpnnvqecjmyhrzcx
+Source backup: backups/production/fytnwpnnvqecjmyhrzcx/20260723T135351Z/
+Archive SHA-256 verification: PASS
+Component SHA-256 manifest: PASS (roles, schema, extension metadata, public/auth/storage data)
+Excluded artifact: data.sql (documented incomplete artifact; not restored)
+Environment: disposable official PostgreSQL 17.6 container, digest-pinned, network=none
+Restore order: role bootstrap, roles.sql, schema.sql, schema_extensions.sql, data_public.sql, data_auth.sql, data_storage.sql
+Restore execution: PASS with ON_ERROR_STOP
+Verification transaction: PASS, read-only
+Tables: 33 (public=2, auth=23, storage=8)
+Functions: 28 (public=1, auth=4, storage=17, extensions=6)
+Triggers: 5
+RLS-enabled tables: 26
+Public policies: 3
+Explicit non-constraint indexes: 69
+Public operational table grants: 42 across anon/authenticated/service_role
+Lead update trigger: verified
+Outreach lead FK with cascade: verified
+Rows: leads=0, outreach_log=0, auth.users=0, storage.buckets=0, storage.objects=0
+Container cleanup: completed
+Result: isolated restore and integrity verification passed

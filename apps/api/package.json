@@ -18,19 +18,22 @@
     "test:integration:db": "node --test integration/employee-portal.postgres.integration.js",
     "test:integration:client-portal": "node --test integration/client-portal.postgres.integration.js",
     "employee:create": "node scripts/provision-employee.js",
+    "owner:bootstrap": "node scripts/bootstrap-owner.js",
+    "owner:bootstrap:local": "node scripts/local-owner-workspace.js bootstrap",
+    "seed:owner-workspace:local": "node scripts/local-owner-workspace.js seed",
+    "verify:owner-workspace:local": "node scripts/verify-owner-workspace-local.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",
+    "test:integration:owner-bootstrap": "node --test integration/owner-bootstrap.postgres.integration.js",
     "test:watch": "node --test --watch"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "busboy": "1.6.0",
     "cookie-parser": "1.4.7",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "pg": "8.16.3"
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "devDependencies": {
-    "pg": "8.16.3"
   }
 }

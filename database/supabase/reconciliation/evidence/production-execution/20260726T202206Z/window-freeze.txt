@@ -1,0 +1,21 @@
+Phase 8 production maintenance window and freeze activation
+Timestamp UTC: 2026-07-26T20:22:06Z
+Window end UTC: 2026-07-26T21:07:06Z
+Timestamp IST: 2026-07-27T01:52:06+0530
+Window end IST: 2026-07-27T02:37:06+0530
+Target project: fytnwpnnvqecjmyhrzcx
+Approval source: explicit release-engineer instruction to execute the next incomplete approved runbook gate
+Maintenance window: active
+Write freeze: active
+Deployment freeze: active
+Operational controls retained: DRY_RUN=true and scheduler disabled
+Prohibited during window: application writes, outreach activity, scheduler activity, manual database writes, concurrent schema operations, application deploys, infrastructure changes, authentication changes, and credential changes
+Operator: Anuj Singh (Founder & CEO)
+Reviewer: Anuj Singh (Founder & CEO)
+Approver: Anuj Singh (Founder & CEO)
+Recovery Owner: Anuj Singh (Founder & CEO)
+Closed prerequisites accepted without re-execution: production backup, isolated restore, PostgreSQL 17 rehearsal, read-only production preflight, migration dry-run, environment restoration, PostgreSQL authentication, package integrity
+Production SQL executed by this gate: none
+Containment executed by this gate: none
+Migrations executed by this gate: none
+Gate result: PASS

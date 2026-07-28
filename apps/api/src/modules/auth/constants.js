@@ -5,6 +5,7 @@ export const auth = {
   // Password requirements (OWASP-aligned)
   password: {
     minLength: 12,
+    maxLength: 128,
     requireUppercase: true,
     requireLowercase: true,
     requireNumbers: true,

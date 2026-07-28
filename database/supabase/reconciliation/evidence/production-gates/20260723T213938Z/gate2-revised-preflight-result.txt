@@ -1,0 +1,16 @@
+Gate 2 revised production preflight: PASS
+Timestamp UTC: 2026-07-23T21:39:38Z
+Target binding: linked Supabase project fytnwpnnvqecjmyhrzcx
+Supabase CLI: 2.109.1
+Execution transport: Supabase Management API via `supabase db query --linked`
+Approved source: 00_read_only_preflight.sql
+Transport adaptation: in-memory removal of psql meta-directives and substitution of approved expected values only; package SQL was not modified
+Transaction mode: BEGIN READ ONLY
+Execution role: postgres
+PostgreSQL: 17.6
+Migration history state: legacy_unmanaged_adoption
+Verified legacy schema fingerprint: 5917ae71c2ce1f9a80bbf3d5983afbb0
+Rows: public.leads=0, public.outreach_log=0
+All remaining approved schema, columns, defaults, constraints, indexes, triggers, functions, policies, grants, RLS, default-ACL, Storage, and duplicate-email assertions: PASS
+Production writes: none
+Migration history writes: none

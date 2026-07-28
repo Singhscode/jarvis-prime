@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ClientPage from './page';
+import { FileJson2Icon } from 'lucide-react';
 
 const snapshot = { client: { id: 'client-1', name: 'Acme' }, projects: [], tasks: [], documents: [{ id: 'document-1', project_id: null, title: 'Delivery', document_type: 'report', created_at: '2026-07-18T00:00:00.000Z' }] };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -52,6 +53,12 @@ describe('ClientPage session boundary', () => {
     const loginCall = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>)[1];
     const loginBody = JSON.parse(loginCall[1]?.body as string);
     expect(loginBody).toMatchObject({ email: 'client@example.test', password: 'password', deviceName: 'Client Portal' });
+  });
+
+  it('shows friendly recovery guidance when the backend is unavailable', async () => {
+    globalThis.fetch = vi.fn(async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch;
+    render(<ClientPage />);
+    expect(await screen.findByText('Backend service is not running. Please start the API server.')).toBeTruthy();
   });
 
   it('clears client state after a portal denial without prefetching document URLs', async () => {

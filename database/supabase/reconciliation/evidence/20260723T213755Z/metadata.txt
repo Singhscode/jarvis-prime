@@ -1,0 +1,4 @@
+image=postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94
+postgres_version=17.6
+legacy_fingerprint=5917ae71c2ce1f9a80bbf3d5983afbb0
+network=none

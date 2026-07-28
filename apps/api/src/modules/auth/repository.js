@@ -47,6 +47,38 @@ export async function createUser(userData) {
   return data;
 }
 
+/**
+ * Creates the single active, verified Owner inside a caller-owned transaction.
+ * Registration continues to use createUser() and its pending-verification state.
+ */
+export async function createInitialOwner(transaction, userData) {
+  const normalizedEmail = normalizeEmail(userData.email);
+  const { rows: [user] } = await transaction.query(`insert into public.users
+    (email, email_normalized, full_name, password_hash, status, role,
+     email_verified_at, failed_login_attempts, last_failed_login_at,
+     account_locked_until, created_at, updated_at)
+    values ($1, $2, $3, $4, 'active', 'client', now(), 0, null, null, now(), now())
+    returning id, email, email_normalized, full_name, status, role, email_verified_at`,
+  [userData.email, normalizedEmail, userData.full_name, userData.password_hash]);
+  return user;
+}
+
+export async function findUserByNormalizedEmailForUpdate(transaction, email) {
+  const { rows } = await transaction.query(`select id, email, role, status
+    from public.users where email_normalized = $1 for update`, [normalizeEmail(email)]);
+  return rows[0] || null;
+}
+
+export async function findOwnerBootstrapAuditForUpdate(transaction) {
+  const { rows } = await transaction.query(`select id, user_id, event_type, action,
+    resource_type, resource_id, success, details, created_at
+    from public.audit_logs
+    where event_type = 'owner.bootstrap_completed' and success = true
+    order by created_at, id
+    limit 1 for update`);
+  return rows[0] || null;
+}
+
 export async function getUserByEmail(email) {
   const { data, error } = await client()
     .from('users')
@@ -397,28 +429,49 @@ export async function revokeRefreshToken(tokenHash) {
   if (error) throw error;
 }
 
+export async function activateEmployeeInvitation(tokenHash, passwordHash) {
+  const { data, error } = await client().rpc('activate_employee_invitation', {
+    p_token_hash: tokenHash,
+    p_password_hash: passwordHash,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // ── Audit Logs ─────────────────────────────────────────────────────────────
 
 /**
  * Creates an audit log entry.
  * Never log passwords, tokens, secrets, or raw personally sensitive data.
  */
-export async function createAuditLog(auditData) {
-  const { error } = await client()
-    .from('audit_logs')
-    .insert([{
-      user_id: auditData.user_id || null,
-      event_type: auditData.event_type,
-      action: auditData.action || 'create',
-      resource_type: auditData.resource_type || null,
-      resource_id: auditData.resource_id || null,
-      success: auditData.success !== false,
-      error_message: auditData.error_message || null,
-      ip_address: auditData.ip_address || null,
-      user_agent: auditData.user_agent || null,
-      details: auditData.details || {},
-      created_at: new Date().toISOString(),
-    }]);
+export async function createAuditLog(auditData, transaction = null) {
+  const record = {
+    user_id: auditData.user_id || null,
+    event_type: auditData.event_type,
+    action: auditData.action || 'create',
+    resource_type: auditData.resource_type || null,
+    resource_id: auditData.resource_id || null,
+    success: auditData.success !== false,
+    error_message: auditData.error_message || null,
+    ip_address: auditData.ip_address || null,
+    user_agent: auditData.user_agent || null,
+    details: auditData.details || {},
+    created_at: new Date().toISOString(),
+  };
 
+  if (transaction) {
+    const { rows: [audit] } = await transaction.query(`insert into public.audit_logs
+      (user_id, event_type, action, resource_type, resource_id, success,
+       error_message, ip_address, user_agent, details, created_at)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning id`, [
+      record.user_id, record.event_type, record.action, record.resource_type,
+      record.resource_id, record.success, record.error_message, record.ip_address,
+      record.user_agent, record.details, record.created_at,
+    ]);
+    return audit;
+  }
+
+  const { error } = await client().from('audit_logs').insert([record]);
   if (error) throw error;
+  return null;
 }

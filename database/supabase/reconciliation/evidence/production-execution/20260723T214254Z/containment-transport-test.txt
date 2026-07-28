@@ -1,0 +1,10 @@
+Containment transport test: PASS
+Environment: disposable PostgreSQL 17.6 container with network=none
+Command shape tested unchanged: psql "$PRODUCTION_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file /workspace/reconciliation/01_contain_browser_access.sql
+Fixture: approved PostgreSQL 17 legacy baseline
+Result: BEGIN, all containment assertions, and COMMIT succeeded
+Container cleanup: completed
+Production containment: NOT EXECUTED
+Reason: no PRODUCTION_DATABASE_URL was available from the approved secret-manager environment in this execution session; no alternative credential source was used
+Production requests: none
+Production state changes: none

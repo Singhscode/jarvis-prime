@@ -16,10 +16,12 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "db:reset": "supabase --workdir database start && supabase --workdir database db reset",
-    "db:status": "supabase --workdir database migration list",
+    "db:status": "supabase --workdir database status",
     "db:push": "supabase --workdir database db push",
     "dev:web": "npm run dev --workspace=apps/web",
-    "dev:api": "npm run server --workspace=apps/api"
+    "dev:api": "npm run server --workspace=apps/api",
+    "employee:create": "npm run employee:create --workspace=apps/api",
+    "owner:bootstrap": "npm run owner:bootstrap --workspace=apps/api"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

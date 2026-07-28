@@ -46,7 +46,7 @@ class ApiClient {
   private maxRetries: number;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:3001';
+    this.baseUrl = process.env.NEXT_PUBLIC_ENGINE_URL ?? '';
     this.secret = process.env.NEXT_PUBLIC_AUTOMATION_SECRET || 'dev-secret';
     this.clientId = process.env.NEXT_PUBLIC_CLIENT_ID || '';
     this.maxRetries = 3;

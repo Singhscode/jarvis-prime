@@ -503,6 +503,32 @@ router.patch('/settings', createAuthMiddleware(), async (req, res) => {
   }
 });
 
+router.post('/employee-invitations/activate', createRateLimiter({
+  windowMs: 15 * 60_000,
+  max: 5,
+  message: 'Too many activation attempts. Try again later.',
+}), async (req, res) => {
+  try {
+    const { activateEmployeeInvitation } = await import('./auth-service.js');
+    const result = await activateEmployeeInvitation(req.body);
+    if (!result.success) {
+      return res.status(result.status || statusCodes.BAD_REQUEST).json({
+        error: { code: result.error?.code || 'INVALID_EMPLOYEE_INVITATION', message: result.message },
+      });
+    }
+    return res.status(statusCodes.OK).json({
+      success: true,
+      message: result.message,
+      employee: result.employee,
+    });
+  } catch {
+    log.error('Employee invitation activation endpoint failed.');
+    return res.status(statusCodes.INTERNAL_ERROR).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Employee activation failed. Please try again.' },
+    });
+  }
+});
+
 /**
  * Refresh access token using refresh token
  * 

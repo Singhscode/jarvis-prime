@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ClientSignIn from '../components/ClientSignIn';
 
-const API_URL = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_ENGINE_URL;
 
 type Phase = 'capturing' | 'sign-in' | 'activating' | 'success' | 'error';
 

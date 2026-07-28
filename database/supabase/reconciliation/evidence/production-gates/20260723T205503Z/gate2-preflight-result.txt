@@ -1,0 +1,15 @@
+Gate 2: FAIL
+Target project: fytnwpnnvqecjmyhrzcx
+Target binding source: database/supabase/.temp/project-ref
+Cached linked PostgreSQL version: 17.6.1.121
+Supabase CLI: 2.109.1
+Approved source: database/supabase/reconciliation/00_read_only_preflight.sql
+Transport: Supabase Management API through `supabase db query --linked`
+Transport adaptation: in memory only; removed psql meta-directives and substituted approved expected values (leads=0, outreach_log=0, reviewed schema fingerprint); SQL package was not modified
+Transaction mode: BEGIN READ ONLY
+Result: STOP condition triggered
+Database error: STOP: migration history relation is missing
+Failed assertion: to_regclass('supabase_migrations.schema_migrations') is NULL
+Production writes: none
+Migration execution: none
+Disposition: stop; do not run migration dry-run or production migration

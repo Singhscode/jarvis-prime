@@ -205,3 +205,26 @@ engine/
   test/engine.test.js       unit tests
   .env.example              configuration template
 ```
+## Initial production Owner bootstrap
+
+The first production Owner is created exactly once by the internal interactive CLI. It is not an HTTP endpoint, registration shortcut, seed, or migration. The command refuses non-production targets, the wrong Supabase project, existing Owner accounts, existing email addresses, non-interactive input, and confirmation mismatches.
+
+Prerequisites and the complete controlled procedure are documented in [`documentation/INITIAL_OWNER_BOOTSTRAP_RUNBOOK.md`](../../documentation/INITIAL_OWNER_BOOTSTRAP_RUNBOOK.md).
+
+From the repository root, with `PRODUCTION_DATABASE_URL` and an absolute `PRODUCTION_DATABASE_CA_PATH` already injected into the current shell:
+
+```sh
+NODE_ENV=production npm run owner:bootstrap
+```
+
+The CA path is used only by this bootstrap connection. Its file must be readable, PEM encoded, smaller than 64 KiB, and exactly match the verified Supabase Root 2021 CA SHA-256 fingerprint. TLS certificate and hostname verification remain enabled.
+
+Passwords are entered through hidden prompts. Success output contains only:
+
+```text
+OWNER_BOOTSTRAP=PASS
+OWNER_ID=<uuid>
+AUDIT_ID=<uuid>
+```
+
+The operation creates one active, verified `client` account and its durable `owner.bootstrap_completed` audit marker in one transaction. Once that successful marker exists, every later invocation fails closed with `ALREADY_BOOTSTRAPPED`, even if the Owner's eligibility later changes. If COMMIT acknowledgement is lost, the service reconciles the exact Owner and marker through a fresh connection; an unprovable outcome fails closed with `COMMIT_OUTCOME_UNKNOWN` and must not be retried. Never delete, demote, or edit the Owner manually to make the command runnable again.

@@ -1,0 +1,18 @@
+Operational containment gate: STOPPED BEFORE VERIFIED EXECUTION
+Evidence timestamp UTC: 2026-07-26T20:23:43Z
+Target project: fytnwpnnvqecjmyhrzcx
+Approved source: database/supabase/reconciliation/01_contain_browser_access.sql
+Requested transport: psql "$PRODUCTION_DATABASE_URL" --no-psqlrc --set ON_ERROR_STOP=1 --file database/supabase/reconciliation/01_contain_browser_access.sql
+Safety guard: stop before psql if PRODUCTION_DATABASE_URL is unavailable in the execution process
+Tool result: command not executed; signal was cancelled
+Tool exit code: -1
+PostgreSQL output: none
+Transaction result: not started / not verified
+Lock timeout result: not exercised
+Statement timeout result: not exercised
+Containment assertions: not exercised
+Grant verification: not exercised
+RLS verification: not exercised
+Production changes: none evidenced; tool reported the command was not executed
+Stop condition: execution process cancelled
+Disposition: STOP; do not execute migrations; containment remains incomplete

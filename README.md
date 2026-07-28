@@ -93,7 +93,9 @@ All other variables are optional. See `apps/api/.env.example` for the full list.
 
 ## Development
 
-From the repo root (requires [Turborepo](https://turbo.build)):
+For the complete disposable Local Supabase, Owner Dashboard, seed-data, and end-to-end verification workflow, see [Local Owner Workspace development](./documentation/LOCAL_DEVELOPMENT.md).
+
+From the repo root:
 
 ```bash
 npm install
@@ -119,7 +121,7 @@ Website Lead → CRM Lead → Client → Project → Task → Employee Portal �
 
 The read-only Client Portal gives an active client member one server-derived CRM client scope for safe project and task visibility and approved private-document downloads. It reuses existing JWT/session authentication and adds hashed, single-use invitation activation, private Storage signing, explicit credentialed CORS, focused API/PostgreSQL/frontend coverage, and CI execution targets. Accessible loading, error, empty, sign-in, activation, and keyboard-operable download states are included without adding client writes, chat, billing, or internal CRM access.
 
-**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ⏳ Phase 8 Finance & Billing · ⏳ Phase 9 Communication Hub · ⏳ Phase 10 Automation Platform · ⏳ Phase 11 Analytics & Reporting · ⏳ Phase 12 Production & DevOps · ⏳ Phase 13 AI Foundation · ⏳ Phase 14 AI Sales Agents · ⏳ Phase 15 AI Operations · ⏳ Phase 16 Enterprise Security · 🚀 Version 1.0 Release
+**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ⏳ Phase 8 Owner Workspace (Dashboard) · ⏳ Phase 9 Finance & Billing · ⏳ Phase 10 Communication Hub · ⏳ Phase 11 Automation Platform · ⏳ Phase 12 Analytics & Reporting · ⏳ Phase 13 Production & DevOps · ⏳ Phase 14 AI Foundation · ⏳ Phase 15 AI Sales Agents · ⏳ Phase 16 AI Operations · ⏳ Phase 17 Enterprise Security · 🚀 Version 1.0 Release
 
 See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), and [changelog and Client Portal release notes](./documentation/roadmap/CHANGELOG.md).
 

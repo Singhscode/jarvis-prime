@@ -5,6 +5,8 @@ import {
 } from '../../middleware/auth-middleware.js';
 import { validate } from '../../middleware/validate.js';
 import * as crm from './crm.service.js';
+import { parseClientPortalDocument } from '../../middleware/client-portal-document-parser.js';
+export { parseClientPortalDocument } from '../../middleware/client-portal-document-parser.js';
 
 const router = Router();
 export const projectsRouter = Router();
@@ -179,63 +181,6 @@ projectsRouter.delete('/:projectId/tasks/:taskId', handle(async (req, res) => {
 export default router;
 
 export const clientPortalRouter = Router();
-
-function clientPortalValidationError(message) {
-  const error = new Error(message);
-  error.statusCode = 400;
-  error.code = 'VALIDATION_ERROR';
-  return error;
-}
-
-function parseClientPortalDocument(req, _res, next) {
-  if (!req.is('multipart/form-data')) {
-    return next(clientPortalValidationError('Client Portal document upload requires multipart/form-data.'));
-  }
-
-  void (async () => {
-    const { default: Busboy } = await import('busboy');
-    const parser = Busboy({
-      headers: req.headers,
-      limits: { files: 1, fields: 3, fileSize: 10 * 1024 * 1024 },
-    });
-    const fields = {};
-    let uploadedFile = null;
-    let parseError = null;
-    const fail = (message) => {
-      if (!parseError) parseError = clientPortalValidationError(message);
-    };
-
-    parser.on('field', (name, value) => {
-      if (Object.hasOwn(fields, name)) fail('Duplicate document metadata field.');
-      else fields[name] = value;
-    });
-    parser.on('file', (name, stream, info) => {
-      if (name !== 'file' || uploadedFile) {
-        fail('Only one document file is permitted.');
-        stream.resume();
-        return;
-      }
-      const chunks = [];
-      stream.on('data', (chunk) => chunks.push(chunk));
-      stream.on('limit', () => fail('Document file exceeds the permitted size.'));
-      stream.on('error', () => fail('Document upload failed.'));
-      stream.on('end', () => {
-        uploadedFile = { buffer: Buffer.concat(chunks), mimeType: info.mimeType };
-      });
-    });
-    parser.on('filesLimit', () => fail('Only one document file is permitted.'));
-    parser.on('fieldsLimit', () => fail('Too many document metadata fields.'));
-    parser.on('error', () => fail('Document upload failed.'));
-    parser.on('finish', () => {
-      if (parseError) return next(parseError);
-      if (!uploadedFile) return next(clientPortalValidationError('One document file is required.'));
-      req.body = fields;
-      req.clientPortalDocument = uploadedFile;
-      return next();
-    });
-    req.pipe(parser);
-  })().catch(next);
-}
 
 clientPortalRouter.use(createAuthMiddleware());
 clientPortalRouter.use(createAuthorizationMiddleware('client'));

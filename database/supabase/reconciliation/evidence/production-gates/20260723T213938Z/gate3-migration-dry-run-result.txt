@@ -1,0 +1,25 @@
+Gate 3 target-bound migration dry-run: PASS
+Timestamp UTC: 2026-07-23T21:39:38Z
+Target binding: `supabase db push --linked --workdir database --include-all --dry-run`
+Linked project: fytnwpnnvqecjmyhrzcx
+Supabase CLI: 2.109.1
+Runner result: DRY RUN — migrations will not be pushed
+Planned migration sequence (exactly 14):
+1. 20260715000000_create_outreach_schema.sql
+2. 20260715000001_create_auth_schema.sql
+3. 20260715000002_add_extensibility_columns.sql
+4. 20260715000003_create_leads.sql
+5. 20260715000004_create_crm_foundation.sql
+6. 20260715000005_create_client_management.sql
+7. 20260715000006_create_project_management.sql
+8. 20260715000007_create_crm_tasks.sql
+9. 20260715000008_add_employee_portal_scope.sql
+10. 20260718000009_grant_phase6_service_role_permissions.sql
+11. 20260718000010_create_client_portal.sql
+12. 20260723000011_reconcile_legacy_leads.sql
+13. 20260723000012_enforce_leads_email_uniqueness.sql
+14. 20260723000013_harden_server_only_access.sql
+Plan review: canonical 00000–00010 followed by reconciliation 00011–00013 in exact approved filename/dependency order; no unexpected migration file or SQL plan entry reported.
+Legacy adoption behavior: the runner discovered all 14 unapplied files against the unmanaged legacy baseline. Migration-history establishment remains deferred to the first successful non-dry migration-runner execution; this dry-run created no history.
+Production writes: none
+Production migrations: none

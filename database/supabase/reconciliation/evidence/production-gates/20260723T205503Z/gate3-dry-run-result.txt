@@ -1,0 +1,5 @@
+Gate 3: NOT RUN
+Reason: Gate 2 approved read-only preflight failed on a mandatory stop condition (`supabase_migrations.schema_migrations` is missing).
+Target-bound migration dry-run was not invoked.
+Production migrations executed: none
+Disposition: NO-GO pending a separately reviewed resolution of the preflight/history baseline mismatch.

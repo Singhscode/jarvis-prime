@@ -126,6 +126,8 @@ export async function createApp(options = {}) {
   app.use('/api/projects', projectsRouter);
   app.use('/api/employee-portal', employeePortalRouter);
   app.use('/api/client-portal', clientPortalRouter);
+  const { default: ownerWorkspaceRouter } = await import('./modules/owner-workspace/owner-workspace.routes.js');
+  app.use('/api/owner-workspace', ownerWorkspaceRouter);
 
   // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());
