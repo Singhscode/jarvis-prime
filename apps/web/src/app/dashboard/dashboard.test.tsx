@@ -51,6 +51,6 @@ describe('Owner Workspace dashboard', () => {
 
   it('shows safe recovery guidance when the backend is unavailable', async () => {
     globalThis.fetch = vi.fn(async () => { throw new TypeError('Failed to fetch'); }) as unknown as typeof fetch; renderDashboard();
-    expect(await screen.findByText('Backend service is not running. Please start the API server.')).toBeTruthy();
+    expect(await screen.findByText('Unable to reach the API. This may be caused by network connectivity or CORS configuration.')).toBeTruthy();
   });
 });

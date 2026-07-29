@@ -336,3 +336,10 @@ The estimate stays within the approved range because the plan reuses current aut
 
 ## Final Approval Boundary
 `tasks.md` is complete as an implementation plan only. Do not write implementation code, migrations, authentication changes, Employee Portal changes, Client Portal changes, CI changes, deployment changes, infrastructure changes, commits, tags, or pushes until explicit implementation approval is granted.
+
+## Approved Direct Client Creation Addendum — July 30, 2026
+
+1. Add one additive migration for direct-client fields, owner-scoped case-insensitive email uniqueness, and a single PostgreSQL-generated display Client ID on `crm_clients`; preserve conversion compatibility.
+2. Add a direct-create CRM service/repository path and dispatch it only through the existing Owner Workspace clients collection POST when no `lead_id` is supplied. Keep legacy CRM client POST and lead conversion unchanged.
+3. Add one local, accessible New Client dialog to the existing Clients page. Submit through the Owner Workspace API, refresh the in-memory list, and highlight the returned client without a page reload.
+4. Add focused API, migration, and dashboard tests for direct creation, validation, duplicate email, generated Client ID, list refresh/highlight, and Lead → Client conversion regression.

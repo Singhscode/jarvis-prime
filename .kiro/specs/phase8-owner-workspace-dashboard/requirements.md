@@ -240,3 +240,7 @@ Phase 8 SHALL be implemented, if approved, as small independently reviewable inc
 
 ## 24. Approval Boundary
 This requirements document is complete for Phase 8 planning. It authorizes neither a design nor implementation. Phase 8 technical design, tasks, code, database/schema work, API changes, authentication changes, test/CI changes, deployment work, commits, tags, and pushes require explicit subsequent approval.
+
+## Approved Direct Client Creation Addendum — July 30, 2026
+
+This approved additive enhancement permits an authenticated Owner to create an in-scope `crm_clients` record directly from the Owner Workspace Clients page. The direct request requires client name, email, phone, and company, with optional notes; the server derives owner scope exclusively from `req.user.sub`. A server-generated display Client ID is returned, and no browser may supply the ID, status, or owner scope. The existing Website Lead → CRM Lead → Client conversion workflow, its API contract, its ownership checks, and its atomic contact/lead linkage remain unchanged. This addendum authorizes only the minimum additive client schema, owner-facade request branch, validation, client-list UI, and verification required for direct creation; it does not authorize profile, Client Portal, project, task, document, invoice, activity, authentication, authorization, or other workflow changes.

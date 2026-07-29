@@ -31,7 +31,7 @@ export type OwnerPage<T> = { items: T[]; pageInfo: { nextCursor: string | null; 
 export type OwnerCompany = { id: string; name: string; created_at: string; updated_at: string };
 export type OwnerContact = { id: string; name: string; email: string | null; phone: string | null; title: string | null; company_id: string | null; client_id: string | null; created_at: string; updated_at: string };
 export type OwnerLead = { id: string; contact_id: string; created_at: string };
-export type OwnerClient = { id: string; name: string; created_at: string; updated_at: string };
+export type OwnerClient = { id: string; client_code: string; name: string; created_at: string; updated_at: string };
 export type ClientPortalMembership = { id: string; status: 'pending' | 'active' | 'revoked'; created_at: string; updated_at: string; activated_at: string | null; revoked_at: string | null; contact: Pick<OwnerContact, 'id' | 'name' | 'email' | 'title'> | null };
 export type ClientPortalAdministration = { memberships: ClientPortalMembership[]; pageInfo: { nextCursor: string | null; hasNextPage: boolean }; activity: { status: SourceStatus; source: string; asOf: string; reason?: string; items: { id: string; label: string; status: string; timestamp: string }[] } };
 

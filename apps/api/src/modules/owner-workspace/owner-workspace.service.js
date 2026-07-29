@@ -77,7 +77,12 @@ export function listCrmLeads(ownerUserId, query) { return crm.listOwnerLeads(own
 export function getCrmLead(ownerUserId, id) { return crm.getOwnerLead(ownerUserId, id); }
 export function createCrmLead(ownerUserId, contactId) { return crm.createLead(ownerUserId, contactId); }
 export function listClients(ownerUserId, query) { return crm.listOwnerClients(ownerUserId, query); }
-export function createClient(ownerUserId, values) { return crm.createClient(ownerUserId, values); }
+export function createClient(ownerUserId, values) {
+  if (values && typeof values === 'object' && !Array.isArray(values) && Object.hasOwn(values, 'lead_id')) {
+    return crm.createClient(ownerUserId, values);
+  }
+  return crm.createDirectClient(ownerUserId, values);
+}
 export function updateClient(ownerUserId, id, values) { return crm.updateClient(ownerUserId, id, values); }
 
 export async function getClientDetail(ownerUserId, clientId, query) {

@@ -5,6 +5,9 @@ const NAME_FIELDS = ['name'];
 const CONTACT_FIELDS = ['name', 'email', 'phone', 'title', 'company_id'];
 const CLIENT_CONTACT_FIELDS = ['name', 'email', 'phone', 'title'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DIRECT_CLIENT_FIELDS = ['name', 'email', 'phone', 'company', 'notes'];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
 function assertAllowedFields(values, allowedFields) {
   const invalid = Object.keys(values).filter((field) => !allowedFields.includes(field));
@@ -30,6 +33,40 @@ function optionalText(value, field) {
 function nameValues(values) {
   assertAllowedFields(values, NAME_FIELDS);
   return { name: requiredText(values.name, 'name') };
+}
+
+function requiredBoundedText(value, field, min, max) {
+  const text = requiredText(value, field);
+  if (text.length < min || text.length > max) {
+    throw new AppError(`Field '${field}' must be between ${min} and ${max} characters.`, 400, 'VALIDATION_ERROR');
+  }
+  return text;
+}
+
+function directClientValues(values) {
+  requireBodyObject(values);
+  assertAllowedFields(values, DIRECT_CLIENT_FIELDS);
+  const name = requiredBoundedText(values.name, 'name', 2, 150);
+  const email = requiredBoundedText(values.email, 'email', 1, 254).toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new AppError("Field 'email' must be a valid email address.", 400, 'VALIDATION_ERROR');
+  }
+  const phone = requiredText(values.phone, 'phone');
+  if (!PHONE_PATTERN.test(phone)) {
+    throw new AppError("Field 'phone' must be a valid international phone number.", 400, 'VALIDATION_ERROR');
+  }
+  const company = requiredBoundedText(values.company, 'company', 2, 150);
+  let notes = null;
+  if (Object.hasOwn(values, 'notes') && values.notes !== null) {
+    if (typeof values.notes !== 'string') {
+      throw new AppError("Field 'notes' must be a string or null.", 400, 'VALIDATION_ERROR');
+    }
+    notes = values.notes.trim() || null;
+    if (notes && notes.length > 2000) {
+      throw new AppError("Field 'notes' must be at most 2000 characters.", 400, 'VALIDATION_ERROR');
+    }
+  }
+  return { name, email, phone, company, notes };
 }
 
 function contactValues(values, requireName) {
@@ -176,6 +213,18 @@ export async function createClient(ownerUserId, values) {
       throw new AppError('Lead conversion could not be completed.', 409, 'LEAD_CONVERSION_CONFLICT');
     }
     throw error;
+  }
+}
+
+export async function createDirectClient(ownerUserId, values) {
+  const directClient = directClientValues(values);
+  try {
+    return await repo.createDirectClient(ownerUserId, directClient);
+  } catch (error) {
+    if (error?.code === '23505') {
+      throw new AppError('A client with that email already exists.', 409, 'CLIENT_EMAIL_EXISTS');
+    }
+    throw new AppError('Client creation failed.', 500, 'INTERNAL_ERROR', false);
   }
 }
 

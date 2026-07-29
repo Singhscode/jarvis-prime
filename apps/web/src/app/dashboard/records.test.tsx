@@ -3,6 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardLayout from './layout';
 import OwnerCrmWorkspace from './components/OwnerCrmWorkspace';
+import OwnerClientsWorkspace from './components/OwnerClientsWorkspace';
 import ClientPortalAdministration from './components/ClientPortalAdministration';
 
 process.env.NEXT_PUBLIC_ENGINE_URL = 'http://api.test';
@@ -72,3 +73,37 @@ describe('Owner Workspace CRM and clients', () => {
     expect(document.body.textContent).not.toMatch(/token_hash|storage_path|raw-invitation/);
   });
 });
+
+
+  it('creates a direct client, refreshes the list, and highlights the generated Client ID', async () => {
+    const user = userEvent.setup();
+    const directClient = { id: 'client-2', client_code: 'JP-CLI-000042', name: 'New Acme', created_at: asOf, updated_at: asOf };
+    let created = false;
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+      if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+      if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
+      if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: created ? [directClient] : [], pageInfo: { nextCursor: null, hasNextPage: false } } });
+      if (url.endsWith('/api/owner-workspace/clients') && init?.method === 'POST') {
+        expect(JSON.parse(init.body as string)).toEqual({ name: 'New Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd', notes: 'Enterprise customer' });
+        created = true;
+        return json({ success: true, data: directClient }, 201);
+      }
+      return json({ error: { message: 'Unexpected test request' } }, 500);
+    });
+    globalThis.fetch = fetch as unknown as typeof fetch;
+    renderWorkspace(<OwnerClientsWorkspace />);
+    await user.click(await screen.findByRole('button', { name: 'New Client' }));
+    await user.type(screen.getByLabelText('Client Name'), 'New Acme');
+    await user.type(screen.getByLabelText('Email'), 'hello@acme.test');
+    await user.type(screen.getByLabelText('Phone'), '+919876543210');
+    await user.type(screen.getByLabelText('Company'), 'Acme Pvt Ltd');
+    await user.type(screen.getByLabelText(/Notes/), 'Enterprise customer');
+    await user.click(screen.getByRole('button', { name: 'Create Client' }));
+    const status = await screen.findByRole('status');
+    expect(status.textContent).toContain('JP-CLI-000042');
+    expect(await screen.findByText('New Acme')).toBeTruthy();
+    expect(screen.getAllByText(/JP-CLI-000042/).length).toBeGreaterThanOrEqual(2);
+    await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.toString().includes('sort=created_at%3Adesc'))).toBe(true));
+  });

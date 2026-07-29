@@ -550,3 +550,28 @@ describe('Response-aware Rate Limiter', () => {
     limiter._cleanup();
   });
 });
+
+
+describe('Direct client validation', () => {
+  test('rejects invalid direct-client fields before database access', async () => {
+    const { createDirectClient } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createDirectClient('user-123', { name: 'A', email: 'not-an-email', phone: '123', company: 'A' }),
+      { code: 'VALIDATION_ERROR' }
+    );
+    await assert.rejects(
+      createDirectClient('user-123', { name: 'Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd', client_code: 'JP-CLI-000001' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
+
+  test('keeps the legacy conversion service conversion-only', async () => {
+    const { createClient } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createClient('user-123', { name: 'Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd' }),
+      { code: 'INVALID_FIELDS' }
+    );
+  });
+});
