@@ -79,6 +79,10 @@ const num = (v, fallback) => {
   const n = parseInt(v, 10);
   return Number.isFinite(n) ? n : fallback;
 };
+const sameSite = (v) => {
+  const value = String(v || 'strict').toLowerCase();
+  return ['strict', 'lax', 'none'].includes(value) ? value : 'strict';
+};
 
 export const config = {
   // Environment
@@ -96,6 +100,7 @@ export const config = {
   // Authentication (JWT — user-facing auth layer)
   jwtSecret: env.JWT_SECRET || '',
   encryptionKey: env.ENCRYPTION_KEY || '',
+  refreshCookieSameSite: sameSite(env.REFRESH_COOKIE_SAME_SITE),
 
   // Database
   supabaseUrl: env.SUPABASE_URL || '',

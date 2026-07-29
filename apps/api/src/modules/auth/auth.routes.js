@@ -15,6 +15,7 @@ import {
 import * as repo from './repository.js';
 import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
 import { createRateLimiter } from '../../middleware/rate-limiter.js';
+import { config } from '../../config/config.js';
 import { statusCodes, auth } from './constants.js';
 import { log } from '../../utils/logger.js';
 
@@ -149,7 +150,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       res.cookie('refreshToken', result.tokens.refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: config.refreshCookieSameSite,
         maxAge: auth.login.refreshTokenExpiryMs,
         path: '/api/auth',
       });
@@ -206,7 +207,7 @@ router.post('/logout', createAuthMiddleware(), async (req, res) => {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: config.refreshCookieSameSite,
       path: '/api/auth',
     });
 
@@ -533,7 +534,7 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
       res.clearCookie('refreshToken', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: config.refreshCookieSameSite,
         path: '/api/auth',
       });
       return res.status(result.status || statusCodes.UNAUTHORIZED).json({
@@ -548,7 +549,7 @@ router.post('/refresh', refreshLimiter, async (req, res) => {
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: config.refreshCookieSameSite,
       maxAge: auth.login.refreshTokenExpiryMs,
       path: '/api/auth',
     });

@@ -9,7 +9,7 @@ type WorkspaceState = { bootstrap: OwnerBootstrap | null; dashboard: OwnerDashbo
 const WorkspaceContext = createContext<WorkspaceState | null>(null);
 
 function displayError(caught: unknown, fallback: string) {
-  if (caught instanceof TypeError) return 'Backend service is not running. Please start the API server.';
+  if (caught instanceof TypeError) return 'Unable to reach the API. This may be caused by network connectivity or CORS configuration.';
   return caught instanceof Error ? caught.message : fallback;
 }
 

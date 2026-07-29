@@ -84,7 +84,7 @@ describe('Employee Portal', () => {
     const routes = await readFile(new URL('../src/modules/auth/auth.routes.js', import.meta.url), 'utf8');
     const refreshRoute = routes.slice(routes.indexOf("router.post('/refresh'"));
     const failureBranch = refreshRoute.slice(0, refreshRoute.indexOf('// Rotate the cookie'));
-    assert.match(failureBranch, /res\.clearCookie\('refreshToken', \{[\s\S]*httpOnly: true,[\s\S]*secure: process\.env\.NODE_ENV === 'production',[\s\S]*sameSite: 'strict',[\s\S]*path: '\/api\/auth',[\s\S]*\}\);/);
+    assert.match(failureBranch, /res\.clearCookie\('refreshToken', \{[\s\S]*httpOnly: true,[\s\S]*secure: process\.env\.NODE_ENV === 'production',[\s\S]*sameSite: config\.refreshCookieSameSite,[\s\S]*path: '\/api\/auth',[\s\S]*\}\);/);
   });
 
   test('reloads active employee status and requires portal owner scope', async () => {
