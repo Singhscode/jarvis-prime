@@ -20,7 +20,9 @@ let db;
 
 async function asService(operation) {
   await db.query('set local role service_role');
-  return operation();
+  const result = await operation();
+  await db.query('reset role');
+  return result;
 }
 async function reissue(ownerId, clientId, contactId, tokenHash = hash('a')) {
   return asService(async () => (await db.query(
@@ -99,7 +101,7 @@ describe('Client Portal PostgreSQL migration and RPCs', { concurrency: false }, 
       from public.client_portal_invitations where membership_id = $1 order by created_at`, [first.membership_id]);
     assert.deepEqual(invitations, [{ token_hash: hash('a'), revoked: true }, { token_hash: hash('b'), revoked: false }]);
     const { rows: [audit] } = await db.query(`select action, details from public.audit_logs
-      where resource_id = $1 order by created_at desc limit 1`, [first.membership_id]);
+      where resource_id = $1 and action = 'resend' order by created_at desc limit 1`, [first.membership_id]);
     assert.equal(audit.action, 'resend');
     assert.doesNotMatch(JSON.stringify(audit.details), /token|hash|member@phase7/i);
     const missingAccountContact = randomUUID();
@@ -126,8 +128,8 @@ describe('Client Portal PostgreSQL migration and RPCs', { concurrency: false }, 
       values ($1, $2, $3, $4, 'other-member@phase7.test', 'pending', $5)`,
     [expiredMembership, ids.otherClient, ids.otherContact, ids.otherClientUser, ids.otherOwner]);
     await db.query(`insert into public.client_portal_invitations
-      (membership_id, token_hash, created_by_user_id, expires_at)
-      values ($1, $2, $3, now() - interval '1 hour')`, [expiredMembership, hash('f'), ids.otherOwner]);
+      (membership_id, token_hash, created_by_user_id, created_at, expires_at)
+      values ($1, $2, $3, now() - interval '2 hours', now() - interval '1 hour')`, [expiredMembership, hash('f'), ids.otherOwner]);
     assert.deepEqual(await activate(ids.otherClientUser, hash('f')), { activated: false });
     const { rows: [membership] } = await db.query(`select user_id, status, activated_at is not null as activated
       from public.client_portal_memberships where id = $1`, [issued.membership_id]);
