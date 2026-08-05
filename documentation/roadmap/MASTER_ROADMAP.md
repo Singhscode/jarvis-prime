@@ -22,7 +22,7 @@
 - Server-side Owner Workspace authorization denies Employee Portal and Client Portal identities before protected handlers execute.
 - Owner responses do not expose storage paths, signed URLs, invitation values, raw audit contents, credentials, or persistent browser state.
 - API, Owner Workspace, Employee Portal, Client Portal, frontend, lint, type-check, diagnostics, and production-build release validation passed.
-- Phase 8 is frozen after release; only bug fixes are permitted.
+- Phase 8 is frozen after release; only bug fixes are permitted, except the explicitly approved July 30, 2026 Direct Client Creation addendum.
 
 ## Phase 7 — Client Portal
 

@@ -150,6 +150,23 @@ export async function listClients(ownerUserId) {
   return data || [];
 }
 
+export async function createDirectClient(ownerUserId, values) {
+  const { data, error } = await client()
+    .from('crm_clients')
+    .insert({
+      owner_user_id: ownerUserId,
+      name: values.name,
+      email: values.email,
+      phone: values.phone,
+      company: values.company,
+      notes: values.notes,
+    })
+    .select('id,client_code,name,created_at,updated_at')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function convertLeadToClient(ownerUserId, leadId, contactId, name) {
   const { data, error } = await client().rpc('convert_crm_lead_to_client', {
     p_owner_user_id: ownerUserId,
@@ -630,11 +647,11 @@ export function getOwnerLead(ownerUserId, id) {
 }
 
 export function listOwnerClientsPage(ownerUserId, options) {
-  return listPage('crm_clients', 'id,name,created_at,updated_at', ownerUserId, options, 'name');
+  return listPage('crm_clients', 'id,client_code,name,created_at,updated_at', ownerUserId, options, 'name');
 }
 
 export function getOwnerClient(ownerUserId, id) {
-  return getOwnerRecord('crm_clients', 'id,name,created_at,updated_at', ownerUserId, id);
+  return getOwnerRecord('crm_clients', 'id,client_code,name,created_at,updated_at', ownerUserId, id);
 }
 
 export function listOwnerClientContactsPage(ownerUserId, clientId, options) {

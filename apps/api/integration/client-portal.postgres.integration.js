@@ -19,10 +19,17 @@ const hash = (suffix) => `${suffix}`.repeat(64).slice(0, 64);
 let db;
 
 async function asService(operation) {
-  await db.query('set local role service_role');
-  const result = await operation();
-  await db.query('reset role');
-  return result;
+  await db.query('savepoint service_role_operation');
+  await db.query('set role service_role');
+  try {
+    const result = await operation();
+    await db.query('reset role');
+    await db.query('release savepoint service_role_operation');
+    return result;
+  } catch (error) {
+    await db.query('rollback to savepoint service_role_operation');
+    throw error;
+  }
 }
 async function reissue(ownerId, clientId, contactId, tokenHash = hash('a')) {
   return asService(async () => (await db.query(
@@ -40,6 +47,7 @@ async function rejected(operation) {
   let error;
   try { await operation(); } catch (caught) { error = caught; }
   await db.query('rollback to savepoint expected_failure');
+  await db.query('release savepoint expected_failure');
   assert.ok(error, 'operation should fail');
   return { code: error.code, message: error.message };
 }
@@ -101,7 +109,7 @@ describe('Client Portal PostgreSQL migration and RPCs', { concurrency: false }, 
       from public.client_portal_invitations where membership_id = $1 order by created_at`, [first.membership_id]);
     assert.deepEqual(invitations, [{ token_hash: hash('a'), revoked: true }, { token_hash: hash('b'), revoked: false }]);
     const { rows: [audit] } = await db.query(`select action, details from public.audit_logs
-      where resource_id = $1 and action = 'resend' order by created_at desc limit 1`, [first.membership_id]);
+      where resource_id = $1 and action = 'resend' limit 1`, [first.membership_id]);
     assert.equal(audit.action, 'resend');
     assert.doesNotMatch(JSON.stringify(audit.details), /token|hash|member@phase7/i);
     const missingAccountContact = randomUUID();
@@ -187,5 +195,39 @@ describe('Client Portal PostgreSQL migration and RPCs', { concurrency: false }, 
     const { rows: [count] } = await db.query(`select count(*)::int as count from public.client_portal_documents
       where storage_path = 'client/rollback.pdf'`);
     assert.equal(count.count, 0);
+  });
+
+  test('generates one display Client ID mechanism for direct and converted clients', async () => {
+    await db.query('set role postgres');
+    const directClientId = randomUUID();
+    const otherOwnerClientId = randomUUID();
+    const { rows: [direct] } = await db.query(`insert into public.crm_clients
+      (id, owner_user_id, name, email, phone, company, notes)
+      values ($1, $2, 'Direct Client', 'direct@phase8.test', '+919876543210', 'Direct Co', 'Created directly')
+      returning id, client_code, email, phone, company, notes`, [directClientId, ids.owner]);
+    assert.equal(direct.id, directClientId);
+    assert.match(direct.client_code, /^JP-CLI-\d+$/);
+    assert.equal(direct.email, 'direct@phase8.test');
+    assert.equal(direct.phone, '+919876543210');
+    assert.equal(direct.company, 'Direct Co');
+    assert.equal(direct.notes, 'Created directly');
+    const { rows: [legacy] } = await db.query('select client_code from public.crm_clients where id = $1', [ids.client]);
+    assert.match(legacy.client_code, /^JP-CLI-\d+$/);
+    await db.query(`insert into public.crm_clients (id, owner_user_id, name, email, phone, company)
+      values ($1, $2, 'Other Direct Client', 'direct@phase8.test', '+919876543211', 'Other Co')`, [otherOwnerClientId, ids.otherOwner]);
+    const duplicate = await rejected(() => db.query(`insert into public.crm_clients
+      (owner_user_id, name, email, phone, company) values ($1, 'Duplicate', 'DIRECT@PHASE8.TEST', '+919876543212', 'Direct Co')`, [ids.owner]));
+    assert.equal(duplicate.code, '23505');
+
+    const conversionContactId = randomUUID(); const conversionLeadId = randomUUID();
+    await db.query(`insert into public.contacts (id, owner_user_id, name) values ($1, $2, 'Conversion Contact')`, [conversionContactId, ids.owner]);
+    await db.query(`insert into public.crm_leads (id, owner_user_id, contact_id) values ($1, $2, $3)`, [conversionLeadId, ids.owner, conversionContactId]);
+    const { rows: [converted] } = await db.query(`select * from public.convert_crm_lead_to_client($1, $2, $3, 'Converted Client')`, [ids.owner, conversionLeadId, conversionContactId]);
+    assert.match(converted.client_code, /^JP-CLI-\d+$/);
+    assert.notEqual(converted.client_code, direct.client_code);
+    const { rows: [linked] } = await db.query(`select
+      (select client_id from public.crm_leads where id = $1) as lead_client_id,
+      (select client_id from public.contacts where id = $2) as contact_client_id`, [conversionLeadId, conversionContactId]);
+    assert.deepEqual(linked, { lead_client_id: converted.id, contact_client_id: converted.id });
   });
 });

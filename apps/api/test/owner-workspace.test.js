@@ -483,3 +483,92 @@ test('returns bounded grouped owner search results and validates query input', a
   });
   for (const rawUrl of calls) { const url = new URL(rawUrl); assert.equal(url.searchParams.get('owner_user_id') || url.searchParams.get('crm_clients.owner_user_id') || url.searchParams.get('portal_owner_user_id'), `eq.${ownerId}`); }
 });
+
+
+test('creates a direct client with JWT-derived owner scope and a database-generated display ID', async () => {
+  calls.length = 0;
+  const clientId = '30000000-0000-4000-8000-000000000003';
+  let insertBody;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_clients') && init.method === 'POST') {
+      insertBody = JSON.parse(init.body);
+      return json({ id: clientId, client_code: 'JP-CLI-000001', name: 'Acme', created_at: '2026-07-30T00:00:00.000Z', updated_at: '2026-07-30T00:00:00.000Z' });
+    }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Acme', email: 'HELLO@ACME.TEST', phone: '+919876543210', company: 'Acme Pvt Ltd', notes: 'Enterprise customer', owner_user_id: 'attacker' }),
+    });
+    assert.equal(response.status, 400);
+
+    const created = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Acme', email: 'HELLO@ACME.TEST', phone: '+919876543210', company: 'Acme Pvt Ltd', notes: 'Enterprise customer' }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual((await created.json()).data, { id: clientId, client_code: 'JP-CLI-000001', name: 'Acme', created_at: '2026-07-30T00:00:00.000Z', updated_at: '2026-07-30T00:00:00.000Z' });
+  });
+  assert.deepEqual(insertBody, { owner_user_id: ownerId, name: 'Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd', notes: 'Enterprise customer' });
+  const insert = new URL(calls.find((url) => url.includes('/crm_clients?')));
+  assert.equal(insert.searchParams.get('select'), 'id,client_code,name,created_at,updated_at');
+});
+
+test('validates direct client input and maps duplicate email safely', async () => {
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_clients') && init.method === 'POST') return json({ code: '23505', message: 'duplicate key detail' }, 409);
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' };
+    const invalid = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, { method: 'POST', headers, body: JSON.stringify({ name: 'A', email: 'not-an-email', phone: '123', company: 'A' }) });
+    assert.equal(invalid.status, 400); assert.equal((await invalid.json()).error.code, 'VALIDATION_ERROR');
+    const duplicate = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, { method: 'POST', headers, body: JSON.stringify({ name: 'Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd' }) });
+    assert.equal(duplicate.status, 409); const duplicateBody = await duplicate.json();
+    assert.equal(duplicateBody.error.code, 'CLIENT_EMAIL_EXISTS'); assert.doesNotMatch(JSON.stringify(duplicateBody), /duplicate key detail/i);
+  });
+});
+
+test('preserves the existing Lead to Client conversion branch on the Owner clients endpoint', async () => {
+  const leadId = '30000000-0000-4000-8000-000000000003'; const contactId = '40000000-0000-4000-8000-000000000004'; let rpcBody;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_leads')) return json({ id: leadId, contact_id: contactId });
+    if (url.pathname.endsWith('/rpc/convert_crm_lead_to_client')) { rpcBody = JSON.parse(init.body); return json({ id: '50000000-0000-4000-8000-000000000005', client_code: 'JP-CLI-000002', name: 'Converted client' }); }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ lead_id: leadId, name: 'Converted client' }),
+    });
+    assert.equal(response.status, 201);
+  });
+  assert.deepEqual(rpcBody, { p_owner_user_id: ownerId, p_lead_id: leadId, p_contact_id: contactId, p_name: 'Converted client' });
+});
+
+test('redacts unexpected direct-client database failures', async () => {
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_clients') && init.method === 'POST') {
+      return json({ code: 'XX000', message: 'raw PostgreSQL detail: internal schema failure' }, 500);
+    }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd' }),
+    });
+    assert.equal(response.status, 500);
+    const body = await response.json();
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(body.error.message, 'Internal server error');
+    assert.doesNotMatch(JSON.stringify(body), /raw PostgreSQL detail|internal schema failure/i);
+  });
+});
