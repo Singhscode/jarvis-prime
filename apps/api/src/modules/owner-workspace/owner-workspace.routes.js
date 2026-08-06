@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
+import { createRateLimiter } from '../../middleware/rate-limiter.js';
 import { parseClientPortalDocument } from '../../middleware/client-portal-document-parser.js';
 import * as workspace from './owner-workspace.service.js';
 
@@ -7,6 +8,8 @@ const router = Router();
 const handle = (handler) => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
 const respond = (res, data, status = 200) => { res.set('Cache-Control', 'private, no-store'); res.status(status).json({ success: true, data }); };
 const authorize = (req, _res, next) => Promise.resolve(workspace.assertOwnerWorkspaceAccess(req.user.sub)).then(() => next(), next);
+const employeeInvitationLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 5, keyFn: (req) => `owner-employee-invitation:${req.user?.sub || req.ip}`, message: 'Too many employee invitation attempts. Try again later.' });
+const automationRunLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 10, keyFn: (req) => `owner-automation-run:${req.user?.sub || req.ip}`, message: 'Too many automation requests. Try again later.' });
 router.use(createAuthMiddleware());
 router.use(authorize);
 
@@ -48,7 +51,11 @@ router.patch('/projects/:projectId/tasks/:taskId', handle(async (req, res) => re
 router.get('/tasks', handle(async (req, res) => respond(res, await workspace.listTasks(req.user.sub, req.query))));
 router.get('/tasks/:taskId', handle(async (req, res) => respond(res, await workspace.getTaskDetail(req.user.sub, req.params.taskId))));
 router.get('/employees', handle(async (req, res) => respond(res, await workspace.listEmployees(req.user.sub, req.query))));
+router.post('/employees', employeeInvitationLimiter, handle(async (req, res) => respond(res, await workspace.createEmployeeInvitation(req.user.sub, req.body), 201)));
+router.post('/employees/:employeeId/resend-invitation', employeeInvitationLimiter, handle(async (req, res) => respond(res, await workspace.resendEmployeeInvitation(req.user.sub, req.params.employeeId))));
 router.get('/employees/:employeeId', handle(async (req, res) => respond(res, await workspace.getEmployeeDetail(req.user.sub, req.params.employeeId, req.query))));
+router.post('/automation-runs', automationRunLimiter, handle(async (req, res) => respond(res, await workspace.createAutomationRun(req.user.sub, req.body, req.get('Idempotency-Key')), 202)));
+router.get('/automation-runs/:runId', handle(async (req, res) => respond(res, await workspace.getAutomationRun(req.user.sub, req.params.runId))));
 
 router.get('/documents', handle(async (req, res) => respond(res, await workspace.listDocuments(req.user.sub, req.query))));
 router.post('/documents', parseClientPortalDocument, handle(async (req, res) => respond(res, await workspace.publishDocument(req.user.sub, req.body, req.clientPortalDocument), 201)));

@@ -58,7 +58,7 @@ export type OwnerEmployeeDetail = { employee: OwnerEmployee; projects: OwnerTask
 
 
 export type OwnerDocument = { id: string; title: string; documentType: 'deliverable' | 'report'; client: Pick<OwnerClient, 'id' | 'name'> | null; project: { id: string; name: string } | null; visibility: 'visible' | 'revoked'; createdAt: string; revokedAt: string | null };
-export type OwnerAuditEvent = { id: string; label: string; category: 'security' | 'invitations' | 'documents'; action: string; success: boolean; resourceType: string | null; resourceId: string | null; createdAt: string };
+export type OwnerAuditEvent = { id: string; label: string; category: 'security' | 'invitations' | 'employees' | 'automation' | 'documents'; action: string; success: boolean; resourceType: string | null; resourceId: string | null; createdAt: string };
 export type OwnerSettingStatus = { label: string; status: SourceStatus; source: string; asOf: string; reason?: string; value?: string };
 export type OwnerSettingsStatus = { asOf: string; api: OwnerSettingStatus; environment: OwnerSettingStatus; companyProfile: OwnerSettingStatus; branding: OwnerSettingStatus; integrations: OwnerSettingStatus; editableSettings: OwnerSettingStatus };
 export type OwnerSearchResult = { id: string; label: string; detail?: string; href: string };

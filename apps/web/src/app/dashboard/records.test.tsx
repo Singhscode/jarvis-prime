@@ -107,3 +107,11 @@ describe('Owner Workspace CRM and clients', () => {
     expect(screen.getAllByText(/JP-CLI-000042/).length).toBeGreaterThanOrEqual(2);
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.toString().includes('sort=created_at%3Adesc'))).toBe(true));
   });
+
+
+it('opens the existing direct-client dialog from the quick-action handoff', async () => {
+  window.history.replaceState(null, '', '/dashboard/clients#new-client');
+  ownerFetch(); renderWorkspace(<OwnerClientsWorkspace />);
+  expect(await screen.findByRole('dialog', { name: 'New Client' })).toBeTruthy();
+  window.history.replaceState(null, '', '/dashboard/clients');
+});

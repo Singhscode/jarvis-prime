@@ -1,6 +1,113 @@
 import { AppError } from '../../middleware/error-handler.js';
+import { queue } from '../../jobs/queue.js';
+import { generateToken, hashToken, isValidEmailFormat, normalizeEmail } from '../auth/crypto.js';
+import { sendTransactionalEmail } from '../../integrations/email-sender.js';
 import * as crm from '../crm/crm.service.js';
 import * as repository from './owner-workspace.repository.js';
+
+const EMPLOYEE_INVITATION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+const AUTOMATION_WORKFLOW = 'workspace_summary';
+const AUTOMATION_JOB_TYPE = 'owner_workspace_summary';
+let automationWorkerRegistered = false;
+
+function inviteValues(values) {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) throw new AppError('Employee invitation is invalid.', 400, 'VALIDATION_ERROR');
+  const allowed = new Set(['full_name', 'email', 'department', 'phone']);
+  if (Object.keys(values).some((key) => !allowed.has(key))) throw new AppError('Employee invitation is invalid.', 400, 'VALIDATION_ERROR');
+  const text = (value, field, max) => {
+    if (typeof value !== 'string') throw new AppError(`${field} is invalid.`, 400, 'VALIDATION_ERROR');
+    const trimmed = value.trim();
+    if (trimmed.length < 2 || trimmed.length > max) throw new AppError(`${field} is invalid.`, 400, 'VALIDATION_ERROR');
+    return trimmed;
+  };
+  const email = normalizeEmail(values.email);
+  if (!isValidEmailFormat(email) || email.length > 254) throw new AppError('Email is invalid.', 400, 'VALIDATION_ERROR');
+  const phone = values.phone?.trim();
+  if (typeof phone !== 'string' || !/^\+[1-9][0-9]{7,14}$/.test(phone)) throw new AppError('Phone is invalid.', 400, 'VALIDATION_ERROR');
+  return { fullName: text(values.full_name, 'Name', 150), email, department: text(values.department, 'Department', 80), phone };
+}
+
+function publicEmployeeInvitationError(error) {
+  const message = error?.message || '';
+  if (message.includes('EMPLOYEE_INVITATION_NOT_FOUND')) return new AppError('Employee invitation not found.', 404, 'EMPLOYEE_INVITATION_NOT_FOUND');
+  if (message.includes('EMPLOYEE_INVITATION_NOT_AVAILABLE')) return new AppError('Employee invitation cannot be sent for this employee.', 409, 'EMPLOYEE_INVITATION_NOT_AVAILABLE');
+  if (message.includes('VALIDATION_ERROR')) return new AppError('Employee invitation is invalid.', 400, 'VALIDATION_ERROR');
+  if (message.includes('INSUFFICIENT_PERMISSIONS')) return new AppError('Owner Workspace access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+  return new AppError('Employee invitation is temporarily unavailable.', 503, 'EMPLOYEE_INVITATION_UNAVAILABLE', false);
+}
+
+async function deliverEmployeeInvitation(ownerUserId, invitation, token) {
+  const activation = new URL('/employee/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
+  activation.searchParams.set('email', invitation.email); activation.searchParams.set('token', token);
+  const delivery = await sendTransactionalEmail({
+    to: invitation.email,
+    subject: 'Set up your JARVIS PRIME employee account',
+    body: `You have been invited to JARVIS PRIME. Set your password within 24 hours: ${activation.toString()}`,
+  });
+  const deliveryStatus = delivery.status === 'sent' || delivery.status === 'dry_run' ? delivery.status : 'failed';
+  try { await repository.recordOwnerEmployeeInvitationDelivery(ownerUserId, invitation.invitation_id, deliveryStatus); }
+  catch { throw new AppError('Employee invitation is temporarily unavailable.', 503, 'EMPLOYEE_INVITATION_UNAVAILABLE', false); }
+  if (deliveryStatus === 'failed') throw new AppError('Employee invitation could not be delivered. Please try again later.', 503, 'EMPLOYEE_INVITATION_DELIVERY_FAILED');
+  return { id: invitation.id, email: invitation.email, status: invitation.status, expiresAt: invitation.expires_at, delivery: deliveryStatus };
+}
+
+export async function createEmployeeInvitation(ownerUserId, values) {
+  const invitationValues = inviteValues(values); const token = generateToken(); const expiresAt = new Date(Date.now() + EMPLOYEE_INVITATION_EXPIRY_MS).toISOString();
+  let invitation;
+  try { invitation = await repository.createOwnerEmployeeInvitation(ownerUserId, invitationValues, hashToken(token), expiresAt); }
+  catch (error) { throw publicEmployeeInvitationError(error); }
+  return deliverEmployeeInvitation(ownerUserId, invitation, token);
+}
+
+export async function resendEmployeeInvitation(ownerUserId, rawEmployeeId) {
+  const employeeUserId = employeeId(rawEmployeeId); const token = generateToken(); const expiresAt = new Date(Date.now() + EMPLOYEE_INVITATION_EXPIRY_MS).toISOString();
+  let invitation;
+  try { invitation = await repository.prepareOwnerEmployeeInvitationResend(ownerUserId, employeeUserId, hashToken(token), expiresAt); }
+  catch (error) { throw publicEmployeeInvitationError(error); }
+  return deliverEmployeeInvitation(ownerUserId, invitation, token);
+}
+
+function automationView(run) {
+  if (!run) throw new AppError('Automation run not found.', 404, 'AUTOMATION_RUN_NOT_FOUND');
+  const logs = Array.isArray(run.logs) ? run.logs.filter((entry) => entry && typeof entry.message === 'string' && typeof entry.at === 'string').map((entry) => ({ at: entry.at, message: entry.message })) : [];
+  const result = run.result && typeof run.result === 'object' ? { generatedAt: run.result.generatedAt || null, metrics: Array.isArray(run.result.metrics) ? run.result.metrics.map((metric) => ({ label: metric.label, value: metric.value })) : [] } : null;
+  return { id: run.id, workflow: run.workflow, status: run.status, logs, result, createdAt: run.created_at, startedAt: run.started_at, completedAt: run.completed_at };
+}
+
+function ensureAutomationWorker() {
+  if (automationWorkerRegistered) return; automationWorkerRegistered = true;
+  queue.process(AUTOMATION_JOB_TYPE, async (job) => {
+    const { ownerUserId, runId } = job.payload;
+    try {
+      if (!(await repository.claimOwnerAutomationRun(ownerUserId, runId))) return;
+      const dashboard = await getDashboard(ownerUserId);
+      const metrics = dashboard.metrics.filter((metric) => typeof metric.value === 'number').map((metric) => ({ label: metric.label, value: metric.value }));
+      await repository.completeOwnerAutomationRun(ownerUserId, runId, { generatedAt: dashboard.asOf, metrics });
+    } catch {
+      await repository.failOwnerAutomationRun(ownerUserId, runId).catch(() => {});
+    }
+  });
+}
+
+export async function createAutomationRun(ownerUserId, values, idempotencyKey) {
+  if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length !== 1 || values.workflow !== AUTOMATION_WORKFLOW || typeof idempotencyKey !== 'string' || idempotencyKey.length < 16 || idempotencyKey.length > 128) {
+    throw new AppError('Automation request is invalid.', 400, 'VALIDATION_ERROR');
+  }
+  let run;
+  try { run = await repository.createOwnerAutomationRun(ownerUserId, AUTOMATION_WORKFLOW, idempotencyKey); }
+  catch (error) {
+    if (error?.message?.includes('AUTOMATION_RATE_LIMITED')) throw new AppError('An automation run is already in progress. Please wait before starting another.', 429, 'AUTOMATION_RATE_LIMITED');
+    if (error?.message?.includes('INSUFFICIENT_PERMISSIONS')) throw new AppError('Owner Workspace access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+    throw new AppError('Automation is temporarily unavailable.', 503, 'AUTOMATION_UNAVAILABLE', false);
+  }
+  ensureAutomationWorker();
+  if (run.created) queue.enqueue(AUTOMATION_JOB_TYPE, { ownerUserId, runId: run.id }, { maxRetries: 0 });
+  return automationView(await repository.getOwnerAutomationRun(ownerUserId, run.id));
+}
+
+export async function getAutomationRun(ownerUserId, runId) {
+  return automationView(await repository.getOwnerAutomationRun(ownerUserId, runId));
+}
 
 function unavailable(label, source, asOf, reason) {
   return { label, status: 'unavailable', source, window: 'current', asOf, reason };
@@ -278,7 +385,7 @@ export async function getEmployeeDetail(ownerUserId, rawEmployeeId, query) {
 
 const DOCUMENT_SORTS = { 'created_at:desc': { field: 'created_at', ascending: false }, 'title:asc': { field: 'title', ascending: true } };
 const DOCUMENT_TYPES = new Set(['deliverable', 'report']);
-const AUDIT_CATEGORIES = { all: [], security: ['user.login', 'login.failed', 'account.locked'], invitations: ['client_portal_invitation'], documents: ['client_portal_document'] };
+const AUDIT_CATEGORIES = { all: [], security: ['user.login', 'login.failed', 'account.locked'], invitations: ['client_portal_invitation'], employees: ['owner_employee_invitation'], automation: ['owner_automation'], documents: ['client_portal_document'] };
 const SEARCH_TYPES = new Set(['companies', 'contacts', 'leads', 'clients', 'projects', 'tasks', 'employees', 'documents']);
 
 function boundedQuery(value, field, { required = false } = {}) {
@@ -365,6 +472,8 @@ function auditPageOptions(query) {
 function auditLabel(event) {
   if (event.event_type === 'client_portal_document') return event.action === 'publish' ? 'Client Portal document published' : 'Client Portal document event';
   if (event.event_type === 'client_portal_invitation') return `Client Portal invitation ${event.action}`;
+  if (event.event_type === 'owner_employee_invitation') return event.action === 'accept' ? 'Employee invitation accepted' : event.action === 'resend' ? 'Employee invitation resent' : event.action === 'deliver' ? 'Employee invitation delivery recorded' : 'Employee invitation created';
+  if (event.event_type === 'owner_automation') return event.action === 'complete' ? 'Owner automation completed' : event.action === 'fail' ? 'Owner automation failed' : 'Owner automation requested';
   if (event.event_type === 'user.login') return 'Successful owner sign-in';
   if (event.event_type === 'login.failed') return 'Failed owner sign-in';
   if (event.event_type === 'account.locked') return 'Owner account locked';
@@ -373,7 +482,7 @@ function auditLabel(event) {
 
 export async function listAuditEvents(ownerUserId, query) {
   const options = auditPageOptions(query); const result = await repository.listOwnerAuditEvents(ownerUserId, options);
-  return { items: result.items.map((event) => ({ id: event.id, label: auditLabel(event), category: event.event_type.startsWith('client_portal_document') ? 'documents' : event.event_type.startsWith('client_portal_invitation') ? 'invitations' : 'security', action: event.action, success: event.success, resourceType: event.resource_type || null, resourceId: event.resource_id || null, createdAt: event.created_at })), pageInfo: { nextCursor: result.nextOffset === null ? null : Buffer.from(String(result.nextOffset)).toString('base64url'), hasNextPage: result.nextOffset !== null } };
+  return { items: result.items.map((event) => ({ id: event.id, label: auditLabel(event), category: event.event_type.startsWith('client_portal_document') ? 'documents' : event.event_type.startsWith('client_portal_invitation') ? 'invitations' : event.event_type.startsWith('owner_employee_invitation') ? 'employees' : event.event_type.startsWith('owner_automation') ? 'automation' : 'security', action: event.action, success: event.success, resourceType: event.resource_type || null, resourceId: event.resource_id || null, createdAt: event.created_at })), pageInfo: { nextCursor: result.nextOffset === null ? null : Buffer.from(String(result.nextOffset)).toString('base64url'), hasNextPage: result.nextOffset !== null } };
 }
 
 export function getSettingsStatus() {

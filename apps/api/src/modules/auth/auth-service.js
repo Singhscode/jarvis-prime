@@ -713,6 +713,7 @@ export async function resetPassword(params, ipAddress) {
 
     // Update password and store in history
     await repo.updatePassword(user.id, newPasswordHash, user.password_hash);
+    await repo.activatePendingEmployee(user.id);
 
     // Mark reset token as used
     await repo.markPasswordResetUsed(resetRecord.id, ipAddress);
