@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { OwnerDashboard, SourceState } from '../lib/owner-contracts';
 
 type Props = { dashboard: OwnerDashboard | null; loading: boolean; error: string; onRetry: () => void };
@@ -28,12 +29,18 @@ function SourcePanel({ title, state, emptyMessage, id }: { title: string; state:
 }
 
 function QuickActions() {
-  const actions = ['Create project', 'Create task', 'Invite client', 'Upload document', 'Create employee', 'Run automation'];
+  const supportedActions = [
+    { label: 'Create project', href: '/dashboard/projects#new-project' },
+    { label: 'Create task', href: '/dashboard/projects#new-task' },
+    { label: 'Invite client', href: '/dashboard/clients#new-client' },
+    { label: 'Upload document', href: '/dashboard/documents' },
+    { label: 'Create employee', href: '/dashboard/employees#new-employee' },
+    { label: 'Run automation', href: '/dashboard/automation#run-automation' },
+  ];
   return <section aria-labelledby="quick-actions-heading" className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
     <h2 id="quick-actions-heading" className="text-lg font-semibold text-white">Quick actions</h2>
-    <p className="mt-2 text-sm text-slate-300">Workflows are introduced in their approved milestone.</p>
-    <div className="mt-4 grid gap-2 sm:grid-cols-2">{actions.map((action) => <button key={action} disabled className="rounded-lg border border-slate-700 px-3 py-2 text-left text-sm text-slate-500 disabled:cursor-not-allowed" aria-describedby="quick-actions-note">{action}<span className="ml-2 text-xs">Unavailable</span></button>)}</div>
-    <p id="quick-actions-note" className="mt-3 text-xs text-slate-500">No quick action bypasses a scoped business workflow.</p>
+    <p className="mt-2 text-sm text-slate-300">Shortcuts open the existing scoped workflow; they do not bypass validation, ownership checks, or automation policy.</p>
+    <div className="mt-4 grid gap-2 sm:grid-cols-2">{supportedActions.map((action) => <Link key={action.label} href={action.href} className="rounded-lg border border-slate-700 px-3 py-2 text-left text-sm text-slate-200 hover:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-300">{action.label}</Link>)}</div>
   </section>;
 }
 

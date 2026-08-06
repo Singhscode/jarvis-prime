@@ -67,8 +67,8 @@ export async function listClientPortalContacts(ownerUserId, clientId, contactIds
 
 
 export async function listOwnerEmployees(ownerUserId, { limit, offset, sort, q }) {
-  let query = client().from('users').select('id,full_name,email')
-    .eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').eq('status', 'active');
+  let query = client().from('users').select('id,full_name,email,department,phone,status')
+    .eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('status', ['active', 'pending_verification']);
   if (q) query = query.ilike('full_name', `%${q}%`);
   const { data, error } = await query.order(sort.field, { ascending: sort.ascending }).order('id', { ascending: sort.ascending }).range(offset, offset + limit);
   if (error) throw error;
@@ -77,8 +77,66 @@ export async function listOwnerEmployees(ownerUserId, { limit, offset, sort, q }
 }
 
 export async function getOwnerEmployee(ownerUserId, employeeId) {
-  const { data, error } = await client().from('users').select('id,full_name,email')
-    .eq('id', employeeId).eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').eq('status', 'active').maybeSingle();
+  const { data, error } = await client().from('users').select('id,full_name,email,department,phone,status')
+    .eq('id', employeeId).eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('status', ['active', 'pending_verification']).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function createOwnerEmployeeInvitation(ownerUserId, values, tokenHash, expiresAt) {
+  const { data, error } = await client().rpc('create_owner_employee_invitation', {
+    p_owner_user_id: ownerUserId, p_email: values.email, p_full_name: values.fullName, p_department: values.department,
+    p_phone: values.phone, p_token_hash: tokenHash, p_expires_at: expiresAt,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function recordOwnerEmployeeInvitationDelivery(ownerUserId, invitationId, deliveryStatus) {
+  const { data, error } = await client().rpc('record_owner_employee_invitation_delivery', {
+    p_owner_user_id: ownerUserId, p_invitation_id: invitationId, p_delivery_status: deliveryStatus,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function prepareOwnerEmployeeInvitationResend(ownerUserId, employeeUserId, tokenHash, expiresAt) {
+  const { data, error } = await client().rpc('prepare_owner_employee_invitation_resend', {
+    p_owner_user_id: ownerUserId, p_employee_user_id: employeeUserId, p_token_hash: tokenHash, p_expires_at: expiresAt,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function createOwnerAutomationRun(ownerUserId, workflow, idempotencyKey) {
+  const { data, error } = await client().rpc('create_owner_automation_run', {
+    p_owner_user_id: ownerUserId, p_workflow: workflow, p_idempotency_key: idempotencyKey,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function claimOwnerAutomationRun(ownerUserId, runId) {
+  const { data, error } = await client().rpc('claim_owner_automation_run', { p_owner_user_id: ownerUserId, p_run_id: runId });
+  if (error) throw error;
+  return data;
+}
+
+export async function completeOwnerAutomationRun(ownerUserId, runId, result) {
+  const { data, error } = await client().rpc('complete_owner_automation_run', { p_owner_user_id: ownerUserId, p_run_id: runId, p_result: result });
+  if (error) throw error;
+  return data;
+}
+
+export async function failOwnerAutomationRun(ownerUserId, runId) {
+  const { data, error } = await client().rpc('fail_owner_automation_run', { p_owner_user_id: ownerUserId, p_run_id: runId });
+  if (error) throw error;
+  return data;
+}
+
+export async function getOwnerAutomationRun(ownerUserId, runId) {
+  const { data, error } = await client().from('owner_automation_runs')
+    .select('id,workflow,status,logs,result,created_at,started_at,completed_at').eq('id', runId).eq('owner_user_id', ownerUserId).maybeSingle();
   if (error) throw error;
   return data;
 }

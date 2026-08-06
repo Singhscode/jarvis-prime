@@ -100,6 +100,17 @@ export async function verifyUserEmail(userId) {
   if (error) throw error;
 }
 
+// Password reset is also the one-time credential setup flow for a pending employee invitation.
+// The database RPC atomically activates the employee and accepts its invitation; ordinary
+// pending employee accounts without an invitation retain the prior activation behavior.
+export async function activatePendingEmployee(userId) {
+  const { data, error } = await client().rpc('activate_pending_employee_invitation', {
+    p_employee_user_id: userId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function recordFailedLogin(userId) {
   // Use a PostgreSQL-safe increment: fetch current count, increment, update.
   // db.raw() does not exist in the Supabase JS SDK — use an RPC instead.

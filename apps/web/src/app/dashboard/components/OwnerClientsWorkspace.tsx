@@ -28,6 +28,12 @@ export default function OwnerClientsWorkspace() {
   }, [appliedQuery, cursor, request, sort]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (dialogOpen) clientNameInput.current?.focus(); }, [dialogOpen]);
+  useEffect(() => {
+    if (window.location.hash === '#new-client') {
+      setForm(emptyClientForm); setFormError(''); setDialogOpen(true);
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+  }, []);
 
   function closeDialog() {
     if (creating) return;

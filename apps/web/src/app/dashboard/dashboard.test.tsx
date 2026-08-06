@@ -41,12 +41,15 @@ describe('Owner Workspace dashboard', () => {
     const loginCall = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>)[1]; expect(JSON.parse(loginCall[1]?.body as string)).toMatchObject({ email: 'owner@example.test', password: 'password', deviceName: 'Owner Workspace' });
   });
 
-  it('labels unsupported sources as unavailable and exposes named navigation controls', async () => {
-    const user = userEvent.setup(); responses(json({ accessToken: 'token' }), json(bootstrap), json(dashboard)); renderDashboard();
-    expect(await screen.findByText('Client lifecycle state is not defined.')).toBeTruthy(); expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(1);
-    expect(screen.getByRole('button', { name: /^Create project/ }).hasAttribute('disabled')).toBe(true); await user.click(screen.getByRole('button', { name: 'Open navigation' }));
-    expect(screen.getByRole('dialog', { name: 'Owner Workspace navigation' })).toBeTruthy(); await user.click(screen.getByRole('button', { name: 'Close navigation' }));
-    expect(screen.queryByRole('dialog', { name: 'Owner Workspace navigation' })).toBeNull();
+  it('opens all scoped quick-action workflows without browser automation credentials', async () => {
+    responses(json({ accessToken: 'token' }), json(bootstrap), json(dashboard)); renderDashboard();
+    expect(await screen.findByText('Client lifecycle state is not defined.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Create project' }).getAttribute('href')).toBe('/dashboard/projects#new-project');
+    expect(screen.getByRole('link', { name: 'Create task' }).getAttribute('href')).toBe('/dashboard/projects#new-task');
+    expect(screen.getByRole('link', { name: 'Invite client' }).getAttribute('href')).toBe('/dashboard/clients#new-client');
+    expect(screen.getByRole('link', { name: 'Upload document' }).getAttribute('href')).toBe('/dashboard/documents');
+    expect(screen.getByRole('link', { name: 'Create employee' }).getAttribute('href')).toBe('/dashboard/employees#new-employee');
+    expect(screen.getByRole('link', { name: 'Run automation' }).getAttribute('href')).toBe('/dashboard/automation#run-automation');
   });
 
   it('shows safe recovery guidance when the backend is unavailable', async () => {
