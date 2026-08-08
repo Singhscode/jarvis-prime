@@ -499,6 +499,15 @@ describe('CRM Foundation', () => {
     );
   });
 
+  test('rejects a generated Client ID before owner-scoped database access', async () => {
+    const { createProject } = await import('../src/modules/crm/crm.service.js');
+
+    await assert.rejects(
+      createProject('user-123', { client_id: 'JP-CLI-000001', name: 'Website' }),
+      { code: 'VALIDATION_ERROR' }
+    );
+  });
+
   test('rejects whitespace-only project names before database access', async () => {
     const { createProject } = await import('../src/modules/crm/crm.service.js');
 

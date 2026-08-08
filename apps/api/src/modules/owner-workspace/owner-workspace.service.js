@@ -37,18 +37,23 @@ function publicEmployeeInvitationError(error) {
 }
 
 async function deliverEmployeeInvitation(ownerUserId, invitation, token) {
-  const activation = new URL('/employee/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
-  activation.searchParams.set('email', invitation.email); activation.searchParams.set('token', token);
-  const delivery = await sendTransactionalEmail({
-    to: invitation.email,
-    subject: 'Set up your JARVIS PRIME employee account',
-    body: `You have been invited to JARVIS PRIME. Set your password within 24 hours: ${activation.toString()}`,
-  });
-  const deliveryStatus = delivery.status === 'sent' || delivery.status === 'dry_run' ? delivery.status : 'failed';
+  let deliveryStatus = 'failed';
+  try {
+    const activation = new URL('/employee/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
+    activation.searchParams.set('email', invitation.email); activation.searchParams.set('token', token);
+    const delivery = await sendTransactionalEmail({
+      to: invitation.email,
+      subject: 'Set up your JARVIS PRIME employee account',
+      body: `You have been invited to JARVIS PRIME. Set your password within 24 hours: ${activation.toString()}`,
+    });
+    deliveryStatus = delivery.status === 'sent' || delivery.status === 'dry_run' ? delivery.status : 'failed';
+  } catch {
+    deliveryStatus = 'failed';
+  }
   try { await repository.recordOwnerEmployeeInvitationDelivery(ownerUserId, invitation.invitation_id, deliveryStatus); }
   catch { throw new AppError('Employee invitation is temporarily unavailable.', 503, 'EMPLOYEE_INVITATION_UNAVAILABLE', false); }
   if (deliveryStatus === 'failed') throw new AppError('Employee invitation could not be delivered. Please try again later.', 503, 'EMPLOYEE_INVITATION_DELIVERY_FAILED');
-  return { id: invitation.id, email: invitation.email, status: invitation.status, expiresAt: invitation.expires_at, delivery: deliveryStatus };
+  return { id: invitation.id, employeeCode: invitation.employee_code, email: invitation.email, status: invitation.status, expiresAt: invitation.expires_at, delivery: deliveryStatus };
 }
 
 export async function createEmployeeInvitation(ownerUserId, values) {
@@ -356,7 +361,7 @@ function employeeUnavailable(label, reason) { return unavailableField(label, 'us
 
 function employeeView(employee, workload, asOf) {
   return {
-    id: employee.id, fullName: employee.full_name || null, email: employee.email,
+    id: employee.id, employeeCode: employee.employee_code, fullName: employee.full_name || null, email: employee.email, status: employee.status,
     workload: { status: 'available', source: 'crm_tasks', window: 'current', asOf, definition: 'Direct assignments currently scoped to this employee.', ...workload },
     availability: employeeUnavailable('Availability', 'No authoritative availability field exists.'),
     performance: employeeUnavailable('Performance summary', 'No authoritative performance definition or source exists.'),

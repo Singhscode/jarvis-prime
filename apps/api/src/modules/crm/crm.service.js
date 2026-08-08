@@ -249,7 +249,7 @@ export function listProjects(ownerUserId) {
 
 export async function createProject(ownerUserId, values) {
   assertAllowedFields(values, ['client_id', 'name']);
-  const clientId = requiredText(values.client_id, 'client_id');
+  const clientId = requireUuid(values.client_id, 'client_id');
   const name = requiredText(values.name, 'name');
   await verifyClientOwnership(ownerUserId, clientId);
   return repo.createProject(ownerUserId, { client_id: clientId, name });

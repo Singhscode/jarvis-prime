@@ -1,5 +1,6 @@
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 const nativeFetch = globalThis.fetch;
 process.env.SUPABASE_URL = 'https://owner-workspace.test';
@@ -313,23 +314,23 @@ test('rejects malformed project filters and gives matching missing and out-of-sc
 });
 
 
-test('lists active owner-scoped employees with bounded workload counts and no credential fields', async () => {
+test('lists owner-scoped employees with bounded workload counts, assignment eligibility, and no credential fields', async () => {
   calls.length = 0;
   const employeeId = '30000000-0000-4000-8000-000000000003';
   databaseFetch = (rawUrl) => {
     const url = new URL(rawUrl);
-    if (url.pathname.endsWith('/users')) return json([{ id: employeeId, full_name: 'Ava Owner', email: 'ava@example.test' }, { id: '40000000-0000-4000-8000-000000000004', full_name: 'Ben Owner', email: 'ben@example.test' }]);
+    if (url.pathname.endsWith('/users')) return json([{ id: employeeId, employee_code: 'JP-EMP-000001', full_name: 'Ava Owner', email: 'ava@example.test', status: 'active' }, { id: '40000000-0000-4000-8000-000000000004', employee_code: 'JP-EMP-000002', full_name: 'Ben Owner', email: 'ben@example.test', status: 'pending_verification' }]);
     if (url.pathname.endsWith('/crm_tasks')) return count(url.searchParams.get('completed') === 'eq.true' ? 1 : url.searchParams.get('completed') === 'eq.false' ? 2 : 3);
     throw new Error(`Unexpected query: ${rawUrl}`);
   };
   await withServer(async (port) => {
     const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/employees?owner_user_id=attacker&q=Ava&limit=1&sort=name:asc`, { headers: { Authorization: `Bearer ${token()}` } });
     assert.equal(response.status, 200); const body = await response.json();
-    assert.equal(body.data.items[0].workload.assigned, 3); assert.equal(body.data.items[0].workload.open, 2);
+    assert.equal(body.data.items[0].workload.assigned, 3); assert.equal(body.data.items[0].workload.open, 2); assert.equal(body.data.items[0].status, 'active');
     assert.equal(body.data.items[0].availability.status, 'unavailable'); assert.doesNotMatch(JSON.stringify(body), /password_hash|"role"|portal_owner_user_id|refresh_token/i);
   });
   const employeeQuery = new URL(calls.find((url) => url.includes('/users?')));
-  assert.equal(employeeQuery.searchParams.get('select'), 'id,full_name,email,department,phone,status'); assert.equal(employeeQuery.searchParams.get('portal_owner_user_id'), `eq.${ownerId}`);
+  assert.equal(employeeQuery.searchParams.get('select'), 'id,employee_code,full_name,email,status'); assert.equal(employeeQuery.searchParams.get('portal_owner_user_id'), `eq.${ownerId}`);
   assert.equal(employeeQuery.searchParams.get('role'), 'eq.employee'); assert.equal(employeeQuery.searchParams.get('status'), 'in.(active,pending_verification)'); assert.equal(employeeQuery.searchParams.get('full_name'), 'ilike.%Ava%');
 });
 
@@ -575,11 +576,16 @@ test('redacts unexpected direct-client database failures', async () => {
 });
 
 
-test('creates employee invitations only through the owner-scoped RPC, validates fields, and never returns credentials', async () => {
-  calls.length = 0;
+test('creates employee invitations only through the owner-scoped RPC, validates fields, returns a server-issued Employee ID, and never returns credentials', async () => {
+  calls.length = 0; let successfulPayload;
   databaseFetch = (rawUrl, init = {}) => {
     const url = new URL(rawUrl);
-    if (url.pathname.endsWith('/rpc/create_owner_employee_invitation')) return json({ id: '30000000-0000-4000-8000-000000000003', invitation_id: '40000000-0000-4000-8000-000000000004', email: 'employee@example.test', status: 'invited', expires_at: '2026-08-06T00:00:00.000Z' });
+    if (url.pathname.endsWith('/rpc/create_owner_employee_invitation')) {
+      const payload = JSON.parse(init.body);
+      if (payload.p_email === 'duplicate@example.test') return json({ message: 'EMPLOYEE_INVITATION_NOT_AVAILABLE' }, 400);
+      successfulPayload = payload;
+      return json({ id: '30000000-0000-4000-8000-000000000003', employee_code: 'JP-EMP-000001', invitation_id: '40000000-0000-4000-8000-000000000004', email: 'employee@example.test', status: 'invited', expires_at: '2026-08-06T00:00:00.000Z' });
+    }
     if (url.pathname.endsWith('/rpc/record_owner_employee_invitation_delivery')) return json({ id: '40000000-0000-4000-8000-000000000004', delivery_status: 'dry_run' });
     throw new Error(`Unexpected query: ${rawUrl} ${init.method || 'GET'}`);
   };
@@ -589,15 +595,36 @@ test('creates employee invitations only through the owner-scoped RPC, validates 
     assert.equal(invalid.status, 400);
     const created = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/employees`, { method: 'POST', headers, body: JSON.stringify({ full_name: 'Ava Employee', email: 'employee@example.test', department: 'Operations', phone: '+919876543210' }) });
     assert.equal(created.status, 201); const body = await created.json();
-    assert.equal(body.data.status, 'invited'); assert.equal(body.data.delivery, 'dry_run'); assert.doesNotMatch(JSON.stringify(body), /token|password|hash|owner_user_id/i);
+    assert.equal(body.data.status, 'invited'); assert.equal(body.data.employeeCode, 'JP-EMP-000001'); assert.equal(body.data.delivery, 'dry_run'); assert.doesNotMatch(JSON.stringify(body), /token|password|hash|owner_user_id|invitation_id/i);
     workspaceIdentity = { id: ownerId, role: 'employee', status: 'active' };
     const denied = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/employees`, { method: 'POST', headers: { ...headers, Authorization: `Bearer ${token('employee')}` }, body: JSON.stringify({ full_name: 'Ava Employee', email: 'employee2@example.test', department: 'Operations', phone: '+919876543210' }) });
     assert.equal(denied.status, 403);
     workspaceIdentity = ownerIdentity();
   });
+  const { createEmployeeInvitation } = await import('../src/modules/owner-workspace/owner-workspace.service.js');
+  await assert.rejects(createEmployeeInvitation(ownerId, { full_name: 'Duplicate Employee', email: 'duplicate@example.test', department: 'Operations', phone: '+919876543210' }), { statusCode: 409, code: 'EMPLOYEE_INVITATION_NOT_AVAILABLE' });
+  assert.equal(successfulPayload.p_owner_user_id, ownerId); assert.match(successfulPayload.p_token_hash, /^[a-f0-9]{64}$/); assert.equal(Object.hasOwn(successfulPayload, 'p_employee_code'), false);
   const createCall = calls.find((url) => url.includes('/rpc/create_owner_employee_invitation'));
-  assert.ok(createCall); const request = new URL(createCall);
-  assert.equal(request.pathname.endsWith('/rpc/create_owner_employee_invitation'), true);
+  assert.ok(createCall); assert.equal(new URL(createCall).pathname.endsWith('/rpc/create_owner_employee_invitation'), true);
+});
+
+test('records an owner-attributed failed delivery and returns a controlled error when invitation delivery setup throws', async () => {
+  calls.length = 0; let deliveryPayload;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/rpc/create_owner_employee_invitation')) return json({ id: '30000000-0000-4000-8000-000000000003', employee_code: 'JP-EMP-000002', invitation_id: '40000000-0000-4000-8000-000000000004', email: 'employee@example.test', status: 'invited', expires_at: '2026-08-06T00:00:00.000Z' });
+    if (url.pathname.endsWith('/rpc/record_owner_employee_invitation_delivery')) { deliveryPayload = JSON.parse(init.body); return json({ id: '40000000-0000-4000-8000-000000000004', delivery_status: 'failed' }); }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  process.env.WEB_APP_URL = 'not-a-valid-url';
+  try {
+    await withServer(async (port) => {
+      const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/employees`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ full_name: 'Ava Employee', email: 'employee@example.test', department: 'Operations', phone: '+919876543210' }) });
+      assert.equal(response.status, 503); const body = await response.json();
+      assert.equal(body.error.code, 'EMPLOYEE_INVITATION_DELIVERY_FAILED'); assert.doesNotMatch(JSON.stringify(body), /token|password|hash|WEB_APP_URL|not-a-valid-url/i);
+    });
+  } finally { delete process.env.WEB_APP_URL; }
+  assert.deepEqual(deliveryPayload, { p_owner_user_id: ownerId, p_invitation_id: '40000000-0000-4000-8000-000000000004', p_delivery_status: 'failed' });
 });
 
 test('rejects unapproved automation workflow requests before queueing work', async () => {
@@ -671,4 +698,20 @@ test('accepts a pending employee invitation during a successful password setup',
   };
   const result = await resetPassword({ email: 'employee@example.test', resetToken: 'setup-token', newPassword: 'Starlight98!Clarity' }, '127.0.0.1');
   assert.equal(result.success, true, `${result.message}; requests: ${requests.join(', ')}`); assert.equal(acceptanceCalls, 1);
+});
+
+test('keeps the employee business identifier migration forward-only and invitation-compatible', async () => {
+  const migration = await readFile(new URL('../../../database/supabase/migrations/20260807000015_add_employee_business_identifier.sql', import.meta.url), 'utf8');
+  const routes = await readFile(new URL('../src/modules/owner-workspace/owner-workspace.routes.js', import.meta.url), 'utf8');
+  assert.match(routes, /employeeInvitationLimiter = createRateLimiter\(\{ windowMs: 60 \* 60_000, max: 5/);
+  assert.match(routes, /owner-employee-invitation:\$\{req\.user\?\.sub \|\| req\.ip\}/);
+  assert.match(migration, /BEGIN;[\s\S]*COMMIT;/);
+  assert.match(migration, /ALTER TABLE public\.users ADD COLUMN employee_code text;/);
+  assert.match(migration, /CREATE UNIQUE INDEX users_employee_code_unique_idx/);
+  assert.match(migration, /JP-EMP-/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.create_owner_employee_invitation/);
+  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.prepare_owner_employee_invitation_resend/);
+  assert.match(migration, /'employee_code', v_employee\.employee_code/);
+  assert.match(migration, /'owner_employee_invitation', 'create'/);
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|ALTER COLUMN id|DISABLE ROW LEVEL SECURITY/i);
 });
