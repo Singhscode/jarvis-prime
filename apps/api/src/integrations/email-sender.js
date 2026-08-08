@@ -78,14 +78,13 @@ export async function sendTransactionalEmail({ to, subject, body }) {
     return { status: 'dry_run' };
   }
 
-  const provider = await getProvider();
-  if (!provider.isConfigured()) return { status: 'failed' };
-
   try {
+    const provider = await getProvider();
+    if (!provider.isConfigured()) return { status: 'failed' };
     const result = await provider.send(to, subject, body);
     return { status: result.status, providerId: result.providerId };
-  } catch (error) {
-    log.warn(`Transactional email delivery failed: ${error.message}`);
+  } catch {
+    log.warn('Transactional email delivery failed.');
     return { status: 'failed' };
   }
 }

@@ -53,7 +53,7 @@ export type OwnerProjectDetail = { project: OwnerProject; tasks: OwnerPage<Owner
 
 
 export type OwnerWorkload = { status: 'available'; source: 'crm_tasks'; window: 'current'; asOf: string; definition: string; assigned: number; open: number; completed: number };
-export type OwnerEmployee = { id: string; fullName: string | null; email: string; workload: OwnerWorkload; availability: OwnerUnavailableField; performance: OwnerUnavailableField };
+export type OwnerEmployee = { id: string; employeeCode: string; fullName: string | null; email: string; status: 'active' | 'pending_verification'; workload: OwnerWorkload; availability: OwnerUnavailableField; performance: OwnerUnavailableField };
 export type OwnerEmployeeDetail = { employee: OwnerEmployee; projects: OwnerTask['project'][]; assignments: OwnerPage<OwnerTask> };
 
 

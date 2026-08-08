@@ -67,7 +67,7 @@ export async function listClientPortalContacts(ownerUserId, clientId, contactIds
 
 
 export async function listOwnerEmployees(ownerUserId, { limit, offset, sort, q }) {
-  let query = client().from('users').select('id,full_name,email,department,phone,status')
+  let query = client().from('users').select('id,employee_code,full_name,email,status')
     .eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('status', ['active', 'pending_verification']);
   if (q) query = query.ilike('full_name', `%${q}%`);
   const { data, error } = await query.order(sort.field, { ascending: sort.ascending }).order('id', { ascending: sort.ascending }).range(offset, offset + limit);
@@ -77,7 +77,7 @@ export async function listOwnerEmployees(ownerUserId, { limit, offset, sort, q }
 }
 
 export async function getOwnerEmployee(ownerUserId, employeeId) {
-  const { data, error } = await client().from('users').select('id,full_name,email,department,phone,status')
+  const { data, error } = await client().from('users').select('id,employee_code,full_name,email,status')
     .eq('id', employeeId).eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('status', ['active', 'pending_verification']).maybeSingle();
   if (error) throw error;
   return data;

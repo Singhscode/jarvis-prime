@@ -115,7 +115,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // Protect internal portal pages
-  const protectedPaths = ['/dashboard', '/leads', '/tasks'];
+  const protectedPaths = ['/leads', '/tasks'];
   const isProtectedPath = protectedPaths.some((p) => pathname.startsWith(p));
 
   if (isProtectedPath) {
@@ -136,5 +136,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*', '/dashboard/:path*', '/leads/:path*', '/tasks/:path*'],
+  matcher: ['/api/:path*', '/leads/:path*', '/tasks/:path*'],
 };

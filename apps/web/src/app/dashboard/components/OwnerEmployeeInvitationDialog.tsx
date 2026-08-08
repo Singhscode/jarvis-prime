@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useOwnerWorkspace } from './OwnerSessionBoundary';
 
-type Props = { open: boolean; onClose: () => void; onCreated: (email: string, delivery: string) => void };
+type Props = { open: boolean; onClose: () => void; onCreated: (email: string, employeeCode: string, delivery: string) => void };
 type EmployeeForm = { full_name: string; email: string; department: string; phone: string };
 const emptyForm: EmployeeForm = { full_name: '', email: '', department: '', phone: '' };
 
@@ -17,10 +17,10 @@ export default function OwnerEmployeeInvitationDialog({ open, onClose, onCreated
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setCreating(true); setError('');
     try {
-      const body = await request<{ success: true; data: { email: string; delivery: string } }>('/api/owner-workspace/employees', {
+      const body = await request<{ success: true; data: { email: string; employeeCode: string; delivery: string } }>('/api/owner-workspace/employees', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       });
-      setForm(emptyForm); refresh(); onCreated(body.data.email, body.data.delivery);
+      setForm(emptyForm); refresh(); onCreated(body.data.email, body.data.employeeCode, body.data.delivery);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to create employee invitation.'); }
     finally { setCreating(false); }
   }
