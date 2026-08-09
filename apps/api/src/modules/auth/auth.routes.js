@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import {
   registerUser,
+  activateRegisteredAccount,
   loginUser,
   logoutUser,
   initiatePasswordReset,
@@ -16,7 +17,7 @@ import * as repo from './repository.js';
 import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
 import { createRateLimiter } from '../../middleware/rate-limiter.js';
 import { config } from '../../config/config.js';
-import { statusCodes, auth } from './constants.js';
+import { statusCodes, auth, authMessages } from './constants.js';
 import { log } from '../../utils/logger.js';
 
 export const router = Router();
@@ -24,6 +25,11 @@ export const router = Router();
 // Per-endpoint rate limiters (values per requirements.md R1.6, R2.7, R4.3).
 // Reuses the existing createRateLimiter() factory — no new middleware.
 const registerLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 3, message: 'Too many registration attempts. Try again later.' });
+const activationLimiter = createRateLimiter({
+  windowMs: auth.rateLimit.windowMs,
+  max: auth.rateLimit.maxTokenVerificationAttempts,
+  message: 'Too many activation attempts. Try again later.',
+});
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60_000,
   max: 5,
@@ -88,6 +94,36 @@ router.post('/register', registerLimiter, async (req, res) => {
       },
     });
   }
+});
+
+/**
+ * POST /api/auth/activate
+ * Consume a one-time registration capability. This endpoint never creates a
+ * session and accepts no account, role, status, owner, or membership fields.
+ */
+router.post('/activate', activationLimiter, async (req, res) => {
+  const body = req.body;
+  const keys = body && typeof body === 'object' && !Array.isArray(body)
+    ? Object.keys(body)
+    : [];
+  if (keys.length !== 1 || keys[0] !== 'token' || typeof body.token !== 'string') {
+    return res.status(statusCodes.BAD_REQUEST).json({
+      error: { code: 'INVALID_TOKEN', message: authMessages.INVALID_TOKEN },
+    });
+  }
+
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const result = await activateRegisteredAccount(body.token, ipAddress);
+  if (!result.success) {
+    return res.status(result.status).json({
+      error: {
+        code: result.error?.code || 'INVALID_TOKEN',
+        message: result.message,
+      },
+    });
+  }
+
+  return res.status(statusCodes.OK).json({ success: true, message: result.message });
 });
 
 /**

@@ -20,9 +20,99 @@ import {
 } from './jwt-service.js';
 import * as repo from './repository.js';
 import { auth, authMessages, statusCodes } from './constants.js';
+import { sendTransactionalEmail } from '../../integrations/email-sender.js';
 import { log } from '../../utils/logger.js';
 
 const refreshInFlight = new Map();
+const REGISTRATION_ACTIVATION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+function configuredInitialOwnerEmail() {
+  const email = normalizeEmail(process.env.INITIAL_OWNER_EMAIL);
+  return isValidEmailFormat(email) && email.length <= 254 ? email : null;
+}
+
+function registrationActivationUrl(token) {
+  const activationUrl = new URL('/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
+  activationUrl.hash = new URLSearchParams({ token }).toString();
+  return activationUrl.toString();
+}
+
+async function issueRegistrationVerification(user, ipAddress, authorizedEmail) {
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + auth.email.verificationTokenExpiryMs).toISOString();
+  await repo.issueRegistrationEmailVerificationToken(
+    user.id,
+    hashToken(token),
+    expiresAt,
+    authorizedEmail
+  );
+
+  let deliveryStatus = 'failed';
+  try {
+    const delivery = await sendTransactionalEmail({
+      to: user.email,
+      subject: 'Verify your JARVIS PRIME account',
+      body: `Verify your email address within 7 days: ${registrationActivationUrl(token)}`,
+    });
+    if (delivery.status === 'sent' || delivery.status === 'dry_run') {
+      deliveryStatus = delivery.status;
+    }
+  } catch {
+    deliveryStatus = 'failed';
+  }
+
+  await repo.createAuditLog({
+    user_id: user.id,
+    event_type: auth.auditEvents.EMAIL_VERIFICATION_SENT,
+    action: 'create',
+    resource_type: 'email_verification',
+    resource_id: user.id,
+    success: deliveryStatus !== 'failed',
+    error_message: deliveryStatus === 'failed' ? 'Transactional email delivery failed' : null,
+    ip_address: ipAddress,
+    details: { delivery_status: deliveryStatus, expires_at: expiresAt },
+  });
+
+  if (deliveryStatus === 'failed') {
+    throw new Error('REGISTRATION_VERIFICATION_DELIVERY_FAILED');
+  }
+}
+
+export async function activateRegisteredAccount(rawToken, ipAddress) {
+  if (typeof rawToken !== 'string' || !REGISTRATION_ACTIVATION_TOKEN_PATTERN.test(rawToken)) {
+    return { success: false, status: statusCodes.BAD_REQUEST, message: authMessages.INVALID_TOKEN };
+  }
+
+  const authorizedEmail = configuredInitialOwnerEmail();
+  if (!authorizedEmail) {
+    return {
+      success: false,
+      status: statusCodes.SERVICE_UNAVAILABLE,
+      message: 'Account activation is temporarily unavailable.',
+      error: { code: 'ACTIVATION_UNAVAILABLE' },
+    };
+  }
+
+  try {
+    const activated = await repo.consumeRegistrationEmailVerificationToken(
+      hashToken(rawToken),
+      ipAddress,
+      authorizedEmail
+    );
+    if (!activated) {
+      return { success: false, status: statusCodes.BAD_REQUEST, message: authMessages.INVALID_TOKEN };
+    }
+    return { success: true, status: statusCodes.OK, message: authMessages.EMAIL_VERIFIED };
+  } catch {
+    log.error('Account activation failed.');
+    return {
+      success: false,
+      status: statusCodes.SERVICE_UNAVAILABLE,
+      message: 'Account activation is temporarily unavailable.',
+      error: { code: 'ACTIVATION_UNAVAILABLE' },
+    };
+  }
+}
 
 /**
  * Registers a new user account
@@ -116,6 +206,11 @@ export async function registerUser(params, ipAddress) {
       details: { email: normalizeEmail(email) },
     });
 
+    const authorizedEmail = configuredInitialOwnerEmail();
+    if (authorizedEmail && normalizeEmail(user.email) === authorizedEmail) {
+      await issueRegistrationVerification(user, ipAddress, authorizedEmail);
+    }
+
     log.info(`User registered: ${user.id}`);
 
     // Return success (don't reveal if email already exists)
@@ -125,8 +220,8 @@ export async function registerUser(params, ipAddress) {
       message: authMessages.REGISTRATION_SUCCESS,
       user: sanitizeUser(user),
     };
-  } catch (error) {
-    log.error('Registration error:', error);
+  } catch {
+    log.error('Registration failed.');
     return {
       success: false,
       status: statusCodes.INTERNAL_ERROR,
@@ -711,9 +806,12 @@ export async function resetPassword(params, ipAddress) {
       }
     }
 
-    // Update password and store in history
+    // Update password and store in history. Only an employee invitation may use
+    // password setup as activation; pending clients require email verification.
     await repo.updatePassword(user.id, newPasswordHash, user.password_hash);
-    await repo.activatePendingEmployee(user.id);
+    if (user.role === 'employee') {
+      await repo.activatePendingEmployee(user.id);
+    }
 
     // Mark reset token as used
     await repo.markPasswordResetUsed(resetRecord.id, ipAddress);
