@@ -6,6 +6,7 @@ export default defineConfig({
     environmentOptions: { jsdom: { url: 'http://localhost' } },
     include: [
       'src/app/activate/**/*.test.tsx',
+      'src/app/register/**/*.test.tsx',
       'src/app/client/**/*.test.tsx',
       'src/app/dashboard/**/*.test.tsx',
     ],
