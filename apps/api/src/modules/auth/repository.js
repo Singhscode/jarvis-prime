@@ -164,6 +164,31 @@ export async function unlockAccount(userId) {
 
 // ── Email Verification ─────────────────────────────────────────────────────
 
+export async function issueRegistrationEmailVerificationToken(userId, tokenHash, expiresAt, authorizedEmail) {
+  const { data, error } = await client().rpc('issue_registration_email_verification', {
+    p_user_id: userId,
+    p_token_hash: tokenHash,
+    p_expires_at: expiresAt,
+    p_authorized_email: authorizedEmail,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
+export async function consumeRegistrationEmailVerificationToken(
+  tokenHash,
+  verificationIp,
+  authorizedEmail
+) {
+  const { data, error } = await client().rpc('consume_registration_email_verification', {
+    p_token_hash: tokenHash,
+    p_verification_ip: verificationIp || null,
+    p_authorized_email: authorizedEmail,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function createEmailVerificationToken(userId, token, expiryMs) {
   const { error } = await client()
     .from('email_verification_tokens')
