@@ -17,6 +17,7 @@
     "test": "node --test",
     "test:integration:db": "node --test integration/employee-portal.postgres.integration.js",
     "test:integration:client-portal": "node --test integration/client-portal.postgres.integration.js",
+    "test:integration:finance": "node --test integration/finance-billing.postgres.integration.js",
     "employee:create": "node scripts/provision-employee.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",
     "test:watch": "node --test --watch"
