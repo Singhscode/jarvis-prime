@@ -9,6 +9,7 @@ const handle = (handler) => (req, res, next) => Promise.resolve(handler(req, res
 const respond = (res, data, status = 200) => { res.set('Cache-Control', 'private, no-store'); res.status(status).json({ success: true, data }); };
 const authorize = (req, _res, next) => Promise.resolve(workspace.assertOwnerWorkspaceAccess(req.user.sub)).then(() => next(), next);
 const employeeInvitationLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 5, keyFn: (req) => `owner-employee-invitation:${req.user?.sub || req.ip}`, message: 'Too many employee invitation attempts. Try again later.' });
+const clientProvisionLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 10, keyFn: (req) => `owner-client-provision:${req.user?.sub || req.ip}`, message: 'Too many client account provisioning attempts. Try again later.' });
 const automationRunLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 10, keyFn: (req) => `owner-automation-run:${req.user?.sub || req.ip}`, message: 'Too many automation requests. Try again later.' });
 router.use(createAuthMiddleware());
 router.use(authorize);
@@ -30,6 +31,7 @@ router.get('/crm/leads/:id', handle(async (req, res) => respond(res, await works
 
 router.get('/clients', handle(async (req, res) => respond(res, await workspace.listClients(req.user.sub, req.query))));
 router.post('/clients', handle(async (req, res) => respond(res, await workspace.createClient(req.user.sub, req.body), 201)));
+router.post('/clients/provision', clientProvisionLimiter, handle(async (req, res) => respond(res, await workspace.provisionClientAccount(req.user.sub, req.body), 201)));
 router.get('/clients/:clientId', handle(async (req, res) => respond(res, await workspace.getClientDetail(req.user.sub, req.params.clientId, req.query))));
 router.patch('/clients/:clientId', handle(async (req, res) => respond(res, await workspace.updateClient(req.user.sub, req.params.clientId, req.body))));
 router.get('/clients/:clientId/contacts', handle(async (req, res) => respond(res, (await workspace.getClientDetail(req.user.sub, req.params.clientId, req.query)).contacts)));

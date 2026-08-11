@@ -75,44 +75,43 @@ describe('Owner Workspace CRM and clients', () => {
 });
 
 
-  it('creates a direct client, refreshes the list, and highlights the generated Client ID', async () => {
+  it('creates a Client account, sends only approved fields, refreshes the list, and highlights its generated Client ID', async () => {
     const user = userEvent.setup();
-    const directClient = { id: 'client-2', client_code: 'JP-CLI-000042', name: 'New Acme', created_at: asOf, updated_at: asOf };
+    const provisionedClient = { id: 'client-2', client_code: 'JP-CLI-000042', name: 'New Acme', created_at: asOf, updated_at: asOf };
     let created = false;
     const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
       if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
       if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
       if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
-      if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: created ? [directClient] : [], pageInfo: { nextCursor: null, hasNextPage: false } } });
-      if (url.endsWith('/api/owner-workspace/clients') && init?.method === 'POST') {
-        expect(JSON.parse(init.body as string)).toEqual({ name: 'New Acme', email: 'hello@acme.test', phone: '+919876543210', company: 'Acme Pvt Ltd', notes: 'Enterprise customer' });
+      if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: created ? [provisionedClient] : [], pageInfo: { nextCursor: null, hasNextPage: false } } });
+      if (url.endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST') {
+        expect(JSON.parse(init.body as string)).toEqual({ name: 'New Acme', contact_name: 'Ava Client', email: 'hello@acme.test', phone: '+919876543210' });
         created = true;
-        return json({ success: true, data: directClient }, 201);
+        return json({ success: true, data: { client: { id: provisionedClient.id, clientCode: provisionedClient.client_code, name: provisionedClient.name }, delivery: { status: 'dry_run', expiresAt: asOf } } }, 201);
       }
       return json({ error: { message: 'Unexpected test request' } }, 500);
     });
     globalThis.fetch = fetch as unknown as typeof fetch;
     renderWorkspace(<OwnerClientsWorkspace />);
-    await user.click(await screen.findByRole('button', { name: 'New Client' }));
-    await user.type(screen.getByLabelText('Client Name'), 'New Acme');
+    await user.click(await screen.findByRole('button', { name: 'Create Client Account' }));
+    await user.type(screen.getByLabelText('Client or Company Name'), 'New Acme');
+    await user.type(screen.getByLabelText('Contact Name'), 'Ava Client');
     await user.type(screen.getByLabelText('Email'), 'hello@acme.test');
     await user.type(screen.getByLabelText('Phone'), '+919876543210');
-    await user.type(screen.getByLabelText('Company'), 'Acme Pvt Ltd');
-    await user.type(screen.getByLabelText(/Notes/), 'Enterprise customer');
-    await user.click(screen.getByRole('button', { name: 'Create Client' }));
-    const status = await screen.findByRole('status');
-    expect(status.textContent).toContain('JP-CLI-000042');
+    await user.click(screen.getByRole('button', { name: 'Create and Send Invitation' }));
+    expect((await screen.findByRole('status')).textContent).toBe('Client invitation sent. The client can activate their account from the email.');
     expect(await screen.findByText('New Acme')).toBeTruthy();
-    expect(screen.getAllByText(/JP-CLI-000042/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/JP-CLI-000042/).length).toBeGreaterThanOrEqual(1);
+    const provision = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>).find(([url]) => url.toString().endsWith('/api/owner-workspace/clients/provision'));
+    expect(Object.keys(JSON.parse(provision?.[1]?.body as string)).sort()).toEqual(['contact_name', 'email', 'name', 'phone']);
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.toString().includes('sort=created_at%3Adesc'))).toBe(true));
   });
 
-
-it('opens the existing direct-client dialog from the quick-action handoff', async () => {
+it('opens the Client account dialog from the quick-action handoff', async () => {
   window.history.replaceState(null, '', '/dashboard/clients#new-client');
   ownerFetch(); renderWorkspace(<OwnerClientsWorkspace />);
-  expect(await screen.findByRole('dialog', { name: 'New Client' })).toBeTruthy();
+  expect(await screen.findByRole('dialog', { name: 'Create Client Account' })).toBeTruthy();
   window.history.replaceState(null, '', '/dashboard/clients');
 });
 

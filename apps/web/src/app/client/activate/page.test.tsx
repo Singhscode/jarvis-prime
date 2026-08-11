@@ -65,4 +65,38 @@ describe('ClientActivationPage', () => {
     expect(alert.textContent).not.toContain('different client');
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Activate your access' })).toBeTruthy());
   });
+
+  it('sets up a provisioned Client password without a session or capability exposure', async () => {
+    window.history.replaceState({}, '', '/client/activate?invitation=raw-invitation&setup=1');
+    const user = userEvent.setup();
+    const fetch = responses(json({ success: true, data: { activated: true } }));
+    render(<ClientActivationPage />);
+    expect(await screen.findByRole('heading', { name: 'Set your Client Portal password' })).toBeTruthy();
+    expect(replaceState).toHaveBeenCalledWith({}, '', '/client/activate');
+    expect(window.location.search).toBe('');
+    await user.type(screen.getByLabelText('Password'), 'StrongClient1!');
+    await user.click(screen.getByRole('button', { name: 'Set password and activate' }));
+    expect(await screen.findByRole('heading', { name: 'Access activated' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Continue to Client Portal' }).getAttribute('href')).toBe('/client');
+    const calls = fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0][0])).toMatch(/\/api\/client-portal\/account-activate$/);
+    expect(JSON.parse(calls[0][1]?.body as string)).toEqual({ invitation: 'raw-invitation', password: 'StrongClient1!' });
+    expect(calls[0][1]?.credentials).toBeUndefined();
+    expect(document.body.textContent).not.toContain('raw-invitation');
+  });
+
+  it('returns one generic setup error for weak passwords and invalid or replayed invitations', async () => {
+    window.history.replaceState({}, '', '/client/activate?invitation=raw-invitation&setup=1');
+    const user = userEvent.setup();
+    const fetch = responses(json({ error: { message: 'replayed invitation' } }, 400));
+    render(<ClientActivationPage />);
+    await screen.findByRole('heading', { name: 'Set your Client Portal password' });
+    await user.type(screen.getByLabelText('Password'), 'alllowercase1!');
+    await user.click(screen.getByRole('button', { name: 'Set password and activate' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toBe('This activation link is invalid or expired.');
+    expect(document.body.textContent).not.toContain('raw-invitation');
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
 });

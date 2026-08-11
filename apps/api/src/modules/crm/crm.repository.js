@@ -524,6 +524,29 @@ export async function activateClientPortalInvitation(userId, tokenHash) {
   return data;
 }
 
+export async function provisionClientAccount(ownerUserId, values, tokenHash, expiresAt) {
+  const { data, error } = await client().rpc('provision_client_account', {
+    p_owner_user_id: ownerUserId,
+    p_client_name: values.name,
+    p_contact_name: values.contactName,
+    p_email: values.email,
+    p_phone: values.phone,
+    p_token_hash: tokenHash,
+    p_expires_at: expiresAt,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function activateProvisionedClientAccount(tokenHash, passwordHash) {
+  const { data, error } = await client().rpc('activate_provisioned_client_account', {
+    p_token_hash: tokenHash,
+    p_password_hash: passwordHash,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function revokeClientPortalMembership(ownerUserId, clientId, membershipId) {
   const { data, error } = await client().rpc('revoke_client_portal_membership', {
     p_owner_user_id: ownerUserId,

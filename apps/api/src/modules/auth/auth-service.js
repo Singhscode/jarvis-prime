@@ -463,7 +463,7 @@ export async function loginUser(params, ipAddress, userAgent) {
  * @param {string} password - Password to validate
  * @returns {object} { valid, message }
  */
-function validatePasswordStrength(password) {
+export function validatePasswordStrength(password) {
   // Check length
   if (password.length < auth.password.minLength) {
     return {

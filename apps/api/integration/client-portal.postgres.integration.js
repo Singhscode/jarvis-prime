@@ -230,4 +230,109 @@ describe('Client Portal PostgreSQL migration and RPCs', { concurrency: false }, 
       (select client_id from public.contacts where id = $2) as contact_client_id`, [conversionLeadId, conversionContactId]);
     assert.deepEqual(linked, { lead_client_id: converted.id, contact_client_id: converted.id });
   });
+
+  test('provisions a pending client account atomically and activates only its hash-only invitation', async () => {
+    const email = 'provisioned-client@phase10.test';
+    const tokenHash = hash('0');
+    const passwordHash = `scrypt:${'a'.repeat(32)}:${'b'.repeat(128)}`;
+    const provision = (ownerId, token = tokenHash, address = email) => asService(async () => (await db.query(
+      `select public.provision_client_account($1, $2, $3, $4, $5, $6, now() + interval '23 hours') as value`,
+      [ownerId, 'Provisioned Client', 'Provisioned Contact', address, '+14155552671', token]
+    )).rows[0].value);
+    const activateProvisioned = (token = resendHash) => asService(async () => (await db.query(
+      'select public.activate_provisioned_client_account($1, $2) as value', [token, passwordHash]
+    )).rows[0].value);
+
+    const provisioned = await provision(ids.owner);
+    assert.match(provisioned.client_code, /^JP-CLI-\d+$/);
+    const { rows: [linked] } = await db.query(`select
+      client.owner_user_id, client.email as client_email,
+      contact.client_id as contact_client_id, contact.email as contact_email,
+      account.role, account.status, account.password_hash is null as password_absent,
+      membership.crm_client_id, membership.contact_id, membership.user_id, membership.status as membership_status,
+      invitation.token_hash, invitation.consumed_at
+      from public.crm_clients client
+      join public.contacts contact on contact.client_id = client.id
+      join public.client_portal_memberships membership on membership.contact_id = contact.id and membership.crm_client_id = client.id
+      join public.users account on account.id = membership.user_id
+      join public.client_portal_invitations invitation on invitation.membership_id = membership.id
+      where client.id = $1`, [provisioned.client_id]);
+    assert.match(linked.contact_id, /^[0-9a-f-]{36}$/);
+    assert.match(linked.user_id, /^[0-9a-f-]{36}$/);
+    const { contact_id: _contactId, user_id: _userId, ...relationFields } = linked;
+    assert.deepEqual(relationFields, {
+      owner_user_id: ids.owner, client_email: email, contact_client_id: provisioned.client_id, contact_email: email,
+      role: 'client', status: 'pending_verification', password_absent: true,
+      crm_client_id: provisioned.client_id, membership_status: 'pending', token_hash: tokenHash, consumed_at: null,
+    });
+    const { rows: [provisionAudit] } = await db.query(`select details from public.audit_logs
+      where event_type = 'client_account_provisioning' and resource_id = $1 and action = 'create'`, [provisioned.membership_id]);
+    assert.doesNotMatch(JSON.stringify(provisionAudit.details), new RegExp(`${email}|${tokenHash}|password`, 'i'));
+
+    const resendHash = hash('1');
+    const resent = await provision(ids.owner, resendHash);
+    assert.deepEqual(resent, { ...provisioned, expires_at: resent.expires_at });
+    const { rows: resentInvitations } = await db.query(`select token_hash, revoked_at is not null as revoked
+      from public.client_portal_invitations where membership_id = $1 order by created_at`, [provisioned.membership_id]);
+    assert.deepEqual(resentInvitations, [{ token_hash: tokenHash, revoked: true }, { token_hash: resendHash, revoked: false }]);
+    const { rows: [resendAudit] } = await db.query(`select details from public.audit_logs
+      where event_type = 'client_account_provisioning' and resource_id = $1 and action = 'resend'`, [provisioned.membership_id]);
+    assert.doesNotMatch(JSON.stringify(resendAudit.details), new RegExp(`${email}|${resendHash}|password`, 'i'));
+
+    const duplicateUserId = randomUUID();
+    await db.query(`insert into public.users (id, email, email_normalized, status, role)
+      values ($1, 'existing-role@phase10.test', 'existing-role@phase10.test', 'active', 'employee')`, [duplicateUserId]);
+    const duplicate = await rejected(() => provision(ids.owner, hash('1'), 'existing-role@phase10.test'));
+    assert.deepEqual(duplicate, { code: 'P0001', message: 'CLIENT_ACCOUNT_EMAIL_UNAVAILABLE' });
+    const { rows: [preserved] } = await db.query('select role, status from public.users where id = $1', [duplicateUserId]);
+    assert.deepEqual(preserved, { role: 'employee', status: 'active' });
+
+    const notOwner = await rejected(() => provision(ids.otherClientUser, hash('2'), 'blocked-owner@phase10.test'));
+    assert.deepEqual(notOwner, { code: 'P0001', message: 'OWNER_ACCESS_DENIED' });
+
+    await db.query('savepoint provisioning_audit_failure');
+    await db.query(`alter table public.audit_logs add constraint phase10_reject_provision_audit
+      check (event_type <> 'client_account_provisioning') not valid`);
+    let auditFailure;
+    try { await provision(ids.owner, hash('3'), 'rollback-client@phase10.test'); } catch (error) { auditFailure = error; }
+    await db.query('reset role');
+    await db.query('rollback to savepoint provisioning_audit_failure');
+    assert.equal(auditFailure?.code, '23514');
+    const { rows: [rolledBack] } = await db.query(`select count(*)::int as count from public.users
+      where email_normalized = 'rollback-client@phase10.test'`);
+    assert.equal(rolledBack.count, 0);
+
+    assert.deepEqual(await activateProvisioned(hash('5')), { activated: false });
+    assert.deepEqual(await activateProvisioned(), { activated: true });
+    assert.deepEqual(await activateProvisioned(), { activated: false });
+    const { rows: [activated] } = await db.query(`select account.status, account.password_hash,
+      membership.status as membership_status, membership.activated_at is not null as membership_activated,
+      invitation.consumed_at is not null as invitation_consumed
+      from public.users account
+      join public.client_portal_memberships membership on membership.user_id = account.id
+      join public.client_portal_invitations invitation on invitation.membership_id = membership.id
+      where membership.id = $1 and invitation.token_hash = $2`, [provisioned.membership_id, resendHash]);
+    assert.deepEqual(activated, {
+      status: 'active', password_hash: passwordHash, membership_status: 'active',
+      membership_activated: true, invitation_consumed: true,
+    });
+    const existingClient = await rejected(() => provision(ids.owner, hash('4')));
+    assert.deepEqual(existingClient, { code: 'P0001', message: 'CLIENT_ACCOUNT_ALREADY_EXISTS' });
+
+    const { rows: [grants] } = await db.query(`select
+      has_function_privilege('service_role', 'public.provision_client_account(uuid,text,text,text,text,text,timestamptz)', 'EXECUTE') as provision_service,
+      has_function_privilege('anon', 'public.provision_client_account(uuid,text,text,text,text,text,timestamptz)', 'EXECUTE') as provision_anon,
+      has_function_privilege('service_role', 'public.activate_provisioned_client_account(text,text)', 'EXECUTE') as activation_service,
+      has_function_privilege('authenticated', 'public.activate_provisioned_client_account(text,text)', 'EXECUTE') as activation_authenticated`);
+    assert.deepEqual(grants, { provision_service: true, provision_anon: false, activation_service: true, activation_authenticated: false });
+    const anonymous = new Client({ connectionString });
+    await anonymous.connect();
+    try {
+      await anonymous.query('set role anon');
+      await assert.rejects(anonymous.query(`select public.provision_client_account(
+        $1, 'Blocked Client', 'Blocked Contact', 'blocked@phase10.test', null, $2, now() + interval '1 hour'
+      )`, [ids.owner, hash('z')]), { code: '42501' });
+      await assert.rejects(anonymous.query('select public.activate_provisioned_client_account($1, $2)', [hash('z'), passwordHash]), { code: '42501' });
+    } finally { await anonymous.end(); }
+  });
 });

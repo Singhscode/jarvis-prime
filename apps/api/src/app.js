@@ -125,6 +125,8 @@ export async function createApp(options = {}) {
   app.use('/api/crm', crmRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/employee-portal', employeePortalRouter);
+  const { default: clientPortalAccountActivationRouter } = await import('./modules/crm/client-portal-account.routes.js');
+  app.use('/api/client-portal', clientPortalAccountActivationRouter);
   app.use('/api/client-portal', clientPortalRouter);
   const { default: ownerWorkspaceRouter } = await import('./modules/owner-workspace/owner-workspace.routes.js');
   app.use('/api/owner-workspace', ownerWorkspaceRouter);

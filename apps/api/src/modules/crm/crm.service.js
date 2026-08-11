@@ -6,6 +6,8 @@ const CONTACT_FIELDS = ['name', 'email', 'phone', 'title', 'company_id'];
 const CLIENT_CONTACT_FIELDS = ['name', 'email', 'phone', 'title'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DIRECT_CLIENT_FIELDS = ['name', 'email', 'phone', 'company', 'notes'];
+const CLIENT_ACCOUNT_PROVISION_FIELDS = ['name', 'contact_name', 'email', 'phone'];
+const CLIENT_ACCOUNT_INVITATION_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
@@ -225,6 +227,82 @@ export async function createDirectClient(ownerUserId, values) {
       throw new AppError('A client with that email already exists.', 409, 'CLIENT_EMAIL_EXISTS');
     }
     throw new AppError('Client creation failed.', 500, 'INTERNAL_ERROR', false);
+  }
+}
+
+function clientAccountProvisionValues(values) {
+  requireBodyObject(values);
+  assertAllowedFields(values, CLIENT_ACCOUNT_PROVISION_FIELDS);
+  const name = requiredBoundedText(values.name, 'name', 2, 150);
+  const contactName = requiredBoundedText(values.contact_name, 'contact_name', 2, 150);
+  const email = requiredBoundedText(values.email, 'email', 3, 254).toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) throw new AppError("Field 'email' must be a valid email address.", 400, 'VALIDATION_ERROR');
+  let phone = null;
+  if (Object.hasOwn(values, 'phone')) {
+    if (typeof values.phone !== 'string' || !PHONE_PATTERN.test(values.phone.trim())) {
+      throw new AppError("Field 'phone' must be a valid international phone number.", 400, 'VALIDATION_ERROR');
+    }
+    phone = values.phone.trim();
+  }
+  return { name, contactName, email, phone };
+}
+
+function clientAccountProvisionError(error) {
+  const message = error?.message || '';
+  if (message.includes('OWNER_ACCESS_DENIED')) return new AppError('Owner Workspace access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+  if (message.includes('CLIENT_ACCOUNT_ALREADY_EXISTS')) return new AppError('Client account already exists.', 409, 'CLIENT_ACCOUNT_ALREADY_EXISTS');
+  if (message.includes('CLIENT_ACCOUNT_EMAIL_UNAVAILABLE')) return new AppError('A client account cannot be created with that email.', 409, 'CLIENT_ACCOUNT_EMAIL_UNAVAILABLE');
+  if (message.includes('CLIENT_ACCOUNT_VALIDATION_ERROR')) return new AppError('Client account details are invalid.', 400, 'VALIDATION_ERROR');
+  return new AppError('Client account provisioning is temporarily unavailable.', 503, 'CLIENT_ACCOUNT_PROVISIONING_UNAVAILABLE', false);
+}
+
+async function deliverClientAccountActivation(email, invitation) {
+  const activation = new URL('/client/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
+  activation.searchParams.set('invitation', invitation);
+  activation.searchParams.set('setup', '1');
+  const { sendTransactionalEmail } = await import('../../integrations/email-sender.js');
+  const delivery = await sendTransactionalEmail({
+    to: email,
+    subject: 'Set up your JARVIS PRIME Client Portal account',
+    body: `Set your Client Portal password within 24 hours: ${activation.toString()}`,
+  });
+  return ['sent', 'dry_run'].includes(delivery.status) ? delivery.status : 'failed';
+}
+
+export async function provisionClientAccount(ownerUserId, values) {
+  const account = clientAccountProvisionValues(values);
+  const { generateToken, hashToken } = await import('../auth/crypto.js');
+  const invitation = generateToken();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  let provisioned;
+  try {
+    provisioned = await repo.provisionClientAccount(ownerUserId, account, hashToken(invitation), expiresAt);
+  } catch (error) {
+    throw clientAccountProvisionError(error);
+  }
+  let status = 'failed';
+  try { status = await deliverClientAccountActivation(account.email, invitation); } catch { status = 'failed'; }
+  return {
+    client: { id: provisioned.client_id, clientCode: provisioned.client_code, name: provisioned.client_name },
+    delivery: { status, expiresAt: provisioned.expires_at },
+  };
+}
+
+export async function activateProvisionedClientAccount(values) {
+  try {
+    requireBodyObject(values);
+    assertAllowedFields(values, ['invitation', 'password']);
+    if (typeof values.invitation !== 'string' || !CLIENT_ACCOUNT_INVITATION_PATTERN.test(values.invitation)
+      || typeof values.password !== 'string') throw new Error('invalid activation');
+    const { validatePasswordStrength } = await import('../auth/auth-service.js');
+    const strength = validatePasswordStrength(values.password);
+    if (!strength.valid) throw new Error('invalid activation');
+    const { hashPassword, hashToken } = await import('../auth/crypto.js');
+    const result = await repo.activateProvisionedClientAccount(hashToken(values.invitation), await hashPassword(values.password));
+    if (!result?.activated) throw new Error('invalid activation');
+    return { activated: true };
+  } catch {
+    throw new AppError('Account activation could not be completed.', 400, 'INVALID_ACCOUNT_ACTIVATION');
   }
 }
 
