@@ -715,3 +715,69 @@ test('keeps the employee business identifier migration forward-only and invitati
   assert.match(migration, /'owner_employee_invitation', 'create'/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|ALTER COLUMN id|DISABLE ROW LEVEL SECURITY/i);
 });
+
+
+test('creates client contacts only for the authorized Owner and denies invalid or unavailable owner scope', async () => {
+  const clientId = '30000000-0000-4000-8000-000000000003';
+  const contactId = '40000000-0000-4000-8000-000000000004';
+  const contactValues = { name: 'Nia', email: 'nia@example.test', phone: '+15555550100', title: 'Operations' };
+  let inserted = null;
+
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false; calls.length = 0;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_clients')) return json({ id: clientId });
+    if (url.pathname.endsWith('/contacts') && init.method === 'POST') {
+      inserted = JSON.parse(init.body);
+      return json({ id: contactId, ...inserted, created_at: '2026-07-21T00:00:00.000Z', updated_at: '2026-07-21T00:00:00.000Z' }, 201);
+    }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}/contacts`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(contactValues),
+    });
+    assert.equal(response.status, 201);
+    assert.equal((await response.json()).data.id, contactId);
+  });
+  assert.deepEqual(inserted, { owner_user_id: ownerId, client_id: clientId, ...contactValues });
+  const ownershipQuery = new URL(calls.find((url) => url.includes('/crm_clients?')));
+  assert.equal(ownershipQuery.searchParams.get('id'), `eq.${clientId}`);
+  assert.equal(ownershipQuery.searchParams.get('owner_user_id'), `eq.${ownerId}`);
+
+  calls.length = 0; inserted = null;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/crm_clients')) return json(null);
+    if (url.pathname.endsWith('/contacts') && init.method === 'POST') throw new Error('Contact insertion must not occur outside owner scope');
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' };
+    const malformed = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/not-a-uuid/contacts`, { method: 'POST', headers, body: JSON.stringify(contactValues) });
+    assert.equal(malformed.status, 404);
+    const outsideScope = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}/contacts`, { method: 'POST', headers, body: JSON.stringify(contactValues) });
+    assert.equal(outsideScope.status, 404);
+  });
+  assert.equal(inserted, null);
+
+  calls.length = 0; workspaceIdentity = { id: ownerId, role: 'employee', status: 'active' };
+  databaseFetch = () => { throw new Error('Owner-scoped contact access must be denied before database work'); };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}/contacts`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token('employee')}`, 'Content-Type': 'application/json' }, body: JSON.stringify(contactValues),
+    });
+    assert.equal(response.status, 403);
+  });
+  assert.equal(calls.length, 0);
+
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = true; calls.length = 0;
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}/contacts`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(contactValues),
+    });
+    assert.equal(response.status, 403);
+  });
+  assert.equal(calls.length, 0);
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
+});

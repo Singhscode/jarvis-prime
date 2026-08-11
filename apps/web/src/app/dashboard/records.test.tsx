@@ -115,3 +115,49 @@ it('opens the existing direct-client dialog from the quick-action handoff', asyn
   expect(await screen.findByRole('dialog', { name: 'New Client' })).toBeTruthy();
   window.history.replaceState(null, '', '/dashboard/clients');
 });
+
+
+describe('Client contact creation for Client Portal invitations', () => {
+  it('validates email, creates a client-scoped contact, refreshes the selector, and preserves invitation payloads', async () => {
+    const user = userEvent.setup();
+    const createdContact = { ...contact, id: 'contact-2', name: 'Nia', email: 'nia@example.test', phone: '+15555550100', title: 'Operations' };
+    let created = false;
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+      if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+      if (url.endsWith('/clients/client-1/contacts') && init?.method === 'POST') {
+        expect(JSON.parse(init.body as string)).toEqual({ name: 'Nia', email: 'nia@example.test', phone: '+15555550100', title: 'Operations' });
+        created = true;
+        return json({ success: true, data: createdContact }, 201);
+      }
+      if (url.includes('/clients/client-1/portal-invitations')) return json({ success: true, data: { membership: { id: 'membership-2', status: 'pending', expires_at: asOf } } }, 201);
+      if (url.includes('/clients/client-1/portal')) return json({ success: true, data: { ...portal, memberships: [] } });
+      if (url.includes('/clients/client-1')) return json({ success: true, data: { client, contacts: { items: created ? [createdContact] : [], pageInfo: { nextCursor: null, hasNextPage: false } } } });
+      return json({ error: { message: 'Unexpected test request' } }, 500);
+    });
+    globalThis.fetch = fetch as unknown as typeof fetch;
+
+    renderWorkspace(<ClientPortalAdministration clientId="client-1" />);
+    expect(await screen.findByRole('heading', { name: 'Acme' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+    expect(screen.getByRole('alert').textContent).toContain('Contact name and email are required.');
+    expect(fetch.mock.calls.some(([url, init]) => url.toString().endsWith('/clients/client-1/contacts') && init?.method === 'POST')).toBe(false);
+
+    await user.type(screen.getByLabelText('Contact name'), 'Nia');
+    await user.type(screen.getByLabelText('Contact email'), 'nia@example.test');
+    await user.type(screen.getByLabelText('Contact phone'), '+15555550100');
+    await user.type(screen.getByLabelText('Contact title'), 'Operations');
+    await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+
+    expect((await screen.findByRole('status')).textContent).toContain('Client contact added.');
+    expect((await screen.findAllByText(/nia@example\.test/)).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole('option', { name: 'Nia — nia@example.test' })).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Client contact'), createdContact.id);
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+
+    const invitation = fetch.mock.calls.find(([url]) => url.toString().includes('/portal-invitations'));
+    expect(JSON.parse(invitation?.[1]?.body as string)).toEqual({ contact_id: createdContact.id });
+    expect(document.body.textContent).not.toMatch(/token_hash|storage_path|raw-invitation/);
+  });
+});
