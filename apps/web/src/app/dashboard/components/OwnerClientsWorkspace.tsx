@@ -56,6 +56,15 @@ export default function OwnerClientsWorkspace() {
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('clientDeleted') !== '1') return;
+    setNotice('Client account deleted successfully.');
+    params.delete('clientDeleted');
+    const query = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+  }, []);
+
   function closeDialog() {
     if (creating) return;
     setDialogOpen(false);

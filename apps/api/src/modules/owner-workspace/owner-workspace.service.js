@@ -198,6 +198,20 @@ export function createClient(ownerUserId, values) {
 export function provisionClientAccount(ownerUserId, values) { return crm.provisionClientAccount(ownerUserId, values); }
 export function updateClient(ownerUserId, id, values) { return crm.updateClient(ownerUserId, id, values); }
 
+export async function deleteClientAccount(ownerUserId, clientId) {
+  if (typeof clientId !== 'string' || !EMPLOYEE_UUID.test(clientId)) throw new AppError('Client account is invalid.', 400, 'VALIDATION_ERROR');
+  try {
+    await repository.deleteOwnerClientAccount(ownerUserId, clientId);
+  } catch (error) {
+    const message = error?.message || '';
+    if (message.includes('CLIENT_ACCOUNT_NOT_FOUND')) throw new AppError('Client account not found.', 404, 'CLIENT_ACCOUNT_NOT_FOUND');
+    if (message.includes('OWNER_ACCESS_DENIED')) throw new AppError('Owner Workspace access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS');
+    if (message.includes('CLIENT_ACCOUNT_VALIDATION_ERROR')) throw new AppError('Client account is invalid.', 400, 'VALIDATION_ERROR');
+    if (message.includes('CLIENT_ACCOUNT_DELETE_CONFLICT')) throw new AppError('Client account cannot be deleted while protected records or shared access remain.', 409, 'CLIENT_ACCOUNT_DELETE_CONFLICT');
+    throw new AppError('Client account deletion is temporarily unavailable.', 503, 'CLIENT_ACCOUNT_DELETE_UNAVAILABLE', false);
+  }
+}
+
 export async function getClientDetail(ownerUserId, clientId, query) {
   const [client, contacts] = await Promise.all([crm.getOwnerClient(ownerUserId, clientId), crm.listOwnerClientContacts(ownerUserId, clientId, query)]);
   return { client, contacts };

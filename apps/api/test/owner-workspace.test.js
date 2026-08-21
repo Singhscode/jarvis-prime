@@ -781,3 +781,70 @@ test('creates client contacts only for the authorized Owner and denies invalid o
   assert.equal(calls.length, 0);
   workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
 });
+
+
+test('deletes a client account only through the owner route with server-derived scope and redacted outcomes', async () => {
+  const clientId = '30000000-0000-4000-8000-000000000003';
+  let deletePayload;
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/rpc/delete_owner_client_account')) {
+      deletePayload = JSON.parse(init.body);
+      return json({ id: clientId });
+    }
+    throw new Error(`Unexpected query: ${rawUrl}`);
+  };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}?owner_user_id=attacker`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(response.status, 200); assert.deepEqual((await response.json()).data, {});
+    const malformed = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/not-a-uuid`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(malformed.status, 400); assert.equal((await malformed.json()).error.code, 'VALIDATION_ERROR');
+  });
+  assert.deepEqual(deletePayload, { p_owner_user_id: ownerId, p_client_id: clientId });
+
+  workspaceIdentity = { id: ownerId, role: 'employee', status: 'active' };
+  databaseFetch = () => { throw new Error('Non-Owner deletion must be denied before database work'); };
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token('employee')}` },
+    });
+    assert.equal(response.status, 403); assert.equal((await response.json()).error.code, 'INSUFFICIENT_PERMISSIONS');
+  });
+
+  workspaceIdentity = ownerIdentity();
+  databaseFetch = () => json({ message: 'CLIENT_ACCOUNT_NOT_FOUND: foreign client database detail' }, 400);
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(response.status, 404);
+    const body = await response.json(); assert.equal(body.error.code, 'CLIENT_ACCOUNT_NOT_FOUND');
+    assert.doesNotMatch(JSON.stringify(body), /foreign client database detail/i);
+  });
+
+  databaseFetch = () => json({ message: 'CLIENT_ACCOUNT_DELETE_CONFLICT: raw database detail' }, 400);
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(response.status, 409);
+    const body = await response.json(); assert.equal(body.error.code, 'CLIENT_ACCOUNT_DELETE_CONFLICT');
+    assert.doesNotMatch(JSON.stringify(body), /raw database detail/i);
+  });
+
+  databaseFetch = () => json({ message: 'raw PostgreSQL failure' }, 500);
+  await withServer(async (port) => {
+    const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/clients/${clientId}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${token()}` },
+    });
+    assert.equal(response.status, 503);
+    const body = await response.json(); assert.equal(body.error.code, 'CLIENT_ACCOUNT_DELETE_UNAVAILABLE');
+    assert.doesNotMatch(JSON.stringify(body), /raw PostgreSQL failure/i);
+  });
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
+});

@@ -34,6 +34,7 @@ router.post('/clients', handle(async (req, res) => respond(res, await workspace.
 router.post('/clients/provision', clientProvisionLimiter, handle(async (req, res) => respond(res, await workspace.provisionClientAccount(req.user.sub, req.body), 201)));
 router.get('/clients/:clientId', handle(async (req, res) => respond(res, await workspace.getClientDetail(req.user.sub, req.params.clientId, req.query))));
 router.patch('/clients/:clientId', handle(async (req, res) => respond(res, await workspace.updateClient(req.user.sub, req.params.clientId, req.body))));
+router.delete('/clients/:clientId', handle(async (req, res) => { await workspace.deleteClientAccount(req.user.sub, req.params.clientId); respond(res, {}); }));
 router.get('/clients/:clientId/contacts', handle(async (req, res) => respond(res, (await workspace.getClientDetail(req.user.sub, req.params.clientId, req.query)).contacts)));
 router.post('/clients/:clientId/contacts', handle(async (req, res) => respond(res, await workspace.createClientContact(req.user.sub, req.params.clientId, req.body), 201)));
 router.patch('/clients/:clientId/contacts/:contactId', handle(async (req, res) => respond(res, await workspace.updateClientContact(req.user.sub, req.params.clientId, req.params.contactId, req.body))));

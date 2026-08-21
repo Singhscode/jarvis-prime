@@ -12,6 +12,15 @@ async function countRows(query) {
   return count ?? 0;
 }
 
+export async function deleteOwnerClientAccount(ownerUserId, clientId) {
+  const { data, error } = await client().rpc('delete_owner_client_account', {
+    p_owner_user_id: ownerUserId,
+    p_client_id: clientId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function isAuthorizedOwnerWorkspaceUser(userId) {
   const { data: user, error: userError } = await client().from('users')
     .select('id,role,status').eq('id', userId).maybeSingle();

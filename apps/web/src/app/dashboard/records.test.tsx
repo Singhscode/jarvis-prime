@@ -115,6 +115,22 @@ it('opens the Client account dialog from the quick-action handoff', async () => 
   window.history.replaceState(null, '', '/dashboard/clients');
 });
 
+it('shows successful client deletion after returning to a freshly loaded client list', async () => {
+  window.history.replaceState(null, '', '/dashboard/clients?clientDeleted=1');
+  const fetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = input.toString();
+    if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+    if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+    if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: [], pageInfo: { nextCursor: null, hasNextPage: false } } });
+    return json({ error: { message: 'Unexpected test request' } }, 500);
+  });
+  globalThis.fetch = fetch as unknown as typeof fetch;
+  renderWorkspace(<OwnerClientsWorkspace />);
+  expect((await screen.findByRole('status')).textContent).toBe('Client account deleted successfully.');
+  await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.toString().includes('/api/owner-workspace/clients?'))).toBe(true));
+  expect(window.location.search).toBe('');
+});
+
 
 describe('Client contact creation for Client Portal invitations', () => {
   it('validates email, creates a client-scoped contact, refreshes the selector, and preserves invitation payloads', async () => {
@@ -158,5 +174,70 @@ describe('Client contact creation for Client Portal invitations', () => {
     const invitation = fetch.mock.calls.find(([url]) => url.toString().includes('/portal-invitations'));
     expect(JSON.parse(invitation?.[1]?.body as string)).toEqual({ contact_id: createdContact.id });
     expect(document.body.textContent).not.toMatch(/token_hash|storage_path|raw-invitation/);
+  });
+});
+
+
+describe('Client account deletion confirmation', () => {
+  it('requires an exact confirmation, identifies the client, supports cancel, sends one scoped DELETE, and redirects after success', async () => {
+    const user = userEvent.setup(); const onDeleted = vi.fn(); const fetch = ownerFetch();
+    renderWorkspace(<ClientPortalAdministration clientId="client-1" onDeleted={onDeleted} />);
+    await screen.findByRole('heading', { name: 'Acme' });
+    await user.click(screen.getByRole('button', { name: 'Delete Client Account' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Client Account' });
+    expect(dialog.textContent).toContain('client-1'); expect(dialog.textContent).toContain('ava@example.test'); expect(dialog.textContent).toContain('permanently delete');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Delete Client Account' })).toBeNull();
+    expect(fetch.mock.calls.some(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/client-1') && init?.method === 'DELETE')).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Delete Client Account' }));
+    await user.type(screen.getByLabelText('Confirm client name'), 'Acme ');
+    expect((screen.getAllByRole('button', { name: 'Delete Client Account' })[1] as HTMLButtonElement).disabled).toBe(true);
+    await user.clear(screen.getByLabelText('Confirm client name')); await user.type(screen.getByLabelText('Confirm client name'), 'Acme');
+    await user.click(screen.getAllByRole('button', { name: 'Delete Client Account' })[1]);
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+    const deletion = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>).find(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/client-1') && init?.method === 'DELETE');
+    expect(deletion?.[1]?.body).toBeUndefined();
+  });
+
+  it('disables duplicate deletes while the deletion request is processing', async () => {
+    const user = userEvent.setup(); const onDeleted = vi.fn(); let resolveDeletion: (() => void) | undefined;
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+      if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+      if (url.includes('/clients/client-1') && init?.method === 'DELETE') return new Promise<Response>((resolve) => { resolveDeletion = () => resolve(json({ success: true, data: {} })); });
+      if (url.includes('/clients/client-1/portal')) return json({ success: true, data: portal });
+      if (url.includes('/clients/client-1')) return json({ success: true, data: { client, contacts: { items: [contact], pageInfo: { nextCursor: null, hasNextPage: false } } } });
+      return json({ error: { message: 'Unexpected test request' } }, 500);
+    });
+    globalThis.fetch = fetch as unknown as typeof fetch;
+    renderWorkspace(<ClientPortalAdministration clientId="client-1" onDeleted={onDeleted} />);
+    await screen.findByRole('heading', { name: 'Acme' }); await user.click(screen.getByRole('button', { name: 'Delete Client Account' }));
+    await user.type(screen.getByLabelText('Confirm client name'), 'Acme');
+    const confirmButton = screen.getAllByRole('button', { name: 'Delete Client Account' })[1] as HTMLButtonElement;
+    await user.click(confirmButton);
+    expect(confirmButton.disabled).toBe(true); expect(confirmButton.textContent).toBe('Deleting…');
+    await user.click(confirmButton);
+    expect(fetch.mock.calls.filter(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/client-1') && init?.method === 'DELETE')).toHaveLength(1);
+    resolveDeletion?.();
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+  });
+
+  it('presents a safe conflict without redirecting', async () => {
+    const user = userEvent.setup(); const onDeleted = vi.fn();
+    const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+      if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+      if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+      if (url.includes('/clients/client-1') && init?.method === 'DELETE') return json({ error: { message: 'Client account cannot be deleted while protected records or shared access remain.' } }, 409);
+      if (url.includes('/clients/client-1/portal')) return json({ success: true, data: portal });
+      if (url.includes('/clients/client-1')) return json({ success: true, data: { client, contacts: { items: [contact], pageInfo: { nextCursor: null, hasNextPage: false } } } });
+      return json({ error: { message: 'Unexpected test request' } }, 500);
+    });
+    globalThis.fetch = fetch as unknown as typeof fetch;
+    renderWorkspace(<ClientPortalAdministration clientId="client-1" onDeleted={onDeleted} />);
+    await screen.findByRole('heading', { name: 'Acme' }); await user.click(screen.getByRole('button', { name: 'Delete Client Account' }));
+    await user.type(screen.getByLabelText('Confirm client name'), 'Acme'); await user.click(screen.getAllByRole('button', { name: 'Delete Client Account' })[1]);
+    expect((await screen.findByRole('alert')).textContent).toContain('protected records'); expect(onDeleted).not.toHaveBeenCalled();
   });
 });
