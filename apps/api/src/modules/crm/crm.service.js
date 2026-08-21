@@ -230,13 +230,18 @@ export async function createDirectClient(ownerUserId, values) {
   }
 }
 
+function clientAccountEmail(value) {
+  const email = requiredBoundedText(value, 'email', 3, 254).toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) throw new AppError("Field 'email' must be a valid email address.", 400, 'VALIDATION_ERROR');
+  return email;
+}
+
 function clientAccountProvisionValues(values) {
   requireBodyObject(values);
   assertAllowedFields(values, CLIENT_ACCOUNT_PROVISION_FIELDS);
   const name = requiredBoundedText(values.name, 'name', 2, 150);
   const contactName = requiredBoundedText(values.contact_name, 'contact_name', 2, 150);
-  const email = requiredBoundedText(values.email, 'email', 3, 254).toLowerCase();
-  if (!EMAIL_PATTERN.test(email)) throw new AppError("Field 'email' must be a valid email address.", 400, 'VALIDATION_ERROR');
+  const email = clientAccountEmail(values.email);
   let phone = null;
   if (Object.hasOwn(values, 'phone')) {
     if (typeof values.phone !== 'string' || !PHONE_PATTERN.test(values.phone.trim())) {
@@ -254,6 +259,15 @@ function clientAccountProvisionError(error) {
   if (message.includes('CLIENT_ACCOUNT_EMAIL_UNAVAILABLE')) return new AppError('A client account cannot be created with that email.', 409, 'CLIENT_ACCOUNT_EMAIL_UNAVAILABLE');
   if (message.includes('CLIENT_ACCOUNT_VALIDATION_ERROR')) return new AppError('Client account details are invalid.', 400, 'VALIDATION_ERROR');
   return new AppError('Client account provisioning is temporarily unavailable.', 503, 'CLIENT_ACCOUNT_PROVISIONING_UNAVAILABLE', false);
+}
+
+export async function getClientAccountEmailEligibility(ownerUserId, value) {
+  const email = clientAccountEmail(value);
+  try {
+    return await repo.getClientAccountEmailEligibility(ownerUserId, email);
+  } catch {
+    throw new AppError('Client email eligibility is temporarily unavailable.', 503, 'CLIENT_ACCOUNT_EMAIL_ELIGIBILITY_UNAVAILABLE', false);
+  }
 }
 
 async function deliverClientAccountActivation(email, invitation) {

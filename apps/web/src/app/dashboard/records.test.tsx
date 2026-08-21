@@ -85,6 +85,7 @@ describe('Owner Workspace CRM and clients', () => {
       if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
       if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
       if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: created ? [provisionedClient] : [], pageInfo: { nextCursor: null, hasNextPage: false } } });
+      if (url.includes('/api/owner-workspace/client-accounts/email-eligibility?email=hello%40acme.test')) return json({ success: true, data: { eligibility: 'available' } });
       if (url.endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST') {
         expect(JSON.parse(init.body as string)).toEqual({ name: 'New Acme', contact_name: 'Ava Client', email: 'hello@acme.test', phone: '+919876543210' });
         created = true;
@@ -98,6 +99,8 @@ describe('Owner Workspace CRM and clients', () => {
     await user.type(screen.getByLabelText('Client or Company Name'), 'New Acme');
     await user.type(screen.getByLabelText('Contact Name'), 'Ava Client');
     await user.type(screen.getByLabelText('Email'), 'hello@acme.test');
+    await user.tab();
+    expect((await screen.findByRole('status')).textContent).toBe('This email can receive a new invitation.');
     await user.type(screen.getByLabelText('Phone'), '+919876543210');
     await user.click(screen.getByRole('button', { name: 'Create and Send Invitation' }));
     expect((await screen.findByRole('status')).textContent).toBe('Client invitation sent. The client can activate their account from the email.');
@@ -240,4 +243,31 @@ describe('Client account deletion confirmation', () => {
     await user.type(screen.getByLabelText('Confirm client name'), 'Acme'); await user.click(screen.getAllByRole('button', { name: 'Delete Client Account' })[1]);
     expect((await screen.findByRole('alert')).textContent).toContain('protected records'); expect(onDeleted).not.toHaveBeenCalled();
   });
+});
+
+
+it('shows a safe unavailable email result and never submits provisioning', async () => {
+  const user = userEvent.setup();
+  const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = input.toString();
+    if (url.endsWith('/api/auth/refresh')) return json({ accessToken: 'token' });
+    if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
+    if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
+    if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: [], pageInfo: { nextCursor: null, hasNextPage: false } } });
+    if (url.includes('/api/owner-workspace/client-accounts/email-eligibility?email=blocked%40example.test')) return json({ success: true, data: { eligibility: 'email_unavailable' } });
+    return json({ error: { message: 'Unexpected test request' } }, 500);
+  });
+  globalThis.fetch = fetch as unknown as typeof fetch;
+  renderWorkspace(<OwnerClientsWorkspace />);
+  await user.click(await screen.findByRole('button', { name: 'Create Client Account' }));
+  await user.type(screen.getByLabelText('Client or Company Name'), 'Blocked Client');
+  await user.type(screen.getByLabelText('Contact Name'), 'Blocked Contact');
+  await user.type(screen.getByLabelText('Email'), 'blocked@example.test');
+  await user.tab();
+  expect((await screen.findByRole('status')).textContent).toBe('This email cannot be used for a Client account.');
+  expect((screen.getByRole('button', { name: 'Create and Send Invitation' }) as HTMLButtonElement).disabled).toBe(true);
+  const calls = fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
+  expect(calls.some(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST')).toBe(false);
+  const eligibility = calls.find(([url]) => url.toString().includes('/client-accounts/email-eligibility'));
+  expect(eligibility?.[1]?.body).toBeUndefined();
 });

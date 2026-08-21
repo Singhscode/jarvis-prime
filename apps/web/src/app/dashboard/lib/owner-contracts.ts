@@ -25,6 +25,7 @@ export type OwnerBootstrap = {
 };
 
 export type ApiBody<T> = { success: true; data: T };
+export type ClientAccountEmailEligibility = { eligibility: 'available' | 'owner_crm_email_exists' | 'email_unavailable' | 'existing_client' | 'resend_available' };
 
 
 export type OwnerPage<T> = { items: T[]; pageInfo: { nextCursor: string | null; hasNextPage: boolean } };

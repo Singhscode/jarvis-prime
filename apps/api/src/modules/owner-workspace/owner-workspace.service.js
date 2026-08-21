@@ -196,6 +196,7 @@ export function createClient(ownerUserId, values) {
   return crm.createDirectClient(ownerUserId, values);
 }
 export function provisionClientAccount(ownerUserId, values) { return crm.provisionClientAccount(ownerUserId, values); }
+export function getClientAccountEmailEligibility(ownerUserId, email) { return crm.getClientAccountEmailEligibility(ownerUserId, email); }
 export function updateClient(ownerUserId, id, values) { return crm.updateClient(ownerUserId, id, values); }
 
 export async function deleteClientAccount(ownerUserId, clientId) {

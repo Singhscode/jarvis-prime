@@ -848,3 +848,69 @@ test('deletes a client account only through the owner route with server-derived 
   });
   workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
 });
+
+
+test('checks Client account email eligibility as an Owner with a minimal, read-only response', async () => {
+  calls.length = 0;
+  const clientId = '30000000-0000-4000-8000-000000000003';
+  const contactId = '40000000-0000-4000-8000-000000000004';
+  let currentEligibilityEmail = '';
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    const email = url.searchParams.get('email_normalized');
+    assert.notEqual(init.method, 'POST');
+    assert.notEqual(init.method, 'PATCH');
+    assert.notEqual(init.method, 'DELETE');
+    assert.equal(url.pathname.includes('/rpc/'), false);
+    if (url.pathname.endsWith('/users')) {
+      currentEligibilityEmail = email?.replace(/^eq\./, '') || '';
+      if (email === 'eq.existing-client@example.test') return json({ id: '50000000-0000-4000-8000-000000000005', role: 'client', status: 'active', password_hash: 'hash' });
+      if (email === 'eq.employee@example.test') return json({ id: '60000000-0000-4000-8000-000000000006', role: 'employee', status: 'active', password_hash: null });
+      if (email === 'eq.resend@example.test') return json({ id: '70000000-0000-4000-8000-000000000007', role: 'client', status: 'pending_verification', password_hash: null });
+      return json(null);
+    }
+    if (url.pathname.endsWith('/client_portal_memberships')) return json([{ contact_id: contactId, crm_client_id: clientId }]);
+    if (url.pathname.endsWith('/contacts')) {
+      if (url.searchParams.get('id') === `eq.${contactId}`) return json({ email: ' Resend@Example.Test ' });
+      if (currentEligibilityEmail === 'existing@workspace.test') return json([{ email: ' Existing@Workspace.Test ' }]);
+      if (email === null) return json([]);
+    }
+    if (url.pathname.endsWith('/crm_clients')) {
+      if (url.searchParams.get('id') === `eq.${clientId}`) return json({ id: clientId });
+      if (email === null) return json([]);
+    }
+    throw new Error(`Unexpected eligibility query: ${rawUrl}`);
+  };
+
+  await withServer(async (port) => {
+    const headers = { Authorization: `Bearer ${token()}` };
+    const check = async (email) => {
+      const response = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/client-accounts/email-eligibility?email=${encodeURIComponent(email)}`, { headers });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'private, no-store');
+      const body = await response.json();
+      assert.deepEqual(Object.keys(body.data), ['eligibility']);
+      assert.doesNotMatch(JSON.stringify(body), /password|membership|contact_id|client_id|token|hash|owner_user_id/i);
+      return body.data.eligibility;
+    };
+    assert.equal(await check('AVAILABLE@EXAMPLE.TEST'), 'available');
+    assert.equal(await check('existing-client@example.test'), 'existing_client');
+    assert.equal(await check('employee@example.test'), 'email_unavailable');
+    assert.equal(await check('resend@example.test'), 'resend_available');
+    assert.equal(await check('existing@workspace.test'), 'owner_crm_email_exists');
+
+    const invalid = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/client-accounts/email-eligibility?email=not-an-email`, { headers });
+    assert.equal(invalid.status, 400); assert.equal((await invalid.json()).error.code, 'VALIDATION_ERROR');
+    const unauthenticated = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/client-accounts/email-eligibility?email=available@example.test`);
+    assert.equal(unauthenticated.status, 401);
+
+    workspaceIdentity = { id: ownerId, role: 'employee', status: 'active' };
+    const denied = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/client-accounts/email-eligibility?email=available@example.test`, { headers: { Authorization: `Bearer ${token('employee')}` } });
+    assert.equal(denied.status, 403); assert.equal((await denied.json()).error.code, 'INSUFFICIENT_PERMISSIONS');
+    workspaceIdentity = ownerIdentity();
+  });
+
+  const normalizedUserQuery = new URL(calls.find((url) => url.includes('/users?') && url.includes('email_normalized=eq.available%40example.test')));
+  assert.equal(normalizedUserQuery.searchParams.get('email_normalized'), 'eq.available@example.test');
+  assert.ok(calls.every((url) => !url.includes('/rpc/provision_client_account')));
+});

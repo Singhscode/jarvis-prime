@@ -538,6 +538,56 @@ export async function provisionClientAccount(ownerUserId, values, tokenHash, exp
   return data;
 }
 
+function emailMatches(value, normalizedEmail) {
+  return typeof value === 'string' && value.trim().toLowerCase() === normalizedEmail;
+}
+
+export async function getClientAccountEmailEligibility(ownerUserId, email) {
+  const existingUserResult = await client()
+    .from('users')
+    .select('id,role,status,password_hash')
+    .eq('email_normalized', email)
+    .maybeSingle();
+  if (existingUserResult.error) throw existingUserResult.error;
+  const existingUser = existingUserResult.data;
+
+  if (existingUser) {
+    if (existingUser.role === 'client' && existingUser.status === 'active') return { eligibility: 'existing_client' };
+    if (existingUser.role === 'client' && existingUser.status === 'pending_verification' && existingUser.password_hash === null) {
+      const membershipsResult = await client()
+        .from('client_portal_memberships')
+        .select('contact_id,crm_client_id')
+        .eq('user_id', existingUser.id)
+        .eq('email_normalized', email)
+        .eq('status', 'pending');
+      if (membershipsResult.error) throw membershipsResult.error;
+
+      for (const membership of membershipsResult.data || []) {
+        const [contactResult, clientResult] = await Promise.all([
+          client().from('contacts').select('email').eq('id', membership.contact_id).eq('owner_user_id', ownerUserId).eq('client_id', membership.crm_client_id).maybeSingle(),
+          client().from('crm_clients').select('id').eq('id', membership.crm_client_id).eq('owner_user_id', ownerUserId).maybeSingle(),
+        ]);
+        if (contactResult.error) throw contactResult.error;
+        if (clientResult.error) throw clientResult.error;
+        if (contactResult.data && clientResult.data && emailMatches(contactResult.data.email, email)) return { eligibility: 'resend_available' };
+      }
+    }
+    return { eligibility: 'email_unavailable' };
+  }
+
+  const [contactsResult, clientsResult] = await Promise.all([
+    client().from('contacts').select('email').eq('owner_user_id', ownerUserId),
+    client().from('crm_clients').select('email').eq('owner_user_id', ownerUserId),
+  ]);
+  if (contactsResult.error) throw contactsResult.error;
+  if (clientsResult.error) throw clientsResult.error;
+  if ((contactsResult.data || []).some((contact) => emailMatches(contact.email, email))
+    || (clientsResult.data || []).some((crmClient) => emailMatches(crmClient.email, email))) {
+    return { eligibility: 'owner_crm_email_exists' };
+  }
+  return { eligibility: 'available' };
+}
+
 export async function activateProvisionedClientAccount(tokenHash, passwordHash) {
   const { data, error } = await client().rpc('activate_provisioned_client_account', {
     p_token_hash: tokenHash,
