@@ -54,12 +54,13 @@ describe('Owner Workspace CRM and clients', () => {
     expect(urls.every((url) => !url.includes('automation'))).toBe(true);
   });
 
-  it('administers Client Portal invitations without exposing invitation material', async () => {
+  it('administers legacy active Client identity attachment without exposing invitation material', async () => {
     const user = userEvent.setup(); const fetch = ownerFetch();
     renderWorkspace(<ClientPortalAdministration clientId="client-1" />);
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeTruthy();
-    await user.selectOptions(screen.getByLabelText('Client contact'), contact.id); await user.click(screen.getByRole('button', { name: 'Send invitation' }));
-    expect((await screen.findByRole('status')).textContent).toContain('Invitation sent.');
+    expect(screen.getByText(/Legacy membership administration only/)).toBeTruthy();
+    await user.selectOptions(screen.getByLabelText('Contact with an active Client identity'), contact.id); await user.click(screen.getByRole('button', { name: 'Attach active Client identity' }));
+    expect((await screen.findByRole('status')).textContent).toContain('Active Client identity attachment invitation sent.');
     await user.click(screen.getByRole('button', { name: 'Resend' }));
     await user.click(screen.getByRole('button', { name: 'Revoke' }));
     expect((await screen.findByRole('status')).textContent).toContain('Client Portal access revoked.');
@@ -75,7 +76,7 @@ describe('Owner Workspace CRM and clients', () => {
 });
 
 
-  it('creates a Client account, sends only approved fields, refreshes the list, and highlights its generated Client ID', async () => {
+  it('invites a Client in one submit, sends only approved fields, refreshes the list, and highlights its generated Client ID', async () => {
     const user = userEvent.setup();
     const provisionedClient = { id: 'client-2', client_code: 'JP-CLI-000042', name: 'New Acme', created_at: asOf, updated_at: asOf };
     let created = false;
@@ -85,7 +86,6 @@ describe('Owner Workspace CRM and clients', () => {
       if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
       if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
       if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: created ? [provisionedClient] : [], pageInfo: { nextCursor: null, hasNextPage: false } } });
-      if (url.includes('/api/owner-workspace/client-accounts/email-eligibility?email=hello%40acme.test')) return json({ success: true, data: { eligibility: 'available' } });
       if (url.endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST') {
         expect(JSON.parse(init.body as string)).toEqual({ name: 'New Acme', contact_name: 'Ava Client', email: 'hello@acme.test', phone: '+919876543210' });
         created = true;
@@ -95,26 +95,26 @@ describe('Owner Workspace CRM and clients', () => {
     });
     globalThis.fetch = fetch as unknown as typeof fetch;
     renderWorkspace(<OwnerClientsWorkspace />);
-    await user.click(await screen.findByRole('button', { name: 'Create Client Account' }));
+    await user.click(await screen.findByRole('button', { name: 'Invite Client' }));
     await user.type(screen.getByLabelText('Client or Company Name'), 'New Acme');
     await user.type(screen.getByLabelText('Contact Name'), 'Ava Client');
     await user.type(screen.getByLabelText('Email'), 'hello@acme.test');
-    await user.tab();
-    expect((await screen.findByRole('status')).textContent).toBe('This email can receive a new invitation.');
     await user.type(screen.getByLabelText('Phone'), '+919876543210');
-    await user.click(screen.getByRole('button', { name: 'Create and Send Invitation' }));
+    await user.click(screen.getAllByRole('button', { name: 'Invite Client' })[1]);
     expect((await screen.findByRole('status')).textContent).toBe('Client invitation sent. The client can activate their account from the email.');
     expect(await screen.findByText('New Acme')).toBeTruthy();
     expect(screen.getAllByText(/JP-CLI-000042/).length).toBeGreaterThanOrEqual(1);
-    const provision = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>).find(([url]) => url.toString().endsWith('/api/owner-workspace/clients/provision'));
-    expect(Object.keys(JSON.parse(provision?.[1]?.body as string)).sort()).toEqual(['contact_name', 'email', 'name', 'phone']);
+    const provisionCalls = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>).filter(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST');
+    expect(provisionCalls).toHaveLength(1);
+    expect(Object.keys(JSON.parse(provisionCalls[0]?.[1]?.body as string)).sort()).toEqual(['contact_name', 'email', 'name', 'phone']);
+    expect(fetch.mock.calls.some(([url]) => url.toString().includes('/client-accounts/email-eligibility'))).toBe(false);
     await waitFor(() => expect(fetch.mock.calls.some(([url]) => url.toString().includes('sort=created_at%3Adesc'))).toBe(true));
   });
 
-it('opens the Client account dialog from the quick-action handoff', async () => {
+it('opens the Invite Client dialog from the quick-action handoff', async () => {
   window.history.replaceState(null, '', '/dashboard/clients#new-client');
   ownerFetch(); renderWorkspace(<OwnerClientsWorkspace />);
-  expect(await screen.findByRole('dialog', { name: 'Create Client Account' })).toBeTruthy();
+  expect(await screen.findByRole('dialog', { name: 'Invite Client' })).toBeTruthy();
   window.history.replaceState(null, '', '/dashboard/clients');
 });
 
@@ -135,8 +135,8 @@ it('shows successful client deletion after returning to a freshly loaded client 
 });
 
 
-describe('Client contact creation for Client Portal invitations', () => {
-  it('validates email, creates a client-scoped contact, refreshes the selector, and preserves invitation payloads', async () => {
+describe('Client contact administration', () => {
+  it('validates email, creates a client-scoped CRM contact, and does not present contact creation as Client onboarding', async () => {
     const user = userEvent.setup();
     const createdContact = { ...contact, id: 'contact-2', name: 'Nia', email: 'nia@example.test', phone: '+15555550100', title: 'Operations' };
     let created = false;
@@ -149,7 +149,6 @@ describe('Client contact creation for Client Portal invitations', () => {
         created = true;
         return json({ success: true, data: createdContact }, 201);
       }
-      if (url.includes('/clients/client-1/portal-invitations')) return json({ success: true, data: { membership: { id: 'membership-2', status: 'pending', expires_at: asOf } } }, 201);
       if (url.includes('/clients/client-1/portal')) return json({ success: true, data: { ...portal, memberships: [] } });
       if (url.includes('/clients/client-1')) return json({ success: true, data: { client, contacts: { items: created ? [createdContact] : [], pageInfo: { nextCursor: null, hasNextPage: false } } } });
       return json({ error: { message: 'Unexpected test request' } }, 500);
@@ -168,14 +167,12 @@ describe('Client contact creation for Client Portal invitations', () => {
     await user.type(screen.getByLabelText('Contact title'), 'Operations');
     await user.click(screen.getByRole('button', { name: 'Add Contact' }));
 
-    expect((await screen.findByRole('status')).textContent).toContain('Client contact added.');
+    expect((await screen.findByRole('status')).textContent).toBe('Client contact added.');
     expect((await screen.findAllByText(/nia@example\.test/)).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole('option', { name: 'Nia — nia@example.test' })).toBeTruthy();
-    await user.selectOptions(screen.getByLabelText('Client contact'), createdContact.id);
-    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
-
-    const invitation = fetch.mock.calls.find(([url]) => url.toString().includes('/portal-invitations'));
-    expect(JSON.parse(invitation?.[1]?.body as string)).toEqual({ contact_id: createdContact.id });
+    expect(screen.getByText(/Legacy membership administration only/)).toBeTruthy();
+    expect(fetch.mock.calls.some(([url]) => url.toString().includes('/portal-invitations'))).toBe(false);
+    expect(document.body.textContent).not.toContain('Select the contact to send an invitation.');
     expect(document.body.textContent).not.toMatch(/token_hash|storage_path|raw-invitation/);
   });
 });
@@ -246,7 +243,7 @@ describe('Client account deletion confirmation', () => {
 });
 
 
-it('shows a safe unavailable email result and never submits provisioning', async () => {
+it('submits an incompatible email once and presents the provisioning endpoint rejection without partial UI creation', async () => {
   const user = userEvent.setup();
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input.toString();
@@ -254,20 +251,21 @@ it('shows a safe unavailable email result and never submits provisioning', async
     if (url.endsWith('/api/owner-workspace/bootstrap')) return json(bootstrap);
     if (url.endsWith('/api/owner-workspace/dashboard')) return json(dashboard);
     if (url.includes('/api/owner-workspace/clients?')) return json({ success: true, data: { items: [], pageInfo: { nextCursor: null, hasNextPage: false } } });
-    if (url.includes('/api/owner-workspace/client-accounts/email-eligibility?email=blocked%40example.test')) return json({ success: true, data: { eligibility: 'email_unavailable' } });
+    if (url.endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST') {
+      return json({ error: { message: 'A client account cannot be created with that email.', code: 'CLIENT_ACCOUNT_EMAIL_UNAVAILABLE' } }, 409);
+    }
     return json({ error: { message: 'Unexpected test request' } }, 500);
   });
   globalThis.fetch = fetch as unknown as typeof fetch;
   renderWorkspace(<OwnerClientsWorkspace />);
-  await user.click(await screen.findByRole('button', { name: 'Create Client Account' }));
+  await user.click(await screen.findByRole('button', { name: 'Invite Client' }));
   await user.type(screen.getByLabelText('Client or Company Name'), 'Blocked Client');
   await user.type(screen.getByLabelText('Contact Name'), 'Blocked Contact');
   await user.type(screen.getByLabelText('Email'), 'blocked@example.test');
-  await user.tab();
-  expect((await screen.findByRole('status')).textContent).toBe('This email cannot be used for a Client account.');
-  expect((screen.getByRole('button', { name: 'Create and Send Invitation' }) as HTMLButtonElement).disabled).toBe(true);
+  await user.click(screen.getAllByRole('button', { name: 'Invite Client' })[1]);
+  expect((await screen.findByRole('alert')).textContent).toContain('cannot be created with that email');
   const calls = fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;
-  expect(calls.some(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST')).toBe(false);
-  const eligibility = calls.find(([url]) => url.toString().includes('/client-accounts/email-eligibility'));
-  expect(eligibility?.[1]?.body).toBeUndefined();
+  expect(calls.filter(([url, init]) => url.toString().endsWith('/api/owner-workspace/clients/provision') && init?.method === 'POST')).toHaveLength(1);
+  expect(calls.some(([url]) => url.toString().includes('/client-accounts/email-eligibility'))).toBe(false);
+  expect(screen.queryByText('Blocked Client')).toBeNull();
 });
