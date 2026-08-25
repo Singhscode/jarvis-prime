@@ -26,7 +26,7 @@ jobs:
   verify-build-deploy:
     name: Verify, package, and deploy API
     runs-on: ubuntu-latest
-    environment: production
+    environment: "jarvis-prime-api / production"
     permissions:
       contents: read
       id-token: write
