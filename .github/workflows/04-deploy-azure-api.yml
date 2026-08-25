@@ -1,0 +1,128 @@
+name: Deploy — Azure Production API
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/04-deploy-azure-api.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-api-production
+  cancel-in-progress: false
+
+env:
+  AZURE_WEBAPP_NAME: jarvis-prime-api
+  NODE_VERSION: '22'
+
+jobs:
+  verify-build-deploy:
+    name: Verify, package, and deploy API
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install monorepo dependencies from root lockfile
+        run: npm ci
+
+      - name: Prepare API test environment
+        run: cp apps/api/.env.test apps/api/.env
+
+      - name: Test API workspace
+        run: npm run test --workspace=apps/api
+
+      - name: Install API production dependencies from root lockfile
+        run: npm ci --omit=dev --workspace=apps/api --include-workspace-root=false
+
+      - name: Create API-only deployment artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact="$RUNNER_TEMP/jarvis-prime-api"
+          rm -rf "$artifact"
+          mkdir -p "$artifact/node_modules"
+
+          cp apps/api/package.json "$artifact/package.json"
+          cp -R apps/api/src "$artifact/src"
+          rsync -a \
+            --exclude '/.bin/' \
+            --exclude '/@jarvis-prime/' \
+            node_modules/ "$artifact/node_modules/"
+
+      - name: Verify API-only deployment artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          artifact="$RUNNER_TEMP/jarvis-prime-api"
+
+          test -f "$artifact/package.json"
+          test -d "$artifact/src"
+          test -d "$artifact/node_modules"
+
+          unexpected="$(find "$artifact" -mindepth 1 -maxdepth 1 \
+            ! -name package.json \
+            ! -name src \
+            ! -name node_modules \
+            -print -quit)"
+          if [[ -n "$unexpected" ]]; then
+            echo "Unexpected top-level artifact entry: $unexpected" >&2
+            exit 1
+          fi
+
+          for forbidden in \
+            "$artifact/apps" \
+            "$artifact/test" \
+            "$artifact/tests" \
+            "$artifact/integration" \
+            "$artifact/database" \
+            "$artifact/.env" \
+            "$artifact/.env.local" \
+            "$artifact/.env.production"; do
+            if [[ -e "$forbidden" ]]; then
+              echo "Forbidden artifact entry found: $forbidden" >&2
+              exit 1
+            fi
+          done
+
+          if find "$artifact" -type l -print -quit | grep -q .; then
+            echo 'Deployment artifact must not contain symbolic links.' >&2
+            exit 1
+          fi
+
+          node -e "const p=require(process.argv[1]); if(p.name!=='@jarvis-prime/api') process.exit(1)" \
+            "$artifact/package.json"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy API to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ runner.temp }}/jarvis-prime-api
