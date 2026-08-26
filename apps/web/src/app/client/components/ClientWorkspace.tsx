@@ -1,6 +1,7 @@
 'use client';
 /* eslint-disable @next/next/no-img-element */
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 type Snapshot = {
@@ -40,7 +41,7 @@ export default function ClientWorkspace({
     <header className="sticky top-0 z-20 border-b border-slate-700/60 bg-slate-950/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3"><img src="/logo-white.svg" alt="JARVIS PRIME" className="h-7 w-auto" /><span className="border-l border-slate-700 pl-3 text-sm font-medium">Client Portal</span></div>
-        <div className="flex gap-2"><button onClick={onRefresh} disabled={loading} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-60">Refresh</button><button onClick={onLogout} className="rounded-lg bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400">Log out</button></div>
+        <div className="flex gap-2"><Link href="/client/communications" className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-400">Communications</Link><button onClick={onRefresh} disabled={loading} className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium transition hover:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-400 disabled:opacity-60">Refresh</button><button onClick={onLogout} className="rounded-lg bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400">Log out</button></div>
       </div>
     </header>
     <div className="mx-auto max-w-6xl space-y-7 px-4 py-8 sm:px-6 lg:px-8">

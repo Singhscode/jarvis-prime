@@ -9,6 +9,8 @@ export default defineConfig({
       'src/app/register/**/*.test.tsx',
       'src/app/client/**/*.test.tsx',
       'src/app/dashboard/**/*.test.tsx',
+      'src/app/employee/**/*.test.tsx',
+      'src/components/**/*.test.tsx',
     ],
   },
 });

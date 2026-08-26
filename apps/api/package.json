@@ -19,6 +19,7 @@
     "test:integration:client-portal": "node --test integration/client-portal.postgres.integration.js",
     "test:integration:client-account-deletion": "node --test integration/client-account-deletion.postgres.integration.js",
     "test:integration:finance": "node --test integration/finance-billing.postgres.integration.js",
+    "test:integration:communications": "node --test integration/communication-hub.postgres.integration.js",
     "employee:create": "node scripts/provision-employee.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",
     "test:watch": "node --test --watch"

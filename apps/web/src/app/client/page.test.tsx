@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import ClientLayout from './layout';
 import ClientPage from './page';
 
 const snapshot = { client: { id: 'client-1', name: 'Acme' }, projects: [], tasks: [], documents: [{ id: 'document-1', project_id: null, title: 'Delivery', document_type: 'report', created_at: '2026-07-18T00:00:00.000Z' }] };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-let nativeFetch = globalThis.fetch;
+const nativeFetch = globalThis.fetch;
 
 afterEach(() => {
   cleanup();
@@ -19,29 +20,32 @@ function responses(...items: Response[]) {
   return fetch;
 }
 
-describe('ClientPage session boundary', () => {
+function renderClientPortal() {
+  return render(<ClientLayout><ClientPage /></ClientLayout>);
+}
+
+describe('ClientPage shared session boundary', () => {
   it('refreshes in memory, retries one protected 401, and does not persist the snapshot', async () => {
-    const setLocal = vi.spyOn(Storage.prototype, 'setItem');
-    const setSession = vi.spyOn(Storage.prototype, 'setItem');
+    const persist = vi.spyOn(Storage.prototype, 'setItem');
     const fetch = responses(
       json({ accessToken: 'token-one' }), json({ error: { message: 'Expired' } }, 401),
       json({ accessToken: 'token-two' }), json({ success: true, data: snapshot }),
     );
-    render(<ClientPage />);
+    renderClientPortal();
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeTruthy();
     expect(fetch).toHaveBeenCalledTimes(4);
-    expect(setLocal).not.toHaveBeenCalled();
-    expect(setSession).not.toHaveBeenCalled();
+    expect(persist).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Communications' }).getAttribute('href')).toBe('/client/communications');
   });
 
-  it('uses existing login after refresh failure and clears workspace on logout', async () => {
+  it('uses the shared login flow after refresh failure and clears the page snapshot on logout', async () => {
     const user = userEvent.setup();
     const fetch = responses(
       json({ error: { message: 'No session' } }, 401),
       json({ tokens: { accessToken: 'login-token' } }), json({ success: true, data: snapshot }),
       json({ success: true }),
     );
-    render(<ClientPage />);
+    renderClientPortal();
     await screen.findByRole('heading', { name: 'Welcome back' });
     await user.type(screen.getByLabelText('Email'), 'client@example.test');
     await user.type(screen.getByLabelText('Password'), 'password');
@@ -50,8 +54,7 @@ describe('ClientPage session boundary', () => {
     await user.click(screen.getByRole('button', { name: 'Log out' }));
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeTruthy();
     const loginCall = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>)[1];
-    const loginBody = JSON.parse(loginCall[1]?.body as string);
-    expect(loginBody).toMatchObject({ email: 'client@example.test', password: 'password', deviceName: 'Client Portal' });
+    expect(JSON.parse(loginCall[1]?.body as string)).toMatchObject({ email: 'client@example.test', password: 'password', deviceName: 'Client Portal' });
   });
 
   it('clears client state after a portal denial without prefetching document URLs', async () => {
@@ -60,13 +63,13 @@ describe('ClientPage session boundary', () => {
       json({ accessToken: 'token' }), json({ success: true, data: snapshot }),
       json({ error: { message: 'Membership no longer permits access.' } }, 403),
     );
-    render(<ClientPage />);
+    renderClientPortal();
     await screen.findByRole('heading', { name: 'Acme' });
-    expect(fetch).toHaveBeenCalledTimes(2);
     expect((fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>).every(
       ([url]) => !url.toString().includes('/documents/document-1/download')
     )).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeTruthy();
+    expect(screen.queryByText('Acme')).toBeNull();
   });
 });

@@ -46,6 +46,10 @@ export async function createApp(options = {}) {
     app.set('trust proxy', trustedProxyHops);
   }
 
+  // ---- Provider callbacks must receive exact raw bytes before JSON parsing. ----
+  const { createCommunicationWebhookRouter } = await import('./modules/communications/communications.webhooks.js');
+  app.use('/api/communications/webhooks/email', createCommunicationWebhookRouter());
+
   // ---- Core middleware ----
   app.use(express.json({ limit: '2mb' }));
   app.use(cookieParser());
@@ -132,6 +136,8 @@ export async function createApp(options = {}) {
   app.use('/api/owner-workspace', ownerWorkspaceRouter);
   const { default: financeRouter } = await import('./modules/finance/finance.routes.js');
   app.use('/api/finance', financeRouter);
+  const { default: communicationsRouter } = await import('./modules/communications/communications.routes.js');
+  app.use('/api/communications', communicationsRouter);
 
   // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());

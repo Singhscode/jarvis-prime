@@ -30,6 +30,7 @@ describe('ClientWorkspace', () => {
     const logout = vi.fn();
     const download = vi.fn().mockResolvedValue(undefined);
     render(<ClientWorkspace snapshot={snapshot} loading={false} error="" onRefresh={refresh} onLogout={logout} onDocumentDownload={download} />);
+    expect(screen.getByRole('link', { name: 'Communications' }).getAttribute('href')).toBe('/client/communications');
     const refreshButton = screen.getByRole('button', { name: 'Refresh' });
     refreshButton.focus();
     await user.keyboard('{Enter}');
