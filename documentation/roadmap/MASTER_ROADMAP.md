@@ -1,5 +1,34 @@
 # JARVIS PRIME Master Roadmap
 
+## Phase 9 — Finance & Billing
+
+✅ **Complete**
+**Status:** Finance foundation, service surfaces, production schema/security verification, disposable local integration testing, CI wiring, and the authenticated Owner browser smoke are complete. The Owner smoke was manually confirmed in an existing authenticated Owner session for all four Finance routes; no login or production mutation was performed during automated verification.
+
+### IMPLEMENTED
+
+- Owner-scoped Finance Dashboard routes for overview, invoices, payments, and expenses.
+- Owner-only billing-profile management; owner and exact-permission employee Finance access.
+- Server-only Finance RPC mutations for invoices, manual payment records, and expenses, with validated status transitions and audit events.
+- Finance schema foundation: billing profiles, employee permissions, invoices/items, payments, expenses, documents, a private `finance-private` bucket, owner-scoped constraints, RLS, and service-role-only table access.
+
+### VERIFIED
+
+- Read-only linked-production schema inspection confirmed all seven Finance tables, required RPCs, RLS, browser/public privilege revocation, and intended service-role grants.
+- Disposable local PostgreSQL integration passed 7/7 tests for RLS/ACL, owner isolation, employee permissions, RPC/audit behavior, relationship constraints, and rollback/error cases.
+- CI runs the existing Finance PostgreSQL suite through the established disposable Supabase integration block.
+- An authenticated Owner manually confirmed that `/dashboard/finance`, `/dashboard/finance/invoices`, `/dashboard/finance/payments`, and `/dashboard/finance/expenses` load without page errors.
+
+### DEFERRED
+
+- Client Finance portal.
+- Payment gateway integration and webhooks; reconciliation; refunds and chargebacks; subscriptions.
+- Finance documents and receipts UI, reports and exports, accounting synchronization, and tax or legal automation.
+
+### Finalization boundary
+
+No production data, schema, migration, deployment, DNS, commit, or push action was performed during verification. Deferred Finance capabilities remain out of scope and must not be represented as implemented.
+
 ## Phase 8 — Owner Workspace
 
 ✅ **Complete**
@@ -78,7 +107,7 @@ The Client Portal gives an external client member a minimal, read-only view of o
 ✅ Phase 6 Employee Portal
 ✅ Phase 7 Client Portal
 ✅ Phase 8 Owner Workspace
-⏳ Phase 9 Finance & Billing
+✅ Phase 9 Finance & Billing
 ⏳ Phase 10 Communication Hub
 ⏳ Phase 11 Automation Platform
 ⏳ Phase 12 Analytics & Reporting

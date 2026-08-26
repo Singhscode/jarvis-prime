@@ -113,7 +113,15 @@ npm run lint       # lint all packages
 
 The Owner Workspace provides one responsive `/dashboard` operating surface for dashboard oversight, CRM, clients, projects, tasks, employees, documents, audit, settings, and global search. It reuses the existing CRM, Client Portal document lifecycle, JWT, refresh-cookie, and session platform while enforcing server-derived Owner Workspace scope and denying Client Portal and Employee Portal identities.
 
-**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ✅ Phase 8 Owner Workspace · ⏳ Phase 9 Finance & Billing · ⏳ Phase 10 Communication Hub · ⏳ Phase 11 Automation Platform · ⏳ Phase 12 Analytics & Reporting · ⏳ Phase 13 Production & DevOps · ⏳ Phase 14 AI Foundation · ⏳ Phase 15 AI Sales Agents · ⏳ Phase 16 AI Operations · ⏳ Phase 17 Enterprise Security · 🚀 Version 1.0 Release
+### Phase 9 — Finance & Billing
+
+✅ **Status:** Complete. Production schema/security verification, disposable PostgreSQL integration (7/7 passing), CI wiring, and the manual authenticated Owner smoke are complete. The Owner confirmed the four Finance routes loaded successfully in an existing authenticated session; no Finance data was created or changed during this verification.
+
+- **IMPLEMENTED:** Owner-scoped Finance overview, billing-profile management, invoices, manual payment records, expenses, server-derived employee permissions, service-only mutation RPCs, audit events, and private Finance storage/schema foundations.
+- **VERIFIED:** Read-only production schema/RPC/RLS/ACL inspection; disposable PostgreSQL Finance integration (7/7 passing); CI wiring for the existing Finance integration suite; and authenticated Owner route loading for overview, invoices, payments, and expenses.
+- **DEFERRED:** Client Finance portal; payment gateways/webhooks; reconciliation; refunds/chargebacks; subscriptions; Finance documents/receipts UI; reports/exports; accounting synchronization; and tax/legal automation.
+
+**Roadmap:** ✅ Phase 0 Repository Cleanup · ✅ Phase 0.5 Database Audit · ✅ Phase 0.6 Runtime Stabilization · ✅ Phase 1 Core User Platform · ✅ Phase 2 CRM Foundation · ✅ Phase 3 Client Management · ✅ Phase 4 Project Management · ✅ Phase 5 Task Management · ✅ Phase 6 Employee Portal · ✅ Phase 7 Client Portal · ✅ Phase 8 Owner Workspace · ✅ Phase 9 Finance & Billing · ⏳ Phase 10 Communication Hub · ⏳ Phase 11 Automation Platform · ⏳ Phase 12 Analytics & Reporting · ⏳ Phase 13 Production & DevOps · ⏳ Phase 14 AI Foundation · ⏳ Phase 15 AI Sales Agents · ⏳ Phase 16 AI Operations · ⏳ Phase 17 Enterprise Security · 🚀 Version 1.0 Release
 See the [master roadmap](./documentation/roadmap/MASTER_ROADMAP.md), [detailed roadmap](./documentation/roadmap/README.md), and [changelog and release notes](./documentation/roadmap/CHANGELOG.md).
 
 ---

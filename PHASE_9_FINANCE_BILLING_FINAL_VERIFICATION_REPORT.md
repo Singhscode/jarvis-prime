@@ -1,48 +1,65 @@
-# Phase 9 Finance & Billing Final Verification Report
+# Phase 9 Finance & Billing — Final Verification Report
 
-**Decision: PRODUCTION READY.** No production, deployment, migration, configuration, financial data, commit, push, or merge action was performed.
+**Decision: COMPLETE.** Finance implementation, read-only production schema/security verification, disposable local PostgreSQL integration, local CI wiring, and the Owner Finance smoke are complete. The Owner smoke was manually confirmed in an existing authenticated Owner browser session for all four Finance routes. No production, deployment, migration, configuration, financial data, commit, push, or merge action was performed.
 
-## 1. Finance functionality verified
-The existing Finance overview, billing profile, invoice, manual payment, and expense flows compile and pass focused UI/API coverage. A narrow Phase 9.4 correction admits authorized Finance employees to the existing Dashboard Finance routes without creating a portal.
+## 1. Finance functionality
 
-## 2. Owner access verified
-Owner Finance admission remains derived by the established database-backed Owner Workspace predicate. Owners retain the complete Owner navigation and Owner-only billing-profile write control.
+**IMPLEMENTED:** Owner-scoped Finance & Billing provides overview totals, owner-only billing-profile management, invoice creation/draft editing/status progression, manual payment recording/status progression, and expense creation/draft editing/status progression. Dashboard routes are `/dashboard/finance`, `/dashboard/finance/invoices`, `/dashboard/finance/payments`, and `/dashboard/finance/expenses`. Payments are records only; the application does not initiate or process an external payment.
 
-## 3. Employee authorization verified
-`GET /api/finance/access` and `GET /api/finance/clients` derive scope server-side from the JWT subject, active employee scope, and exact `finance.read` permission. A permitted employee sees only Finance navigation; normal employees and Client Portal identities receive `403`. Individual invoice, payment, and expense writes remain separately permission-gated.
+## 2. Owner access
 
-## 4. Client isolation verified
-Finance repository reads include resolved Owner scope, UI sends no ownership fields, Finance client selection is owner-scoped server-side, and invoice/payment database foreign keys and triggers prevent cross-owner/client substitutions. The current isolated local PostgreSQL rehearsal passed these scoped relationship checks.
+**VERIFIED:** Finance scope is derived server-side from the authenticated JWT subject. An eligible Owner uses the existing Owner Workspace predicate. The Owner manually confirmed the four Finance Dashboard routes load in an existing authenticated Owner session without page errors, a login redirect, or Finance record creation.
 
-## 5. Authentication verified
-Focused Finance API coverage confirms missing, malformed, and correctly signed-but-expired JWTs return `401`; the existing in-memory access-token, refresh rotation, and logout behavior are unchanged.
+## 3. Employee authorization
 
-## 6. RLS and service-role ACLs verified
-The Phase 9 migrations enable RLS on all Finance tables, revoke browser access, and restrict direct table/RPC access to `service_role`. The disposable local PostgreSQL rehearsal passed **7/7**, including RLS state, anonymous denial, and service-role ACL verification.
+**IMPLEMENTED:** An active employee must belong to the Owner scope and hold the exact required Finance permission: `finance.read`, `finance.invoices.write`, `finance.payments.write`, or `finance.expenses.write`. Unauthorized identities are denied before Finance operations proceed.
 
-## 7. API security verified
-All Finance routes use JWT middleware, cache-control `private, no-store`, server-derived Owner/employee scope, UUID/query/body allowlists, integer minor-unit validation, conservative transitions, safe `400`/`403`/`404` handling, mutation limiting, and scoped RPC writes. Focused API tests: **7/7 passed**.
+## 4. Client isolation
 
-## 8. UI security verified
-Finance children do not render until Finance admission succeeds, so denied direct Finance navigation does not make Finance data calls. The UI uses the existing authenticated request helper, Finance-scoped client read, server-derived display capabilities only, and never sends ownership IDs, role/permission claims, JWTs, credentials, keys, or private paths. Focused UI tests: **7/7 passed**.
+**VERIFIED:** Owner-scoped composite foreign keys and scope triggers prevent cross-owner client, invoice, employee, payment, and expense substitutions. The disposable PostgreSQL Finance integration suite passed its owner-isolation and invalid-relationship coverage.
+
+## 5. Authentication
+
+**VERIFIED:** Public unauthenticated Finance API access returned `401` during production verification. The user-confirmed manual Owner smoke verified authenticated Finance route loading in the existing Owner session.
+
+## 6. RLS and service-role ACLs
+
+**VERIFIED:** A read-only linked-production schema dump confirmed all seven Finance tables with RLS enabled; Finance table grants only to `service_role`; no Finance grants to `anon`, `authenticated`, or `PUBLIC`; and service-role-only grants for the required Finance entry RPCs.
+
+## 7. API security
+
+**VERIFIED:** Finance mutations use server-only RPCs with owner predicates, validation, status-transition controls, and controlled error mapping. The integration suite confirmed anonymous direct table denial and service-only mutation behavior.
+
+## 8. UI security
+
+**VERIFIED:** The Finance UI uses protected API routes and does not fabricate Finance data. The authenticated Owner manually confirmed that overview, invoices, payments, and expenses load without observed page errors.
 
 ## 9. Audit and transaction verification
-The isolated PostgreSQL rehearsal passed permitted employee invoice/payment/expense RPC authorization, payment and expense status mutations, safe audit detail checks, foreign-actor denial, and transaction rollback. Finance mutation RPCs atomically write safe `finance.*` audit events containing only permitted metadata.
+
+**VERIFIED:** The integration suite confirmed Finance audit events for scoped mutations, safe status-only audit details, and rollback/error behavior.
 
 ## 10. End-to-end smoke coverage
-Automated local UI smoke coverage exercised admission, overview, billing-profile write restriction, invoice create/update/status, manual payment/status, expense create/update/status, and denied access. The isolated PostgreSQL rehearsal confirmed the database RLS, ACL, owner scope, employee-RPC, audit, and rollback boundaries.
+
+**VERIFIED:** The Owner manually confirmed that `/dashboard/finance`, `/dashboard/finance/invoices`, `/dashboard/finance/payments`, and `/dashboard/finance/expenses` load in the existing authenticated Owner browser session. No invoice, payment, expense, billing profile, user, or session was created for this verification.
 
 ## 11. Regression test results
-`npm run test` passed: API **105/105**, web **39/39**, ICP scorer **16/16**. The direct Finance PostgreSQL integration rehearsal passed **7/7**.
+
+**VERIFIED:** `npm run test:integration:finance --workspace=apps/api` passed 7/7 tests in the disposable local Supabase/PostgreSQL environment, covering RLS/ACL, owner isolation, employee permissions, invoice/payment/expense RPCs, relationship constraints, and rollback/error cases.
 
 ## 12. Build, lint, type-check, and diagnostics
-`npm run lint`, `npm run type-check --workspace=apps/web`, `npm run build`, and `git diff --check` passed. Diagnostics are clear for the changed integration test. The production build lists all four Finance Dashboard routes.
+
+**VERIFIED:** The finalization validation run completed successfully: `npm run lint`, `npm run type-check --workspace=apps/web`, `npm run test`, and `npm run build` all exited successfully. The web test suite reported 47/47 passing tests; the root Turbo test command completed successfully. `git diff --check` also passed. Workflow YAML parsing and workflow diagnostics had previously passed when the Finance CI command was added.
 
 ## 13. Migration status
-No historical Finance migration was modified and no Phase 9.4 migration was added. The tracked Phase 9 migrations remain `20260810000017` and `20260810000018`; no production migration was accessed.
+
+**VERIFIED:** Production migration ledger and read-only schema inspection confirmed Finance migrations `20260810000017` and `20260810000018`. No migration was applied during verification. No production schema or data was changed.
 
 ## 14. Remaining limitations
-Deferred approved limitations remain unchanged: no permission-administration UI, Client Portal invoice visibility, documents/receipts, reporting/export, tax/legal automation, payment-provider integration, reconciliation, refunds, subscriptions, or accounting sync. Pre-existing unrelated worktree changes were not altered or staged.
+
+**DEFERRED:** Client Finance portal; payment gateway/webhooks; reconciliation; refunds/chargebacks; subscriptions; Finance documents/receipts UI; reports/exports; accounting synchronization; and tax/legal automation.
+
+A `finance_documents` table and private `finance-private` bucket exist only as a schema foundation. No document or receipt API/UI workflow is implemented. Manual payment records do not confirm, collect, reconcile, or otherwise process funds.
 
 ## 15. Production readiness decision
-**PRODUCTION READY.** The only blocker was the employee Finance RPC/audit integration test being declared outside its shared suite, after the suite closed the PostgreSQL client. The unchanged test was moved inside `Finance & Billing PostgreSQL foundation`, preserving all its assertions. The local disposable rehearsal now passes **7/7**, including RLS, service-role ACLs, employee RPC authorization, payment/expense audits, foreign-actor denial, and rollback. No production action was taken.
+
+**COMPLETE:** The Phase 9 Finance & Billing verification gate is complete. Production migrations, schema, RLS/ACL, Finance API authorization, disposable PostgreSQL integration, CI integration, full local validation, and authenticated Owner route smoke coverage are verified. Deferred Finance capabilities remain explicitly out of scope and must not be represented as implemented.
