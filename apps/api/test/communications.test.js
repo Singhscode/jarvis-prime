@@ -8,6 +8,7 @@ process.env.SUPABASE_URL = 'https://communications.test';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
 process.env.JWT_SECRET = 'communications-test-jwt-secret';
 process.env.DRY_RUN = 'true';
+process.env.CORS_ORIGINS = 'https://www.jarvisprime.me';
 
 const ids = {
   owner: '10000000-0000-4000-8000-000000000001',
@@ -121,6 +122,7 @@ after(() => { globalThis.fetch = nativeFetch; });
 
 const express = (await import('express')).default;
 const { default: communicationsRouter } = await import('../src/modules/communications/communications.routes.js');
+const { createApp } = await import('../src/app.js');
 const { createCommunicationWebhookRouter } = await import('../src/modules/communications/communications.webhooks.js');
 const { errorHandler } = await import('../src/middleware/error-handler.js');
 const { createAccessToken } = await import('../src/modules/auth/jwt-service.js');
@@ -135,6 +137,12 @@ async function withApp(run) {
   app.use(express.json());
   app.use('/communications', communicationsRouter);
   app.use(errorHandler);
+  const server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
+  try { await run(server.address().port); } finally { await new Promise((resolve) => server.close(resolve)); }
+}
+
+async function withFullApp(run) {
+  const { app } = await createApp({ enableScheduler: false, enableRateLimit: false });
   const server = await new Promise((resolve) => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   try { await run(server.address().port); } finally { await new Promise((resolve) => server.close(resolve)); }
 }
@@ -183,6 +191,47 @@ test('Communication thread creation requires exact input and an idempotency key 
   const rpc = calls.find((call) => call.url.pathname.endsWith('/rpc/communication_create_thread'));
   assert.equal(rpc.body.p_owner_user_id, ids.owner);
   assert.deepEqual(rpc.body.p_participants[0], { kind: 'owner', user_id: ids.owner });
+});
+
+test('Communication thread preflight preserves approved headers and permits the authenticated idempotent create request', async () => {
+  created = false; calls.length = 0;
+  const origin = 'https://www.jarvisprime.me';
+  await withFullApp(async (port) => {
+    const url = `http://127.0.0.1:${port}/api/communications/threads`;
+    const preflight = await nativeFetch(url, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization, content-type, idempotency-key',
+      },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get('access-control-allow-origin'), origin);
+    assert.equal(preflight.headers.get('access-control-allow-credentials'), 'true');
+    assert.match(preflight.headers.get('vary') || '', /Origin/i);
+    assert.ok((preflight.headers.get('access-control-allow-methods') || '').split(/,\s*/).includes('POST'));
+    assert.deepEqual((preflight.headers.get('access-control-allow-headers') || '').split(/,\s*/), [
+      'Content-Type', 'x-automation-secret', 'x-client-id', 'Authorization', 'Idempotency-Key',
+    ]);
+
+    const response = await nativeFetch(url, {
+      method: 'POST',
+      headers: {
+        Origin: origin,
+        Authorization: `Bearer ${token()}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': 'communication-cors-create-key-0001',
+      },
+      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', userId: ids.employee }] }),
+    });
+    assert.equal(response.status, 201);
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    assert.equal(response.headers.get('access-control-allow-credentials'), 'true');
+    assert.equal((await response.json()).data.thread.id, ids.thread);
+  });
+  const rpc = calls.find((call) => call.url.pathname.endsWith('/rpc/communication_create_thread'));
+  assert.equal(rpc.body.p_idempotency_key, 'communication-cors-create-key-0001');
 });
 
 test('Communication mutation rejects malformed message bodies and client-supplied authority fields', async () => {

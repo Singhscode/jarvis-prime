@@ -7,7 +7,7 @@ export function createCors(options = {}) {
   const {
     origins = config.corsOrigins,
     methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    headers = ['Content-Type', 'x-automation-secret', 'x-client-id', 'Authorization'],
+    headers = ['Content-Type', 'x-automation-secret', 'x-client-id', 'Authorization', 'Idempotency-Key'],
     maxAge = 86400,
     credentials = false,
   } = options;
