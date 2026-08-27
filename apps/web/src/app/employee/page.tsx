@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { usePortalSession } from '../components/PortalSessionBoundary';
+import ClientSignIn from '../client/components/ClientSignIn';
 
 type Task = { id: string; project_id: string; name: string; completed: boolean };
 type PortalSnapshot = {
@@ -68,17 +69,17 @@ export default function EmployeePage() {
     }
   }
 
-  if (needsLogin) return <main className="mx-auto max-w-md space-y-4 px-6 py-12">
-    <h1 className="text-3xl font-semibold">Employee Portal</h1>
-    {error && <p className="text-red-600">{error}</p>}
-    <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void signInAndLoad(); }}>
-      <input className="w-full rounded border p-2" type="email" required placeholder="Email"
-        value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} />
-      <input className="w-full rounded border p-2" type="password" required placeholder="Password"
-        value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} />
-      <button className="rounded border px-3 py-2" disabled={authenticationLoading || loading}>Sign in</button>
-    </form>
-  </main>;
+  if (needsLogin) {
+    return <ClientSignIn
+      credentials={credentials}
+      error={error}
+      loading={authenticationLoading || loading}
+      onChange={setCredentials}
+      onSubmit={() => void signInAndLoad()}
+      portalLabel="Employee Portal"
+      description="Sign in to view your employee workspace."
+    />;
+  }
 
   return <main className="mx-auto max-w-5xl space-y-8 px-6 py-12">
     <header className="flex items-center justify-between">
