@@ -49,6 +49,7 @@ function requestForWorkspace() {
       return success({ state, readAt: state === 'read' ? createdAt : createdAt, dismissedAt: state === 'dismissed' ? createdAt : null });
     }
     if (path === '/api/communications/preferences' && init?.method === 'PUT') return success({});
+    if (path === '/api/communications/threads' && init?.method === 'POST') return success(detail);
     throw new Error(`Unexpected request: ${path}`);
   }) as unknown as CommunicationRequest;
 }
@@ -72,6 +73,32 @@ describe('CommunicationWorkspace', () => {
     renderWorkspace(requestForWorkspace(), 'client');
     await screen.findByText('Delivery plan');
     expect(screen.queryByRole('button', { name: 'New thread' })).toBeNull();
+  });
+
+  it('submits only typed business codes when an owner creates a thread', async () => {
+    const user = userEvent.setup();
+    const { request } = renderWorkspace();
+    await screen.findByText('Delivery plan');
+    await user.click(screen.getByRole('button', { name: 'New thread' }));
+    expect(screen.getByLabelText('Employee code')).toBeTruthy();
+    expect(screen.getByLabelText('Client code')).toBeTruthy();
+    expect(screen.queryByLabelText('Employee user ID')).toBeNull();
+    expect(screen.queryByLabelText('Client membership ID')).toBeNull();
+    await user.type(screen.getByLabelText('Thread subject'), 'Project update');
+    await user.type(screen.getByLabelText('Initial message'), 'Initial update');
+    await user.type(screen.getByLabelText('Employee code'), 'JP-EMP-000001');
+    await user.type(screen.getByLabelText('Client code'), 'JP-CLI-000005');
+    await user.click(screen.getByRole('button', { name: 'Create thread' }));
+    await waitFor(() => {
+      const create = callsFor(request).find(([path, init]) => path === '/api/communications/threads' && init?.method === 'POST');
+      expect(create).toBeTruthy();
+      expect(JSON.parse(String(create?.[1]?.body))).toEqual({
+        subject: 'Project update', body: 'Initial update', participants: [
+          { kind: 'employee', employeeCode: 'JP-EMP-000001' }, { kind: 'client', clientCode: 'JP-CLI-000005' },
+        ],
+      });
+      expect(String(create?.[1]?.body)).not.toMatch(/[0-9a-f]{8}-[0-9a-f-]{27}/i);
+    });
   });
 
   it('filters inbox and sent threads, orders immutable messages, marks reads, and sends with an idempotency key', async () => {

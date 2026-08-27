@@ -5,6 +5,8 @@ import * as repository from './communications.repository.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const KEY = /^[A-Za-z0-9._:-]{16,128}$/;
+const EMPLOYEE_CODE = /^JP-EMP-\d{6}$/;
+const CLIENT_CODE = /^JP-CLI-\d{6}$/;
 
 function invalid(message = 'Communication request is invalid.') { throw new AppError(message, 400, 'VALIDATION_ERROR'); }
 function denied() { throw new AppError('Communication access is not permitted.', 403, 'INSUFFICIENT_PERMISSIONS'); }
@@ -170,34 +172,60 @@ export async function getThread(userId, rawThreadId, query) {
   try { return await threadDetail(scope, threadId, options); } catch (error) { operationError(error); }
 }
 
-function threadCreateValues(values, actorUserId) {
+function businessCode(value, field, pattern) {
+  const normalized = text(value, field, 1, 64);
+  if (!pattern.test(normalized)) invalid(`Field '${field}' is invalid.`);
+  return normalized;
+}
+function recipientUnavailable(kind) { throw new AppError(`${kind} recipient is not available.`, 404, `COMMUNICATION_${kind.toUpperCase()}_RECIPIENT_NOT_FOUND`); }
+function clientRecipientAmbiguous() { throw new AppError('Client recipient selection is ambiguous.', 409, 'COMMUNICATION_CLIENT_RECIPIENT_AMBIGUOUS'); }
+
+function threadCreateValues(values) {
   exact(values, new Set(['subject', 'body', 'participants']));
   const subject = text(values.subject, 'subject', 1, 200); const body = text(values.body, 'body', 1, 10000);
   if (!Array.isArray(values.participants) || values.participants.length < 1 || values.participants.length > 25) invalid('Participants are invalid.');
-  const seen = new Set();
   const participants = values.participants.map((entry) => {
-    exact(entry, new Set(['kind', 'userId', 'membershipId']));
-    if (entry.kind === 'employee' && Object.hasOwn(entry, 'userId') && !Object.hasOwn(entry, 'membershipId')) {
-      const userId = uuid(entry.userId, 'participants.userId'); if (seen.has(userId)) invalid('Participants are invalid.'); seen.add(userId);
-      return { kind: 'employee', user_id: userId };
+    exact(entry, new Set(['kind', 'employeeCode', 'clientCode']));
+    if (entry.kind === 'employee' && Object.hasOwn(entry, 'employeeCode') && !Object.hasOwn(entry, 'clientCode')) {
+      return { kind: 'employee', employeeCode: businessCode(entry.employeeCode, 'participants.employeeCode', EMPLOYEE_CODE) };
     }
-    if (entry.kind === 'client' && Object.hasOwn(entry, 'membershipId') && !Object.hasOwn(entry, 'userId')) {
-      const membershipId = uuid(entry.membershipId, 'participants.membershipId'); if (seen.has(`client:${membershipId}`)) invalid('Participants are invalid.'); seen.add(`client:${membershipId}`);
-      return { kind: 'client', membership_id: membershipId };
+    if (entry.kind === 'client' && Object.hasOwn(entry, 'clientCode') && !Object.hasOwn(entry, 'employeeCode')) {
+      return { kind: 'client', clientCode: businessCode(entry.clientCode, 'participants.clientCode', CLIENT_CODE) };
     }
     invalid('Participants are invalid.');
   });
-  return { subject, body, participants: [{ kind: 'owner', user_id: actorUserId }, ...participants] };
+  return { subject, body, participants };
+}
+
+async function resolveThreadParticipants(ownerUserId, actorUserId, locators) {
+  const seen = new Set([actorUserId]);
+  const participants = [{ kind: 'owner', user_id: actorUserId }];
+  for (const locator of locators) {
+    if (locator.kind === 'employee') {
+      const employee = await repository.resolveOwnerEmployeeCode(ownerUserId, locator.employeeCode);
+      if (!employee) recipientUnavailable('Employee');
+      if (seen.has(employee.id)) invalid('Participants are invalid.');
+      seen.add(employee.id); participants.push({ kind: 'employee', user_id: employee.id });
+      continue;
+    }
+    const client = await repository.resolveOwnerClientCode(ownerUserId, locator.clientCode);
+    if (client?.ambiguous) clientRecipientAmbiguous();
+    if (!client) recipientUnavailable('Client');
+    if (seen.has(`client:${client.membershipId}`)) invalid('Participants are invalid.');
+    seen.add(`client:${client.membershipId}`); participants.push({ kind: 'client', membership_id: client.membershipId });
+  }
+  return participants;
 }
 
 export async function createThread(userId, values, headerKey) {
   const scope = await actorScope(userId);
   if (scope.kind !== 'owner') denied();
-  const input = threadCreateValues(values, scope.actorUserId); const idempotencyKeyValue = idempotencyKey(headerKey);
-  const stableParticipants = [...input.participants].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+  const input = threadCreateValues(values); const idempotencyKeyValue = idempotencyKey(headerKey);
+  const participants = await resolveThreadParticipants(scope.ownerUserId, scope.actorUserId, input.participants);
+  const stableParticipants = [...participants].sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
   const requestHash = hash({ subject: input.subject, body: input.body, participants: stableParticipants });
   try {
-    const result = await repository.createThread(scope.actorUserId, scope.ownerUserId, { ...input, idempotencyKey: idempotencyKeyValue, requestHash });
+    const result = await repository.createThread(scope.actorUserId, scope.ownerUserId, { ...input, participants, idempotencyKey: idempotencyKeyValue, requestHash });
     return { ...(await threadDetail(scope, result.thread_id, { limit: 100, beforeSequence: null })), created: Boolean(result.created) };
   } catch (error) { operationError(error); }
 }

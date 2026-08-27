@@ -41,6 +41,30 @@ export async function getClientOwner(clientId) {
   return result(await client().from('crm_clients').select('owner_user_id').eq('id', clientId).maybeSingle());
 }
 
+export async function resolveOwnerEmployeeCode(ownerUserId, employeeCode) {
+  return result(await client().from('users').select('id')
+    .eq('employee_code', employeeCode).eq('portal_owner_user_id', ownerUserId)
+    .eq('role', 'employee').eq('status', 'active').maybeSingle());
+}
+
+export async function resolveOwnerClientCode(ownerUserId, clientCode) {
+  const ownedClient = result(await client().from('crm_clients').select('id')
+    .eq('client_code', clientCode).eq('owner_user_id', ownerUserId).maybeSingle());
+  if (!ownedClient) return null;
+
+  const memberships = result(await client().from('client_portal_memberships').select('id,user_id')
+    .eq('crm_client_id', ownedClient.id).eq('status', 'active').limit(2)) || [];
+  if (!memberships.length) return null;
+
+  const activeUsers = result(await client().from('users').select('id')
+    .in('id', memberships.map((membership) => membership.user_id)).eq('role', 'client').eq('status', 'active')) || [];
+  const activeUserIds = new Set(activeUsers.map((user) => user.id));
+  const eligibleMemberships = memberships.filter((membership) => activeUserIds.has(membership.user_id));
+  if (eligibleMemberships.length === 1) return { membershipId: eligibleMemberships[0].id };
+  if (eligibleMemberships.length > 1) return { ambiguous: true };
+  return null;
+}
+
 export async function syncActorParticipants(actorUserId, ownerUserId) {
   return result(await client().rpc('communication_sync_actor_participants', {
     p_actor_user_id: actorUserId, p_owner_user_id: ownerUserId,

@@ -13,10 +13,23 @@ process.env.CORS_ORIGINS = 'https://www.jarvisprime.me';
 const ids = {
   owner: '10000000-0000-4000-8000-000000000001',
   employee: '20000000-0000-4000-8000-000000000002',
-  thread: '30000000-0000-4000-8000-000000000003',
-  message: '40000000-0000-4000-8000-000000000004',
-  attachment: '50000000-0000-4000-8000-000000000005',
-  notification: '60000000-0000-4000-8000-000000000006',
+  clientUser: '20000000-0000-4000-8000-000000000003',
+  clientUserTwo: '20000000-0000-4000-8000-000000000004',
+  inactiveClientUser: '20000000-0000-4000-8000-000000000005',
+  client: '30000000-0000-4000-8000-000000000003',
+  inactiveClient: '30000000-0000-4000-8000-000000000004',
+  revokedClient: '30000000-0000-4000-8000-000000000005',
+  ambiguousClient: '30000000-0000-4000-8000-000000000006',
+  clientMembership: '40000000-0000-4000-8000-000000000003',
+  clientMembershipTwo: '40000000-0000-4000-8000-000000000004',
+  thread: '50000000-0000-4000-8000-000000000003',
+  message: '60000000-0000-4000-8000-000000000004',
+  attachment: '70000000-0000-4000-8000-000000000005',
+  notification: '80000000-0000-4000-8000-000000000006',
+};
+const codes = {
+  employee: 'JP-EMP-000001', inactiveEmployee: 'JP-EMP-000002', crossOwnerEmployee: 'JP-EMP-000003', missingEmployee: 'JP-EMP-999999',
+  client: 'JP-CLI-000005', inactiveClient: 'JP-CLI-000006', crossOwnerClient: 'JP-CLI-000007', revokedClient: 'JP-CLI-000008', ambiguousClient: 'JP-CLI-000009', missingClient: 'JP-CLI-999999',
 };
 const calls = [];
 let created = false;
@@ -53,10 +66,37 @@ async function dbFetch(input, init = {}) {
     return json({ Key: `communication-private/${storagePath}` });
   }
   if (path.endsWith('/users')) {
+    const employeeCode = queryValue(url, 'employee_code')?.replace(/^eq\./, '');
+    if (employeeCode) {
+      const employee = employeeCode === codes.employee ? { id: ids.employee } : null;
+      return json(singular ? employee : (employee ? [employee] : []));
+    }
+    const userIds = queryValue(url, 'id');
+    if (userIds?.startsWith('in.(')) {
+      const requestedIds = userIds.slice(4, -1).split(',');
+      const rows = requestedIds.includes(ids.inactiveClientUser) ? [] : requestedIds.includes(ids.clientUserTwo)
+        ? [{ id: ids.clientUser }, { id: ids.clientUserTwo }]
+        : requestedIds.includes(ids.clientUser) ? [{ id: ids.clientUser }] : [{ id: ids.owner, full_name: 'Owner User' }];
+      return json(rows);
+    }
     const owner = { id: ids.owner, role: 'client', status: 'active', full_name: 'Owner User' };
     return json(singular ? owner : [owner]);
   }
-  if (path.endsWith('/client_portal_memberships')) return json([]);
+  if (path.endsWith('/crm_clients')) {
+    const clientCode = queryValue(url, 'client_code')?.replace(/^eq\./, '');
+    const codeMap = new Map([
+      [codes.client, ids.client], [codes.inactiveClient, ids.inactiveClient], [codes.revokedClient, ids.revokedClient], [codes.ambiguousClient, ids.ambiguousClient],
+    ]);
+    const clientId = codeMap.get(clientCode);
+    return json(singular ? (clientId ? { id: clientId } : null) : (clientId ? [{ id: clientId }] : []));
+  }
+  if (path.endsWith('/client_portal_memberships')) {
+    const clientId = queryValue(url, 'crm_client_id')?.replace(/^eq\./, '');
+    const rows = clientId === ids.client ? [{ id: ids.clientMembership, user_id: ids.clientUser }]
+      : clientId === ids.inactiveClient ? [{ id: ids.clientMembership, user_id: ids.inactiveClientUser }]
+        : clientId === ids.ambiguousClient ? [{ id: ids.clientMembership, user_id: ids.clientUser }, { id: ids.clientMembershipTwo, user_id: ids.clientUserTwo }] : [];
+    return json(rows);
+  }
   if (path.endsWith('/rpc/communication_sync_actor_participants')) return json(null);
   if (path.endsWith('/rpc/communication_create_thread')) { created = true; return json({ thread_id: ids.thread, message_id: ids.message, created: true }); }
   if (path.endsWith('/rpc/communication_send_message')) {
@@ -176,12 +216,12 @@ test('Communication thread creation requires exact input and an idempotency key 
     });
     assert.equal(response.status, 400);
     response = await nativeFetch(`http://127.0.0.1:${port}/communications/threads`, {
-      method: 'POST', headers, body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', userId: ids.employee }] }),
+      method: 'POST', headers, body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', employeeCode: codes.employee }] }),
     });
     assert.equal(response.status, 400);
     response = await nativeFetch(`http://127.0.0.1:${port}/communications/threads`, {
       method: 'POST', headers: { ...headers, 'Idempotency-Key': 'communication-create-key-0001' },
-      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', userId: ids.employee }] }),
+      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', employeeCode: codes.employee }] }),
     });
     assert.equal(response.status, 201);
     const data = (await response.json()).data;
@@ -191,6 +231,66 @@ test('Communication thread creation requires exact input and an idempotency key 
   const rpc = calls.find((call) => call.url.pathname.endsWith('/rpc/communication_create_thread'));
   assert.equal(rpc.body.p_owner_user_id, ids.owner);
   assert.deepEqual(rpc.body.p_participants[0], { kind: 'owner', user_id: ids.owner });
+});
+
+test('Communication thread creation resolves Owner-scoped business codes without exposing UUID locators', async () => {
+  created = false; calls.length = 0;
+  const headers = { authorization: `Bearer ${token()}`, 'content-type': 'application/json' };
+  await withApp(async (port) => {
+    const post = (participants, key) => nativeFetch(`http://127.0.0.1:${port}/communications/threads`, {
+      method: 'POST', headers: { ...headers, 'Idempotency-Key': key }, body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants }),
+    });
+    let response = await post([{ kind: 'employee', employeeCode: codes.employee }], 'communication-employee-code-0001');
+    assert.equal(response.status, 201);
+    const employeeBody = await response.json();
+    assert.doesNotMatch(JSON.stringify(employeeBody), new RegExp(`${ids.employee}|${ids.clientMembership}`));
+    let rpc = calls.find((call) => call.url.pathname.endsWith('/rpc/communication_create_thread'));
+    assert.deepEqual(rpc.body.p_participants, [{ kind: 'owner', user_id: ids.owner }, { kind: 'employee', user_id: ids.employee }]);
+
+    calls.length = 0;
+    response = await post([{ kind: 'client', clientCode: codes.client }], 'communication-client-code-0001');
+    assert.equal(response.status, 201);
+    const clientBody = await response.json();
+    assert.doesNotMatch(JSON.stringify(clientBody), new RegExp(`${ids.clientUser}|${ids.clientMembership}`));
+    rpc = calls.find((call) => call.url.pathname.endsWith('/rpc/communication_create_thread'));
+    assert.deepEqual(rpc.body.p_participants, [{ kind: 'owner', user_id: ids.owner }, { kind: 'client', membership_id: ids.clientMembership }]);
+  });
+});
+
+test('Communication thread creation denies unavailable and ambiguous business-code recipients without calling the RPC', async () => {
+  const headers = { authorization: `Bearer ${token()}`, 'content-type': 'application/json' };
+  const unavailable = [
+    ['employee', 'employeeCode', codes.missingEmployee, 'COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND'],
+    ['employee', 'employeeCode', codes.inactiveEmployee, 'COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND'],
+    ['employee', 'employeeCode', codes.crossOwnerEmployee, 'COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND'],
+    ['client', 'clientCode', codes.missingClient, 'COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND'],
+    ['client', 'clientCode', codes.inactiveClient, 'COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND'],
+    ['client', 'clientCode', codes.crossOwnerClient, 'COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND'],
+    ['client', 'clientCode', codes.revokedClient, 'COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND'],
+  ];
+  await withApp(async (port) => {
+    for (const [kind, field, value, code] of unavailable) {
+      created = false; calls.length = 0;
+      const response = await nativeFetch(`http://127.0.0.1:${port}/communications/threads`, {
+        method: 'POST', headers: { ...headers, 'Idempotency-Key': `communication-unavailable-${value}` },
+        body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind, [field]: value }] }),
+      });
+      assert.equal(response.status, 404);
+      const body = await response.json();
+      assert.equal(body.error.code, code);
+      assert.doesNotMatch(JSON.stringify(body), /owner_user_id|membership_id|user_id/i);
+      assert.equal(calls.some((call) => call.url.pathname.endsWith('/rpc/communication_create_thread')), false);
+    }
+
+    created = false; calls.length = 0;
+    const response = await nativeFetch(`http://127.0.0.1:${port}/communications/threads`, {
+      method: 'POST', headers: { ...headers, 'Idempotency-Key': 'communication-ambiguous-client-0001' },
+      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'client', clientCode: codes.ambiguousClient }] }),
+    });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).error.code, 'COMMUNICATION_CLIENT_RECIPIENT_AMBIGUOUS');
+    assert.equal(calls.some((call) => call.url.pathname.endsWith('/rpc/communication_create_thread')), false);
+  });
 });
 
 test('Communication thread preflight preserves approved headers and permits the authenticated idempotent create request', async () => {
@@ -223,7 +323,7 @@ test('Communication thread preflight preserves approved headers and permits the 
         'Content-Type': 'application/json',
         'Idempotency-Key': 'communication-cors-create-key-0001',
       },
-      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', userId: ids.employee }] }),
+      body: JSON.stringify({ subject: 'Project update', body: 'Initial update', participants: [{ kind: 'employee', employeeCode: codes.employee }] }),
     });
     assert.equal(response.status, 201);
     assert.equal(response.headers.get('access-control-allow-origin'), origin);
