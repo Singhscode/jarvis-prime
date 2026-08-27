@@ -1,6 +1,7 @@
 import { AppError } from '../../middleware/error-handler.js';
 import { queue } from '../../jobs/queue.js';
 import { generateToken, hashToken, isValidEmailFormat, normalizeEmail } from '../auth/crypto.js';
+import { sendPasswordResetForUser } from '../auth/auth-service.js';
 import { sendTransactionalEmail } from '../../integrations/email-sender.js';
 import * as crm from '../crm/crm.service.js';
 import * as repository from './owner-workspace.repository.js';
@@ -70,6 +71,21 @@ export async function resendEmployeeInvitation(ownerUserId, rawEmployeeId) {
   try { invitation = await repository.prepareOwnerEmployeeInvitationResend(ownerUserId, employeeUserId, hashToken(token), expiresAt); }
   catch (error) { throw publicEmployeeInvitationError(error); }
   return deliverEmployeeInvitation(ownerUserId, invitation, token);
+}
+
+export async function sendEmployeePasswordReset(ownerUserId, rawEmployeeId, ipAddress) {
+  const employeeUserId = employeeId(rawEmployeeId);
+  const employee = await repository.getOwnerEmployee(ownerUserId, employeeUserId);
+  if (!employee) throw new AppError('Employee not found.', 404, 'EMPLOYEE_NOT_FOUND');
+  if (employee.status !== 'active') throw new AppError('Password reset is not available for this employee.', 409, 'EMPLOYEE_PASSWORD_RESET_NOT_AVAILABLE');
+  try {
+    const { delivery } = await sendPasswordResetForUser(employee, ipAddress);
+    await repository.recordOwnerEmployeePasswordReset(ownerUserId, employeeUserId, delivery, ipAddress);
+    return { delivery };
+  } catch {
+    await repository.recordOwnerEmployeePasswordReset(ownerUserId, employeeUserId, 'failed', ipAddress).catch(() => {});
+    throw new AppError('Password reset link could not be delivered. Please try again later.', 503, 'EMPLOYEE_PASSWORD_RESET_DELIVERY_FAILED', false);
+  }
 }
 
 function automationView(run) {
@@ -406,7 +422,7 @@ export async function getEmployeeDetail(ownerUserId, rawEmployeeId, query) {
 
 const DOCUMENT_SORTS = { 'created_at:desc': { field: 'created_at', ascending: false }, 'title:asc': { field: 'title', ascending: true } };
 const DOCUMENT_TYPES = new Set(['deliverable', 'report']);
-const AUDIT_CATEGORIES = { all: [], security: ['user.login', 'login.failed', 'account.locked'], invitations: ['client_portal_invitation'], employees: ['owner_employee_invitation'], automation: ['owner_automation'], documents: ['client_portal_document'] };
+const AUDIT_CATEGORIES = { all: [], security: ['user.login', 'login.failed', 'account.locked'], invitations: ['client_portal_invitation'], employees: ['owner_employee_invitation', 'owner_employee_password_reset'], automation: ['owner_automation'], documents: ['client_portal_document'] };
 const SEARCH_TYPES = new Set(['companies', 'contacts', 'leads', 'clients', 'projects', 'tasks', 'employees', 'documents']);
 
 function boundedQuery(value, field, { required = false } = {}) {
@@ -494,6 +510,7 @@ function auditLabel(event) {
   if (event.event_type === 'client_portal_document') return event.action === 'publish' ? 'Client Portal document published' : 'Client Portal document event';
   if (event.event_type === 'client_portal_invitation') return `Client Portal invitation ${event.action}`;
   if (event.event_type === 'owner_employee_invitation') return event.action === 'accept' ? 'Employee invitation accepted' : event.action === 'resend' ? 'Employee invitation resent' : event.action === 'deliver' ? 'Employee invitation delivery recorded' : 'Employee invitation created';
+  if (event.event_type === 'owner_employee_password_reset') return event.success ? 'Employee password reset link sent' : 'Employee password reset link delivery failed';
   if (event.event_type === 'owner_automation') return event.action === 'complete' ? 'Owner automation completed' : event.action === 'fail' ? 'Owner automation failed' : 'Owner automation requested';
   if (event.event_type === 'user.login') return 'Successful owner sign-in';
   if (event.event_type === 'login.failed') return 'Failed owner sign-in';
@@ -503,7 +520,7 @@ function auditLabel(event) {
 
 export async function listAuditEvents(ownerUserId, query) {
   const options = auditPageOptions(query); const result = await repository.listOwnerAuditEvents(ownerUserId, options);
-  return { items: result.items.map((event) => ({ id: event.id, label: auditLabel(event), category: event.event_type.startsWith('client_portal_document') ? 'documents' : event.event_type.startsWith('client_portal_invitation') ? 'invitations' : event.event_type.startsWith('owner_employee_invitation') ? 'employees' : event.event_type.startsWith('owner_automation') ? 'automation' : 'security', action: event.action, success: event.success, resourceType: event.resource_type || null, resourceId: event.resource_id || null, createdAt: event.created_at })), pageInfo: { nextCursor: result.nextOffset === null ? null : Buffer.from(String(result.nextOffset)).toString('base64url'), hasNextPage: result.nextOffset !== null } };
+  return { items: result.items.map((event) => ({ id: event.id, label: auditLabel(event), category: event.event_type.startsWith('client_portal_document') ? 'documents' : event.event_type.startsWith('client_portal_invitation') ? 'invitations' : event.event_type.startsWith('owner_employee_invitation') || event.event_type.startsWith('owner_employee_password_reset') ? 'employees' : event.event_type.startsWith('owner_automation') ? 'automation' : 'security', action: event.action, success: event.success, resourceType: event.resource_type || null, resourceId: event.resource_id || null, createdAt: event.created_at })), pageInfo: { nextCursor: result.nextOffset === null ? null : Buffer.from(String(result.nextOffset)).toString('base64url'), hasNextPage: result.nextOffset !== null } };
 }
 
 export function getSettingsStatus() {

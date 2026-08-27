@@ -914,3 +914,65 @@ test('checks Client account email eligibility as an Owner with a minimal, read-o
   assert.equal(normalizedUserQuery.searchParams.get('email_normalized'), 'eq.available@example.test');
   assert.ok(calls.every((url) => !url.includes('/rpc/provision_client_account')));
 });
+
+
+test('issues an active employee reset only through Owner scope and never returns credentials or reset capabilities', async () => {
+  calls.length = 0;
+  const employeeId = '30000000-0000-4000-8000-000000000003';
+  const outsideEmployeeId = '40000000-0000-4000-8000-000000000004';
+  let resetInsert;
+  const audits = [];
+  databaseFetch = (rawUrl, init = {}) => {
+    const url = new URL(rawUrl);
+    if (url.pathname.endsWith('/users')) {
+      if (url.searchParams.get('id') === `eq.${employeeId}`) return json({ id: employeeId, employee_code: 'JP-EMP-000001', full_name: 'Ava Employee', email: 'employee@example.test', status: 'active' });
+      if (url.searchParams.get('id') === `eq.${outsideEmployeeId}`) return json(null);
+    }
+    if (url.pathname.endsWith('/password_resets') && init.method === 'POST') {
+      resetInsert = JSON.parse(init.body);
+      return json({});
+    }
+    if (url.pathname.endsWith('/audit_logs') && init.method === 'POST') {
+      audits.push(JSON.parse(init.body));
+      return json({});
+    }
+    throw new Error(`Unexpected query: ${rawUrl} ${init.method || 'GET'}`);
+  };
+
+  await withServer(async (port) => {
+    const endpoint = `http://127.0.0.1:${port}/owner-workspace/employees/${employeeId}/password-reset`;
+    const response = await nativeFetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.deepEqual(body.data, { delivery: 'dry_run' });
+    assert.doesNotMatch(JSON.stringify(body), /token|password|hash|secret|url|owner_user_id/i);
+
+    workspaceIdentity = { id: ownerId, role: 'employee', status: 'active' };
+    const employeeDenied = await nativeFetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${token('employee')}` } });
+    assert.equal(employeeDenied.status, 403);
+
+    workspaceIdentity = ownerIdentity(); activeClientPortalMembership = true;
+    const clientDenied = await nativeFetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${token('client')}` } });
+    assert.equal(clientDenied.status, 403);
+
+    activeClientPortalMembership = false;
+    const crossOwner = await nativeFetch(`http://127.0.0.1:${port}/owner-workspace/employees/${outsideEmployeeId}/password-reset`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` } });
+    assert.equal(crossOwner.status, 404);
+    const crossOwnerError = (await crossOwner.json()).error;
+    assert.equal(crossOwnerError.code, 'EMPLOYEE_NOT_FOUND');
+    assert.equal(crossOwnerError.message, 'Employee not found.');
+  });
+
+  assert.equal(resetInsert.length, 1);
+  assert.equal(resetInsert[0].user_id, employeeId);
+  assert.match(resetInsert[0].token_hash, /^[a-f0-9]{64}$/);
+  assert.equal(Object.hasOwn(resetInsert[0], 'password'), false);
+  assert.equal(Object.hasOwn(resetInsert[0], 'token'), false);
+  assert.equal(audits.length, 2);
+  assert.ok(audits.some((entry) => entry[0].event_type === 'password.reset_initiated' && entry[0].user_id === employeeId));
+  assert.ok(audits.some((entry) => entry[0].event_type === 'owner_employee_password_reset' && entry[0].user_id === ownerId && entry[0].resource_id === employeeId));
+  assert.doesNotMatch(JSON.stringify(audits), /token_hash|employee@example\.test|https?:\/\//i);
+  assert.ok(audits.every((entry) => !Object.hasOwn(entry[0], 'token') && !Object.hasOwn(entry[0], 'password') && !Object.hasOwn(entry[0].details, 'token') && !Object.hasOwn(entry[0].details, 'reset_url')));
+  assert.equal(calls.some((url) => url.includes('/sessions') || url.includes('/auth/login')), false);
+  workspaceIdentity = ownerIdentity(); activeClientPortalMembership = false;
+});

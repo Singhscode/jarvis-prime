@@ -669,67 +669,69 @@ async function rotateRefreshTokenOnce(tokenHash, ipAddress) {
   }
 }
 
+function passwordResetUrl(email, token) {
+  const resetUrl = new URL('/employee/activate', process.env.WEB_APP_URL || 'https://www.jarvisprime.me');
+  resetUrl.searchParams.set('email', email);
+  resetUrl.searchParams.set('token', token);
+  return resetUrl.toString();
+}
+
+async function issuePasswordReset(user, ipAddress) {
+  const token = generateToken();
+  await repo.createPasswordResetToken(user.id, token, auth.passwordReset.tokenExpiryMs);
+
+  let deliveryStatus = 'failed';
+  try {
+    const delivery = await sendTransactionalEmail({
+      to: user.email,
+      subject: 'Reset your JARVIS PRIME password',
+      body: `Reset your password within 24 hours: ${passwordResetUrl(user.email, token)}`,
+    });
+    if (delivery.status === 'sent' || delivery.status === 'dry_run') deliveryStatus = delivery.status;
+  } catch {
+    deliveryStatus = 'failed';
+  }
+
+  await repo.createAuditLog({
+    user_id: user.id,
+    event_type: 'password.reset_initiated',
+    action: 'create',
+    resource_type: 'password_reset',
+    resource_id: user.id,
+    success: deliveryStatus !== 'failed',
+    error_message: deliveryStatus === 'failed' ? 'Transactional email delivery failed' : null,
+    ip_address: ipAddress,
+    details: { delivery_status: deliveryStatus },
+  });
+  if (deliveryStatus === 'failed') throw new Error('PASSWORD_RESET_DELIVERY_FAILED');
+  log.info(`Password reset initiated for user: ${user.id}`);
+  return { delivery: deliveryStatus };
+}
+
 /**
- * Initiates password reset flow
- * Sends reset token via email
- * 
- * @param {string} email - User email
- * @param {string} ipAddress - Client IP
+ * Issues a password reset for a server-authorized user. The raw capability is
+ * hashed before persistence and is only placed in the transactional email.
+ */
+export async function sendPasswordResetForUser(user, ipAddress) {
+  if (!user?.id || !isValidEmailFormat(user.email)) throw new Error('PASSWORD_RESET_USER_INVALID');
+  return issuePasswordReset(user, ipAddress);
+}
+
+/**
+ * Initiates the public password reset flow while preserving the generic,
+ * enumeration-safe response contract.
  */
 export async function initiatePasswordReset(email, ipAddress) {
   try {
     const user = await repo.getUserByEmail(email);
-
-    if (!user) {
-      // Generic response (prevent user enumeration)
-      return {
-        success: true,
-        message: 'If an account exists with this email, a reset link has been sent.',
-      };
-    }
-
-    // Generate reset token
-    const token = generateToken();
-    await repo.createPasswordResetToken(
-      user.id,
-      token,
-      auth.passwordReset.tokenExpiryMs
-    );
-
-    // In production, send email with reset link
-    // The token should be: `${resetUrl}?token=${token}&email=${encodeURIComponent(email)}`
-
-    await repo.createAuditLog({
-      user_id: user.id,
-      event_type: 'password.reset_initiated',
-      action: 'create',
-      resource_type: 'password_reset',
-      success: true,
-      ip_address: ipAddress,
-    });
-
-    log.info(`Password reset initiated for user: ${user.id}`);
-
-    const result = {
-      success: true,
-      message: 'If an account exists with this email, a reset link has been sent.',
-    };
-
-    // Never return the raw reset token in production. It must only ever
-    // reach the user via the email link. Exposed here only in development
-    // to allow local testing without an email provider configured.
-    if (config.env === 'development') {
-      result.resetToken = token;
-    }
-
-    return result;
-  } catch (error) {
-    log.error('Password reset initiation error:', error);
-    return {
-      success: false,
-      message: 'Failed to initiate password reset.',
-    };
+    if (user) await sendPasswordResetForUser(user, ipAddress);
+  } catch {
+    log.error('Password reset initiation error.');
   }
+  return {
+    success: true,
+    message: 'If an account exists with this email, a reset link has been sent.',
+  };
 }
 
 /**

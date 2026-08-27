@@ -92,6 +92,22 @@ export async function getOwnerEmployee(ownerUserId, employeeId) {
   return data;
 }
 
+export async function recordOwnerEmployeePasswordReset(ownerUserId, employeeUserId, deliveryStatus, ipAddress) {
+  const { error } = await client().from('audit_logs').insert([{
+    user_id: ownerUserId,
+    event_type: 'owner_employee_password_reset',
+    action: 'request',
+    resource_type: 'user',
+    resource_id: employeeUserId,
+    success: deliveryStatus !== 'failed',
+    error_message: deliveryStatus === 'failed' ? 'Transactional email delivery failed' : null,
+    ip_address: ipAddress || null,
+    details: { delivery_status: deliveryStatus },
+    created_at: new Date().toISOString(),
+  }]);
+  if (error) throw error;
+}
+
 export async function createOwnerEmployeeInvitation(ownerUserId, values, tokenHash, expiresAt) {
   const { data, error } = await client().rpc('create_owner_employee_invitation', {
     p_owner_user_id: ownerUserId, p_email: values.email, p_full_name: values.fullName, p_department: values.department,
