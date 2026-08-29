@@ -85,6 +85,7 @@ export default function EmployeePage() {
     <header className="flex items-center justify-between">
       <h1 className="text-3xl font-semibold">Employee Portal</h1>
       <div className="space-x-2">
+        <Link href="/employee/automations" className="inline-block rounded border px-3 py-2">Automations</Link>
         <Link href="/employee/communications" className="inline-block rounded border px-3 py-2">Communications</Link>
         <button className="rounded border px-3 py-2" onClick={() => void loadSnapshot()}>Refresh</button>
         <button className="rounded border px-3 py-2" onClick={() => void signOut()}>Logout</button>

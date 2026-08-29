@@ -7,7 +7,7 @@ import { useOwnerWorkspace } from './OwnerSessionBoundary';
 import OwnerGlobalSearch from './OwnerGlobalSearch';
 import OwnerWorkspaceControls from './OwnerWorkspaceControls';
 
-const ownerNavigation = [{ href: '/dashboard', label: 'Overview' }, { href: '/dashboard/crm', label: 'CRM' }, { href: '/dashboard/clients', label: 'Clients' }, { href: '/dashboard/projects', label: 'Projects' }, { href: '/dashboard/employees', label: 'Employees' }, { href: '/dashboard/communications', label: 'Communications' }, { href: '/dashboard/finance', label: 'Finance' }, { href: '/dashboard/documents', label: 'Documents' }, { href: '/dashboard/audit', label: 'Audit' }, { href: '/dashboard/settings', label: 'Settings' }];
+const ownerNavigation = [{ href: '/dashboard', label: 'Overview' }, { href: '/dashboard/crm', label: 'CRM' }, { href: '/dashboard/clients', label: 'Clients' }, { href: '/dashboard/projects', label: 'Projects' }, { href: '/dashboard/employees', label: 'Employees' }, { href: '/dashboard/communications', label: 'Communications' }, { href: '/dashboard/automations', label: 'Automations' }, { href: '/dashboard/finance', label: 'Finance' }, { href: '/dashboard/documents', label: 'Documents' }, { href: '/dashboard/audit', label: 'Audit' }, { href: '/dashboard/settings', label: 'Settings' }];
 const financeNavigation = [{ href: '/dashboard/finance', label: 'Finance' }];
 
 export default function OwnerWorkspaceShell({ children }: { children: React.ReactNode }) {
