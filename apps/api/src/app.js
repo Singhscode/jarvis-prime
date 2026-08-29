@@ -138,6 +138,10 @@ export async function createApp(options = {}) {
   app.use('/api/finance', financeRouter);
   const { default: communicationsRouter } = await import('./modules/communications/communications.routes.js');
   app.use('/api/communications', communicationsRouter);
+  const { default: recipePolicyRouter } = await import('./modules/automation/automation.recipe-policy.routes.js');
+  const { default: automationRouter } = await import('./modules/automation/automation.execution.routes.js');
+  app.use('/api/automation', recipePolicyRouter);
+  app.use('/api/automation', automationRouter);
 
   // ---- Shared-secret middleware for all other /api routes ----
   app.use('/api', createAuth());
