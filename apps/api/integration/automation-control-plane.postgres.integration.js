@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { evaluateScorePolicyV1 } from '../src/modules/automation/automation.recipe-policy.policy.js';
+import { assertApolloSearchInput } from '../src/modules/automation/automation.apollo-read.adapter.js';
 
 const { Client } = pg;
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -83,6 +84,10 @@ async function claimFor(runId, worker = `worker-${randomUUID()}`) {
 async function work(runId) {
   const { rows: [row] } = await db.query('select * from public.automation_work_items where run_id=$1', [runId]);
   return row;
+}
+async function apolloInputIsValid(input) {
+  const { rows: [row] } = await db.query('select public.automation_apollo_search_input_is_valid($1::jsonb) as valid', [JSON.stringify(input)]);
+  return row.valid;
 }
 async function cancel(runId) {
   return call(db, 'automation_cancel_run', [ids.ownerA, runId, ids.ownerA, 'TEST_CLEANUP']);
@@ -706,6 +711,52 @@ test('admits only bounded owner-scoped ACT_APOLLO_SEARCH work and records derive
   const { rows: sideEffects } = await db.query(`select action_code from public.automation_work_items where run_id=$1`, [first.run_id]);
   assert.deepEqual(sideEffects, [{ action_code: 'ACT_APOLLO_SEARCH' }]);
   await cancel(first.run_id);
+});
+
+test('Apollo SQL admission matches runtime validation and creates no claimable or dispatchable work for malformed input', { concurrency: false }, async () => {
+  const recipe = await createApolloRecipe();
+  const valid = { titles: [' Founder '], locations: ['New York'], industries: ['Software'], limit: 2 };
+  assert.deepEqual(assertApolloSearchInput(valid), { titles: ['Founder'], locations: ['New York'], industries: ['Software'], limit: 2 });
+  assert.equal(await apolloInputIsValid(valid), true);
+  const accepted = await admitApolloRecipe({ recipe, input: valid, idempotency: key('apollo-valid-parity') });
+  assert.equal((await work(accepted.run_id)).state, 'WAITING');
+  await cancel(accepted.run_id);
+
+  const invalidInputs = [
+    { label: 'numeric term', input: { ...valid, titles: [1] } },
+    { label: 'boolean term', input: { ...valid, locations: [true] } },
+    { label: 'null term', input: { ...valid, industries: [null] } },
+    { label: 'object term', input: { ...valid, titles: [{ value: 'Founder' }] } },
+    { label: 'array term', input: { ...valid, titles: [['Founder']] } },
+    { label: 'whitespace-only term', input: { ...valid, locations: [' \t '] } },
+    { label: 'case-normalized duplicate', input: { ...valid, titles: ['Founder', 'founder'] } },
+    { label: 'trim-normalized duplicate', input: { ...valid, locations: [' New York ', 'new york'] } },
+    { label: 'overlong term', input: { ...valid, industries: ['x'.repeat(101)] } },
+    { label: 'unknown field', input: { ...valid, query: 'browser-selected' } },
+    { label: 'missing field', input: { titles: ['Founder'], locations: ['New York'], limit: 2 } },
+    { label: 'empty list', input: { ...valid, titles: [] } },
+    { label: 'oversized list', input: { ...valid, titles: Array.from({ length: 11 }, (_, index) => `title-${index}`) } },
+    { label: 'fractional limit', input: { ...valid, limit: 1.5 } },
+    { label: 'out-of-range limit', input: { ...valid, limit: 51 } },
+  ];
+  const { rows: [before] } = await db.query(`select
+    (select count(*)::int from public.automation_trigger_inbox where owner_user_id=$1) as inboxes,
+    (select count(*)::int from public.automation_runs where owner_user_id=$1) as runs,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1) as work,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1 and state='RUNNING') as running,
+    (select count(*)::int from public.automation_run_events where owner_user_id=$1 and action_code='ACT_APOLLO_SEARCH' and event_code='WORK_DISPATCHING') as dispatches`, [ids.ownerA]);
+  for (const [index, { label, input }] of invalidInputs.entries()) {
+    assert.equal(await apolloInputIsValid(input), false, label);
+    assert.throws(() => assertApolloSearchInput(input), /AUTOMATION_APOLLO_INPUT_INVALID/, label);
+    await assert.rejects(admitApolloRecipe({ recipe, input, idempotency: key(`apollo-invalid-${index}`) }), /AUTOMATION_(?:APOLLO|RECIPE)_INPUT_INVALID/, label);
+  }
+  const { rows: [after] } = await db.query(`select
+    (select count(*)::int from public.automation_trigger_inbox where owner_user_id=$1) as inboxes,
+    (select count(*)::int from public.automation_runs where owner_user_id=$1) as runs,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1) as work,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1 and state='RUNNING') as running,
+    (select count(*)::int from public.automation_run_events where owner_user_id=$1 and action_code='ACT_APOLLO_SEARCH' and event_code='WORK_DISPATCHING') as dispatches`, [ids.ownerA]);
+  assert.deepEqual(after, before);
 });
 
 

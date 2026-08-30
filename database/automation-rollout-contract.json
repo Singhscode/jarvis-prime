@@ -1,0 +1,19 @@
+{
+  "contractVersion": 1,
+  "workerCommand": "npm run worker:automation --workspace=apps/api",
+  "compatibility": {
+    "registryVersion": "AUTOMATION_REGISTRY_V1",
+    "workerVersion": "AUTOMATION_WORKER_V1"
+  },
+  "migrations": [
+    { "file": "20260810000023_add_automation_control_plane.sql", "sha256": "efb966cc2d39e0b269658acfdb8f1b659a1f267bc55119163b533c0d17378c65" },
+    { "file": "20260810000024_add_automation_execution_gap_controls.sql", "sha256": "b4d3c44f0e77528e018c51924a11f4f94b5bb1421deb06c6ddd6db456ba1965a" },
+    { "file": "20260810000025_fix_automation_daily_quota_window.sql", "sha256": "7bd56786743ea123d43d1fbd81afddc3f722003ee75ddfebe24a55bbcd5c9fb6" },
+    { "file": "20260810000026_add_automation_recipe_policy_governance.sql", "sha256": "7b653401b0ee3735df6bd1093ea9355cf1ce0d77c6c81258bfb34e9c2f6f3d27" },
+    { "file": "20260810000027_add_employee_run_pause_control.sql", "sha256": "7245888759fc785cbe97fe2efeca44a2f3aafd8bae124ab28e2d170b5a66770b" },
+    { "file": "20260810000028_add_automation_icp_score_policy.sql", "sha256": "f2068757a882f7856d37976f060239dbce701734c6ebee8d40d69d2b8a5e6fdc" },
+    { "file": "20260810000029_add_automation_apollo_readonly_action.sql", "sha256": "3337529943c1a769dd2dec4c8d3583307867df1bf1c8c01d42235f78485ab7c0" },
+    { "file": "20260810000030_add_automation_apollo_operational_readiness.sql", "sha256": "0cd87609f63e6a3972340a6843b1ce6bf16e918b2e78d199d1e1f1f5a41e8d4a" },
+    { "file": "20260810000031_add_automation_operational_health.sql", "sha256": "31d6bb2a3982b8c5d4cb6c5185887019065c74194aeacf85cfd75144d65d0ed8" }
+  ]
+}

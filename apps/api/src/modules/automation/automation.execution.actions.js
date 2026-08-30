@@ -2,6 +2,8 @@ import * as crm from '../crm/crm.service.js';
 import * as communications from '../communications/communications.service.js';
 import { communicationEmailDeliveryEnabled } from '../communications/communications.delivery.js';
 import { assertActionCode, assertObject } from './automation.execution.validation.js';
+import { config } from '../../config/config.js';
+import { APOLLO_ACTION_CODE, APOLLO_PROVIDER_CODE, createApolloReadOnlyAdapterRegistry } from './automation.apollo-read.adapter.js';
 
 function context(value) {
   if (!value?.ownerUserId || !value?.actorUserId || !value?.workItemId) throw new Error('AUTOMATION_INVALID_ACTION_CONTEXT');
@@ -82,4 +84,32 @@ export function createActionRegistry({ crmApi = crm, communicationsApi = communi
 }
 
 const registry = createActionRegistry();
-export function getAction(code) { assertActionCode(code); return registry[code]; }
+const externalRegistry = createApolloReadOnlyAdapterRegistry();
+
+/**
+ * Resolves only server-composed, fixed action/provider pairs. Apollo is read-only
+ * and delegates to the Step 6A adapter; all other external providers remain disabled.
+ */
+export function createActionResolver({ internalRegistry = registry, providerRegistry = externalRegistry, enableApolloReadOnly = config.phase11ApolloReadEnabled } = {}) {
+  return (actionCode, providerCode = 'INTERNAL') => {
+    assertActionCode(actionCode);
+    if (providerCode === 'INTERNAL' && Object.hasOwn(internalRegistry, actionCode)) return internalRegistry[actionCode];
+    if (enableApolloReadOnly === true && providerCode === APOLLO_PROVIDER_CODE && actionCode === APOLLO_ACTION_CODE) {
+      const action = async (context) => providerRegistry.execute({
+        providerCode: APOLLO_PROVIDER_CODE,
+        actionCode: APOLLO_ACTION_CODE,
+        ownerUserId: context.ownerUserId,
+        runId: context.runId,
+        workItemId: context.workItemId,
+        correlationId: context.correlationId,
+        input: context.input,
+      });
+      action.rateConcurrencyGroup = 'APOLLO_READ';
+      return action;
+    }
+    throw new Error('AUTOMATION_ACTION_DISABLED');
+  };
+}
+
+const actionResolver = createActionResolver();
+export function getAction(code, providerCode = 'INTERNAL') { return actionResolver(code, providerCode); }

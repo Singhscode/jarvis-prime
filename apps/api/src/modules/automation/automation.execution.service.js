@@ -86,7 +86,7 @@ export async function setOwnerControl(userId, values) {
   if (!['OWNER', 'RECIPE', 'RUN', 'PROVIDER'].includes(body.scopeType) || typeof body.scopeId !== 'string' || typeof body.paused !== 'boolean' || typeof body.emergencyStop !== 'boolean') invalid();
   const scopeId = body.scopeType === 'OWNER' ? actor.ownerUserId : body.scopeId;
   if (body.scopeType === 'OWNER' && scopeId !== actor.ownerUserId) denied();
-  if (body.scopeType === 'PROVIDER' && scopeId !== 'INTERNAL') invalid();
+  if (body.scopeType === 'PROVIDER' && !['INTERNAL', 'APOLLO'].includes(scopeId)) invalid();
   if (['RECIPE', 'RUN'].includes(body.scopeType) && !(await repository.getOwnedResource(actor.ownerUserId, body.scopeType, uuid(scopeId)))) denied();
   try { await repository.setControl({ ownerUserId: actor.ownerUserId, scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop, reasonCode: reason(body.reasonCode, 'OWNER_CONTROL'), actorUserId: actor.actorUserId }); return { scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop }; }
   catch (error) { mapError(error); }

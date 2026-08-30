@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
-export const RECIPE_ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY']);
+export const RECIPE_ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
 export const FIXED_POLICY_KEYS = Object.freeze(['POL_APPROVAL@V1', 'POL_LIMIT@V1']);
-export const DISABLED_POLICY_CODES = Object.freeze(['POL_SCORE', 'POL_REPLY']);
+export const DISABLED_POLICY_CODES = Object.freeze(['POL_REPLY']);
 export const RECIPE_LIFECYCLE_TRANSITIONS = Object.freeze(['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE', 'PAUSE', 'ARCHIVE']);
 export const RECIPE_STATUSES = Object.freeze(['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE', 'PAUSED', 'ARCHIVED']);
 
@@ -98,4 +98,51 @@ export function assertAssignmentInputs(value) {
     if (!RECIPE_ACTION_CODES.includes(action) || !Array.isArray(hashes) || hashes.some((hash) => typeof hash !== 'string' || !HASH.test(hash))) invalid('AUTOMATION_ASSIGNMENT_INVALID');
   }
   return value;
+}
+
+const SCORE_PROSPECT_FIELDS = Object.freeze(['title', 'company', 'industry', 'location', 'email']);
+const SCORE_CLIENT_FIELDS = Object.freeze(['titles', 'industries', 'locations', 'keywords', 'scoringWeights', 'qualifyThreshold', 'hotThreshold', 'disqualifiers']);
+const SCORE_WEIGHT_FIELDS = Object.freeze(['title', 'industry', 'location', 'keyword', 'email']);
+function scoreText(value) {
+  if (typeof value !== 'string' || value.length > 240) invalid('AUTOMATION_SCORE_INPUT_INVALID');
+  return value.trim();
+}
+function scoreTerms(value) {
+  if (!Array.isArray(value) || value.length > 50) invalid('AUTOMATION_SCORE_INPUT_INVALID');
+  return value.map((item) => {
+    const term = scoreText(item);
+    if (!term) invalid('AUTOMATION_SCORE_INPUT_INVALID');
+    return term;
+  });
+}
+function scoreWeights(value) {
+  exact(value, SCORE_WEIGHT_FIELDS, 'AUTOMATION_SCORE_INPUT_INVALID');
+  const normalized = {};
+  for (const field of SCORE_WEIGHT_FIELDS) {
+    if (!Number.isInteger(value[field]) || value[field] < 0 || value[field] > 30) invalid('AUTOMATION_SCORE_INPUT_INVALID');
+    normalized[field] = value[field];
+  }
+  return Object.freeze(normalized);
+}
+
+// A complete, normalized snapshot prevents environment defaults or browser expressions
+// from changing the meaning of an auditable POL_SCORE@V1 evaluation.
+export function assertScorePolicyInput(value) {
+  exact(value, ['prospect', 'clientIcp'], 'AUTOMATION_SCORE_INPUT_INVALID');
+  exact(value.prospect, SCORE_PROSPECT_FIELDS, 'AUTOMATION_SCORE_INPUT_INVALID');
+  exact(value.clientIcp, SCORE_CLIENT_FIELDS, 'AUTOMATION_SCORE_INPUT_INVALID');
+  const prospect = Object.fromEntries(SCORE_PROSPECT_FIELDS.map((field) => [field, scoreText(value.prospect[field])]));
+  const clientIcp = {
+    titles: scoreTerms(value.clientIcp.titles),
+    industries: scoreTerms(value.clientIcp.industries),
+    locations: scoreTerms(value.clientIcp.locations),
+    keywords: scoreTerms(value.clientIcp.keywords),
+    scoringWeights: scoreWeights(value.clientIcp.scoringWeights),
+    qualifyThreshold: value.clientIcp.qualifyThreshold,
+    hotThreshold: value.clientIcp.hotThreshold,
+    disqualifiers: scoreTerms(value.clientIcp.disqualifiers),
+  };
+  if (!Number.isInteger(clientIcp.qualifyThreshold) || !Number.isInteger(clientIcp.hotThreshold)
+      || clientIcp.qualifyThreshold < 0 || clientIcp.hotThreshold < clientIcp.qualifyThreshold || clientIcp.hotThreshold > 30) invalid('AUTOMATION_SCORE_INPUT_INVALID');
+  return Object.freeze({ prospect: Object.freeze(prospect), clientIcp: Object.freeze(clientIcp) });
 }

@@ -50,7 +50,7 @@ test('Recipe validation fails closed for unknown fields, dynamic content, invali
 test('the policy registry is fixed and only static approval can admit or hold a Recipe for review', () => {
   const registry = listPolicyRegistry();
   assert.deepEqual(registry.map((policy) => [policy.code, policy.enabled]), [
-    ['POL_APPROVAL', true], ['POL_LIMIT', true], ['POL_SCORE', false], ['POL_REPLY', false],
+    ['POL_APPROVAL', true], ['POL_LIMIT', true], ['POL_SCORE', true], ['POL_REPLY', false],
   ]);
   assert.deepEqual(evaluateAdmissionPolicies(definition().steps[0]), {
     decision: 'ALLOW', reasonCode: 'RECIPE_APPROVED', evidence: { policyCode: 'POL_APPROVAL', policyVersion: 'V1' },

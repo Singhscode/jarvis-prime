@@ -96,6 +96,9 @@ export const config = {
   // Server (for HTTP mode)
   port: num(env.PORT, 3001),
   automationSecret: env.AUTOMATION_SERVER_SECRET || 'dev-secret',
+  // Phase 11 external reads stay fail-closed until an explicit server-side activation.
+  // The durable Apollo owner configuration is independently disabled by default.
+  phase11ApolloReadEnabled: bool(env.PHASE11_APOLLO_READ_ENABLED, false),
 
   // Authentication (JWT — user-facing auth layer)
   jwtSecret: env.JWT_SECRET || '',

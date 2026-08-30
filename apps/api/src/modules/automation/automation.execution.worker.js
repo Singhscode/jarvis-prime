@@ -2,7 +2,7 @@ import * as repository from './automation.execution.repository.js';
 import { getAction } from './automation.execution.actions.js';
 import { AUTOMATION_REGISTRY_VERSION, AUTOMATION_WORKER_VERSION, bounded, classifyError, MAX, redactedError, retryDelayMs, workerIdentity } from './automation.execution.validation.js';
 
-export function createWorker({ workerId = workerIdentity(), claimBatch = 10, concurrency = 4, actionConcurrency = 2, leaseSeconds = 60, heartbeatMs = 15000, pollMs = 5000, registryVersion = AUTOMATION_REGISTRY_VERSION, workerVersion = AUTOMATION_WORKER_VERSION, repositoryApi = repository, actionResolver = getAction, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), logger = console } = {}) {
+export function createWorker({ workerId = workerIdentity(), claimBatch = 10, concurrency = 4, actionConcurrency = 2, leaseSeconds = 60, heartbeatMs = 15000, pollMs = 5000, registryVersion = AUTOMATION_REGISTRY_VERSION, workerVersion = AUTOMATION_WORKER_VERSION, repositoryApi = repository, actionResolver = getAction, concurrencyKeyResolver = (work) => work.provider_code === 'APOLLO' ? 'APOLLO_READ' : work.action_code, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), logger = console } = {}) {
   const batch = bounded(claimBatch, 10, 1, MAX.claimBatch, 'CLAIM_BATCH');
   const limit = bounded(concurrency, 4, 1, MAX.workerConcurrency, 'WORKER_CONCURRENCY');
   const actionLimit = bounded(actionConcurrency, 2, 1, MAX.actionConcurrency, 'ACTION_CONCURRENCY');
@@ -47,7 +47,8 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
     active += 1;
     let dispatched = false; let actionAcquired = false; let heartbeat = null;
     try {
-      await acquireAction(work.action_code); actionAcquired = true;
+      const concurrencyKey = concurrencyKeyResolver(work);
+      await acquireAction(concurrencyKey); actionAcquired = concurrencyKey;
       const dispatchAdmission = await repositoryApi.markDispatching(work.id, workerId, work.lease_token);
       if (dispatchAdmission?.allowed === false) {
         recordState(dispatchAdmission.state || 'BLOCKED');
@@ -55,8 +56,8 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
       }
       dispatched = true;
       heartbeat = startHeartbeat(work);
-      const action = actionResolver(work.action_code);
-      const outcome = await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, workItemId: work.id, correlationId: work.correlation_id, input: work.input });
+      const action = actionResolver(work.action_code, work.provider_code || 'INTERNAL');
+      const outcome = await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, runId: work.run_id, workItemId: work.id, correlationId: work.correlation_id, input: work.input });
       if (heartbeat.lost()) {
         const error = new Error('AUTOMATION_LEASE_LOST'); error.code = 'AUTOMATION_LEASE_LOST'; throw error;
       }
@@ -65,13 +66,15 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
       return { id: work.id, state: 'COMPLETED' };
     } catch (error) {
       const classified = classifyError(error, { afterDispatch: dispatched, knownOutcome: Boolean(error?.knownOutcome) });
+      const safeProviderResult = error?.safeMetadata && typeof error.safeMetadata === 'object' && !Array.isArray(error.safeMetadata)
+        ? error.safeMetadata : {};
       const dueAt = classified.state === 'RETRYABLE' ? new Date(Date.now() + retryDelayMs(work.attempt_count, work.id)).toISOString() : null;
-      try { await repositoryApi.transition(work.id, workerId, work.lease_token, classified.state, classified.reason, redactedError(error), dueAt); } catch (transitionError) { logger.warn?.('Automation transition failed after worker error', redactedError(transitionError)); }
+      try { await repositoryApi.transition(work.id, workerId, work.lease_token, classified.state, classified.reason, { ...redactedError(error), ...safeProviderResult }, dueAt); } catch (transitionError) { logger.warn?.('Automation transition failed after worker error', redactedError(transitionError)); }
       recordState(classified.state);
       return { id: work.id, state: classified.state };
     } finally {
       heartbeat?.stop();
-      if (actionAcquired) releaseAction(work.action_code);
+      if (actionAcquired) releaseAction(actionAcquired);
       active -= 1;
     }
   }

@@ -10,6 +10,7 @@ const mutationLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 30, keyF
 
 router.use(createAuthMiddleware());
 router.get('/policies', handle(async (req, res) => respond(res, await recipes.getPolicyRegistry(req.user.sub))));
+router.post('/policies/score/evaluations', mutationLimiter, handle(async (req, res) => respond(res, await recipes.evaluateScorePolicy(req.user.sub, req.body, req.get('Idempotency-Key')), 201)));
 router.get('/recipes', handle(async (req, res) => respond(res, await recipes.listRecipes(req.user.sub, req.query))));
 router.get('/recipes/assigned', handle(async (req, res) => respond(res, await recipes.listAssignedRecipes(req.user.sub))));
 router.get('/recipes/assigned/:recipeCode', handle(async (req, res) => respond(res, await recipes.getAssignedRecipe(req.user.sub, req.params.recipeCode))));
