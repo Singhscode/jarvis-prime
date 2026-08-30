@@ -104,6 +104,14 @@ export type AutomationAssignmentProjection = {
 export type AutomationHealth = {
   runCounts: Partial<Record<string, number>>;
   policyFailures: { runId: string | null; decision: string; reasonCode: string | null; createdAt: string }[];
+  operationalHealth?: {
+    observedAt: string;
+    queue: { eligibleCount: number; delayedCount: number; oldestQueuedAt: string | null; oldestEligibleAt: string | null };
+    leases: { activeCount: number; staleCount: number; staleClaimedCount: number; staleDispatchingCount: number };
+    attention: { retryableCount: number; failedCount: number; blockedCount: number; humanReviewCount: number };
+    recovery: { recoveredLast24h: number };
+    compatibility: { ready: boolean; schemaVersion: number | null; registryVersion: string | null; workerVersion: string | null };
+  };
 };
 
 export type AutomationInputSchema = {

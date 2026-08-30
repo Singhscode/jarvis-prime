@@ -13,6 +13,7 @@ const employeePasswordResetLimiter = createRateLimiter({ windowMs: 60 * 60_000, 
 const clientProvisionLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 10, keyFn: (req) => `owner-client-provision:${req.user?.sub || req.ip}`, message: 'Too many client account provisioning attempts. Try again later.' });
 const clientEmailEligibilityLimiter = createRateLimiter({ windowMs: 60 * 60_000, max: 30, keyFn: (req) => `owner-client-email-eligibility:${req.user?.sub || req.ip}`, message: 'Too many client email eligibility checks. Try again later.' });
 const automationRunLimiter = createRateLimiter({ windowMs: 15 * 60_000, max: 10, keyFn: (req) => `owner-automation-run:${req.user?.sub || req.ip}`, message: 'Too many automation requests. Try again later.' });
+// Legacy manual workspace-summary compatibility route. It does not admit Phase 11 work.
 router.use(createAuthMiddleware());
 router.use(authorize);
 

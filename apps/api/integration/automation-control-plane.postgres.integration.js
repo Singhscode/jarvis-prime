@@ -2,6 +2,7 @@ import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import pg from 'pg';
+import { evaluateScorePolicyV1 } from '../src/modules/automation/automation.recipe-policy.policy.js';
 
 const { Client } = pg;
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -43,6 +44,19 @@ async function createGovernedRecipe({ code = recipeCode('GOV'), humanReview = fa
 async function admitGovernedRecipe({ recipe, actor = ids.ownerA, actorKind = 'owner', input = taskInput, idempotency = key('recipe-admit'), dueAt = new Date(Date.now() - 1000).toISOString() } = {}) {
   const requestHash = hash(jsonb({ recipeCode: recipe.code, input, dueAt }));
   return call(db, 'automation_admit_recipe_run', [ids.ownerA, actor, actorKind, recipe.code, JSON.stringify(input), dueAt, idempotency, requestHash]);
+}
+async function createApolloRecipe({ owner = ids.ownerA, actor = owner, code = recipeCode('APOLLO') } = {}) {
+  const definition = {
+    recipeCode: code,
+    inputSchema: { properties: { titles: { type: 'array' }, locations: { type: 'array' }, industries: { type: 'array' }, limit: { type: 'number' } }, required: ['titles', 'locations', 'industries', 'limit'] },
+    steps: [{ stepCode: 'STEP_APOLLO', sequence: 1, actionCode: 'ACT_APOLLO_SEARCH', policies: ['POL_APPROVAL@V1', 'POL_LIMIT@V1'], requiresHumanReview: false }],
+  };
+  const created = await call(db, 'automation_create_recipe', [owner, actor, code, JSON.stringify(definition), hash(jsonb(definition))]);
+  for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) await call(db, 'automation_transition_recipe_lifecycle', [owner, actor, created.recipe_id, created.recipe_version_id, transition]);
+  return { ...created, code, definition };
+}
+async function admitApolloRecipe({ recipe, owner = ids.ownerA, actor = owner, idempotency = key('apollo-admit'), dueAt = new Date(Date.now() - 1_000).toISOString(), input = { titles: ['Founder'], locations: ['New York'], industries: ['Software'], limit: 2 } } = {}) {
+  return call(db, 'automation_admit_recipe_run', [owner, actor, 'owner', recipe.code, JSON.stringify(input), dueAt, idempotency, hash(jsonb({ recipeCode: recipe.code, input, dueAt }))]);
 }
 let db;
 
@@ -451,8 +465,10 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     invalid.steps[1].dependsOn = 'STEP_UNKNOWN';
     await assert.rejects(call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, invalidCode, JSON.stringify(invalid), hash(jsonb(invalid))]), /AUTOMATION_RECIPE_GRAPH_INVALID/);
     const unsupported = governedDefinition(recipeCode('UNSUPPORTED'));
-    unsupported.steps[0].actionCode = 'ACT_EMAIL';
-    await assert.rejects(call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, unsupported.recipeCode, JSON.stringify(unsupported), hash(jsonb(unsupported))]), /AUTOMATION_RECIPE_GRAPH_INVALID/);
+    for (const actionCode of ['ACT_EMAIL', 'ACT_HUNTER_EMAIL_FIND', 'ACT_OUTREACH_SEND', 'ACT_CALENDAR_BOOK']) {
+      unsupported.steps[0].actionCode = actionCode;
+      await assert.rejects(call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, unsupported.recipeCode, JSON.stringify(unsupported), hash(jsonb(unsupported))]), /AUTOMATION_RECIPE_GRAPH_INVALID/);
+    }
 
     const recipe = await createGovernedRecipe();
     const assigned = await call(db, 'automation_upsert_recipe_assignment', [
@@ -581,4 +597,209 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     assert.equal(claimed.some((item) => item.run_id === workerRun.run_id), false);
     await cancel(workerRun.run_id);
   });
+});
+
+
+test('persists owner-scoped, idempotent POL_SCORE evidence without admitting or dispatching work', { concurrency: false }, async () => {
+  const recipe = await createGovernedRecipe();
+  const input = {
+    prospect: { title: 'Founder', company: 'BrightReach Agency', industry: 'Marketing', location: 'Gurgaon, India', email: 'founder@brightreach.test' },
+    clientIcp: {
+      titles: ['Founder', 'Head of Sales'], industries: ['Marketing'], locations: ['India'], keywords: ['agency', 'outbound', 'b2b'],
+      scoringWeights: { title: 10, industry: 8, location: 4, keyword: 2, email: 2 }, qualifyThreshold: 15, hotThreshold: 24,
+      disqualifiers: ['student', 'intern', 'freelance', 'unemployed', 'looking for work'],
+    },
+  };
+  const evaluation = evaluateScorePolicyV1(input);
+  const idempotency = key('score-policy');
+  const requestHash = hash(jsonb({ policy: 'POL_SCORE@V1', recipeCode: recipe.code, input }));
+  const before = await db.query(`select
+    (select count(*)::int from public.automation_trigger_inbox where owner_user_id=$1) as inboxes,
+    (select count(*)::int from public.automation_runs where owner_user_id=$1) as runs,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1) as work`, [ids.ownerA]);
+  const args = [ids.ownerA, ids.ownerA, recipe.code, JSON.stringify(input), idempotency, requestHash,
+    evaluation.safeMetadata.score, evaluation.safeMetadata.qualified, evaluation.safeMetadata.hot,
+    evaluation.decision, evaluation.reasonCode, JSON.stringify(evaluation.safeMetadata)];
+  const first = await call(db, 'automation_evaluate_recipe_score_policy', args);
+  const replay = await call(db, 'automation_evaluate_recipe_score_policy', args);
+  assert.equal(first.replayed, false);
+  assert.equal(replay.replayed, true);
+  assert.deepEqual({ correlation_id: replay.correlation_id, decision: replay.decision, score: replay.score }, {
+    correlation_id: first.correlation_id, decision: 'ALLOW', score: evaluation.safeMetadata.score,
+  });
+  const { rows: [evidence] } = await db.query(`select owner_user_id,recipe_version_id,configuration_sha256,policy_code,policy_version,decision,reason_code,
+    evaluated_input_sha256,safe_metadata,correlation_id,idempotency_key,request_sha256,created_at
+    from public.automation_policy_decisions where owner_user_id=$1 and idempotency_key=$2`, [ids.ownerA, idempotency]);
+  assert.deepEqual({ owner_user_id: evidence.owner_user_id, recipe_version_id: evidence.recipe_version_id, configuration_sha256: evidence.configuration_sha256,
+    policy_code: evidence.policy_code, policy_version: evidence.policy_version, decision: evidence.decision, reason_code: evidence.reason_code,
+    evaluated_input_sha256: evidence.evaluated_input_sha256, safe_metadata: evidence.safe_metadata, idempotency_key: evidence.idempotency_key, request_sha256: evidence.request_sha256 }, {
+    owner_user_id: ids.ownerA, recipe_version_id: recipe.recipe_version_id, configuration_sha256: hash(jsonb(recipe.definition)),
+    policy_code: 'POL_SCORE', policy_version: 'V1', decision: 'ALLOW', reason_code: 'ICP_QUALIFIED',
+    evaluated_input_sha256: inputHash(input), safe_metadata: evaluation.safeMetadata, idempotency_key: idempotency, request_sha256: requestHash,
+  });
+  assert.match(evidence.correlation_id, /^[0-9a-f-]{36}$/i);
+  assert.ok(evidence.created_at);
+  const after = await db.query(`select
+    (select count(*)::int from public.automation_trigger_inbox where owner_user_id=$1) as inboxes,
+    (select count(*)::int from public.automation_runs where owner_user_id=$1) as runs,
+    (select count(*)::int from public.automation_work_items where owner_user_id=$1) as work`, [ids.ownerA]);
+  assert.deepEqual(after.rows[0], before.rows[0]);
+  await assert.rejects(call(db, 'automation_evaluate_recipe_score_policy', [
+    ids.ownerA, ids.ownerA, recipe.code, JSON.stringify({ ...input, prospect: { ...input.prospect, company: 'Changed Company' } }), idempotency,
+    hash(jsonb({ policy: 'POL_SCORE@V1', recipeCode: recipe.code, input: { ...input, prospect: { ...input.prospect, company: 'Changed Company' } } })),
+    evaluation.safeMetadata.score, evaluation.safeMetadata.qualified, evaluation.safeMetadata.hot, evaluation.decision, evaluation.reasonCode, JSON.stringify(evaluation.safeMetadata),
+  ]), /AUTOMATION_IDEMPOTENCY_CONFLICT/);
+  await assert.rejects(call(db, 'automation_evaluate_recipe_score_policy', [
+    ids.ownerB, ids.ownerB, recipe.code, JSON.stringify(input), key('score-cross-owner'), requestHash,
+    evaluation.safeMetadata.score, evaluation.safeMetadata.qualified, evaluation.safeMetadata.hot, evaluation.decision, evaluation.reasonCode, JSON.stringify(evaluation.safeMetadata),
+  ]), /AUTOMATION_RECIPE_NOT_ACTIVE/);
+});
+
+
+test('admits only bounded owner-scoped ACT_APOLLO_SEARCH work and records derived provider audit identifiers without CRM or outreach work', { concurrency: false }, async () => {
+  const code = recipeCode('APOLLO_READ');
+  const definition = {
+    recipeCode: code,
+    inputSchema: {
+      properties: { titles: { type: 'array' }, locations: { type: 'array' }, industries: { type: 'array' }, limit: { type: 'number' } },
+      required: ['titles', 'locations', 'industries', 'limit'],
+    },
+    steps: [{ stepCode: 'STEP_APOLLO', sequence: 1, actionCode: 'ACT_APOLLO_SEARCH', policies: ['POL_APPROVAL@V1', 'POL_LIMIT@V1'], requiresHumanReview: false }],
+  };
+  const recipe = await call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, code, JSON.stringify(definition), hash(jsonb(definition))]);
+  for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) {
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, transition]);
+  }
+  const input = { titles: ['Founder'], locations: ['New York'], industries: ['Software'], limit: 2 };
+  const dueAt = new Date(Date.now() - 1_000).toISOString();
+  const idempotency = key('apollo-read');
+  const requestHash = hash(jsonb({ recipeCode: code, input, dueAt }));
+  const first = await call(db, 'automation_admit_recipe_run', [ids.ownerA, ids.ownerA, 'owner', code, JSON.stringify(input), dueAt, idempotency, requestHash]);
+  const replay = await call(db, 'automation_admit_recipe_run', [ids.ownerA, ids.ownerA, 'owner', code, JSON.stringify(input), dueAt, idempotency, requestHash]);
+  assert.deepEqual({ replayed: first.replayed, state: first.state }, { replayed: false, state: 'WAITING' });
+  assert.deepEqual(replay, { trigger_id: first.trigger_id, run_id: first.run_id, replayed: true });
+  const { rows: [stored] } = await db.query(`select action_code,provider_code,input,input_sha256,provider_idempotency_key,provider_correlation_id
+    from public.automation_work_items where id=$1`, [first.work_item_id]);
+  assert.deepEqual({ action_code: stored.action_code, provider_code: stored.provider_code, input: stored.input }, { action_code: 'ACT_APOLLO_SEARCH', provider_code: 'APOLLO', input });
+  assert.equal(stored.input_sha256, inputHash(input));
+  assert.equal(stored.provider_idempotency_key, null);
+  assert.equal(stored.provider_correlation_id, null);
+
+  await call(db, 'automation_configure_apollo_read', [ids.ownerA, ids.ownerA, true, 5, 1]);
+  const claimed = await claimFor(first.run_id, 'worker-apollo-read');
+  assert.equal(claimed.provider_code, 'APOLLO');
+  const dispatched = await call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]);
+  assert.equal(dispatched.allowed, true);
+  const { rows: [dispatchedWork] } = await db.query(`select provider_idempotency_key,provider_correlation_id from public.automation_work_items where id=$1`, [claimed.id]);
+  const { rows: [run] } = await db.query('select correlation_id from public.automation_runs where id=$1', [first.run_id]);
+  assert.deepEqual(dispatchedWork, {
+    provider_idempotency_key: `phase11:APOLLO:ACT_APOLLO_SEARCH:${claimed.id}`,
+    provider_correlation_id: `phase11:APOLLO:${run.correlation_id}`,
+  });
+  const { rows: [event] } = await db.query(`select event_code,action_code,safe_metadata from public.automation_run_events
+    where work_item_id=$1 and event_code='WORK_DISPATCHING'`, [claimed.id]);
+  assert.deepEqual(event, { event_code: 'WORK_DISPATCHING', action_code: 'ACT_APOLLO_SEARCH', safe_metadata: { provider_code: 'APOLLO' } });
+
+  const invalid = { ...input, limit: 51 };
+  await assert.rejects(call(db, 'automation_admit_recipe_run', [ids.ownerA, ids.ownerA, 'owner', code, JSON.stringify(invalid), dueAt, key('apollo-invalid'), hash(jsonb({ recipeCode: code, input: invalid, dueAt }))]), /AUTOMATION_APOLLO_INPUT_INVALID/);
+  await assert.rejects(call(db, 'automation_admit_recipe_run', [ids.ownerB, ids.ownerB, 'owner', code, JSON.stringify(input), dueAt, key('apollo-cross-owner'), requestHash]), /AUTOMATION_RECIPE_NOT_ACTIVE/);
+  const { rows: sideEffects } = await db.query(`select action_code from public.automation_work_items where run_id=$1`, [first.run_id]);
+  assert.deepEqual(sideEffects, [{ action_code: 'ACT_APOLLO_SEARCH' }]);
+  await cancel(first.run_id);
+});
+
+
+test('Apollo stays disabled without explicit owner configuration and the durable configuration is owner-scoped', { concurrency: false }, async () => {
+  await call(db, 'automation_configure_apollo_read', [ids.ownerA, ids.ownerA, false, null, null]);
+  const recipe = await createApolloRecipe();
+  const blockedRun = await admitApolloRecipe({ recipe, idempotency: key('apollo-disabled') });
+  await callSet(db, 'automation_claim_work', ['worker-apollo-disabled', 50, 60]);
+  const blocked = await work(blockedRun.run_id);
+  assert.deepEqual({ state: blocked.state, reason: blocked.last_reason_code, attempts: blocked.attempt_count, lease: blocked.lease_token }, { state: 'BLOCKED', reason: 'APOLLO_PROVIDER_NOT_READY', attempts: 0, lease: null });
+
+  await call(db, 'automation_configure_apollo_read', [ids.ownerA, ids.ownerA, true, 3, 1]);
+  const ownerBRecipe = await createApolloRecipe({ owner: ids.ownerB, actor: ids.ownerB });
+  const ownerBRun = await admitApolloRecipe({ recipe: ownerBRecipe, owner: ids.ownerB, actor: ids.ownerB, idempotency: key('apollo-owner-b') });
+  await callSet(db, 'automation_claim_work', ['worker-apollo-owner-b-disabled', 50, 60]);
+  const ownerBBlocked = await work(ownerBRun.run_id);
+  assert.deepEqual({ state: ownerBBlocked.state, reason: ownerBBlocked.last_reason_code, attempts: ownerBBlocked.attempt_count }, { state: 'BLOCKED', reason: 'APOLLO_PROVIDER_NOT_READY', attempts: 0 });
+  await assert.rejects(call(db, 'automation_configure_apollo_read', [ids.ownerB, ids.ownerA, true, 1, 1]), /AUTOMATION_OWNER_ACCESS_DENIED|AUTOMATION_ASSIGNMENT_SCOPE_DENIED|AUTOMATION_/);
+  const { rows: configs } = await db.query(`select owner_user_id,enabled,max_requests_per_window,max_concurrent_requests from public.automation_provider_action_configs order by owner_user_id`);
+  assert.ok(configs.some((row) => row.owner_user_id === ids.ownerA && row.enabled && row.max_requests_per_window === 3 && row.max_concurrent_requests === 1));
+  assert.equal(configs.some((row) => row.owner_user_id === ids.ownerB && row.enabled), false);
+});
+
+test('Apollo reservations, safe summaries, replay, and recovery remain single-work-item and lease safe', { concurrency: false }, async () => {
+  await call(db, 'automation_configure_apollo_read', [ids.ownerA, ids.ownerA, true, 8, 1]);
+  const recipe = await createApolloRecipe();
+  const firstIdempotency = key('apollo-complete');
+  const firstDueAt = new Date(Date.now() - 1_000).toISOString();
+  const first = await admitApolloRecipe({ recipe, idempotency: firstIdempotency, dueAt: firstDueAt });
+  const replay = await admitApolloRecipe({ recipe, idempotency: firstIdempotency, dueAt: firstDueAt });
+  assert.deepEqual(replay, { trigger_id: first.trigger_id, run_id: first.run_id, replayed: true });
+  const claimed = await claimFor(first.run_id, 'worker-apollo-complete');
+  const second = await admitApolloRecipe({ recipe, idempotency: key('apollo-concurrent') });
+  await callSet(db, 'automation_claim_work', ['worker-apollo-concurrent', 50, 60]);
+  const quotaBlocked = await work(second.run_id);
+  assert.deepEqual({ state: quotaBlocked.state, attempts: quotaBlocked.attempt_count, reason: quotaBlocked.last_reason_code }, { state: 'BLOCKED', attempts: 0, reason: 'QUOTA_DENIED' });
+  await call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]);
+  const { rows: [run] } = await db.query('select correlation_id from public.automation_runs where id=$1', [first.run_id]);
+  const complete = { provider: 'APOLLO', outcome: 'COMPLETE_SUCCESS', completeness: 'COMPLETE', returnedCount: 2, providerCorrelationId: `phase11:APOLLO:${run.correlation_id}` };
+  await call(db, 'automation_transition_work', [claimed.id, claimed.worker, claimed.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify(complete), null]);
+  const { rows: [stored] } = await db.query('select owner_user_id,state,result_metadata from public.automation_work_items where id=$1', [claimed.id]);
+  assert.deepEqual(stored, { owner_user_id: ids.ownerA, state: 'COMPLETED', result_metadata: complete });
+  const late = await call(db, 'automation_transition_work', [claimed.id, claimed.worker, claimed.lease_token, 'RUNNING', 'COMPLETED', 'LATE_RESULT', JSON.stringify(complete), null]);
+  assert.equal(late.late, true);
+  const { rows: resultRows } = await db.query('select id from public.automation_work_items where run_id=$1 and result_metadata=$2::jsonb', [first.run_id, JSON.stringify(complete)]);
+  assert.equal(resultRows.length, 1);
+
+  const retry = await admitApolloRecipe({ recipe, idempotency: key('apollo-retry') });
+  const retryClaim = await claimFor(retry.run_id, 'worker-apollo-retry');
+  await call(db, 'automation_mark_dispatching', [retryClaim.id, retryClaim.worker, retryClaim.lease_token]);
+  const { rows: [retryRun] } = await db.query('select correlation_id from public.automation_runs where id=$1', [retry.run_id]);
+  const retryResult = { provider: 'APOLLO', outcome: 'RETRYABLE_FAILURE', completeness: 'UNKNOWN', providerCorrelationId: `phase11:APOLLO:${retryRun.correlation_id}`, code: 'APOLLO_RATE_LIMIT' };
+  await call(db, 'automation_transition_work', [retryClaim.id, retryClaim.worker, retryClaim.lease_token, 'RUNNING', 'RETRYABLE', 'APOLLO_RATE_LIMIT', JSON.stringify(retryResult), new Date(Date.now() - 1_000).toISOString()]);
+  const { rows: [released] } = await db.query('select count(*) filter(where active)::int as active from public.automation_work_reservations where work_item_id=$1', [retryClaim.id]);
+  assert.equal(released.active, 0);
+  const retryClaimedAgain = await claimFor(retry.run_id, 'worker-apollo-retry-again');
+  assert.equal(retryClaimedAgain.id, retryClaim.id);
+  await call(db, 'automation_mark_dispatching', [retryClaimedAgain.id, retryClaimedAgain.worker, retryClaimedAgain.lease_token]);
+  await db.query(`update public.automation_work_items set lease_until=now()-interval '1 second' where id=$1`, [retryClaimedAgain.id]);
+  const recovered = await callSet(db, 'automation_recover_stale', [50]);
+  assert.ok(recovered.some((entry) => entry.work_item_id === retryClaimedAgain.id && entry.state === 'HUMAN_REVIEW'));
+  const { rows: [unknown] } = await db.query('select state,result_metadata from public.automation_work_items where id=$1', [retryClaimedAgain.id]);
+  assert.deepEqual(unknown, { state: 'HUMAN_REVIEW', result_metadata: { provider: 'APOLLO', outcome: 'UNKNOWN_OUTCOME', completeness: 'UNKNOWN', providerCorrelationId: `phase11:APOLLO:${retryRun.correlation_id}`, code: 'LEASE_EXPIRED_DISPATCHING' } });
+  await cancel(retry.run_id);
+  await call(db, 'automation_configure_apollo_read', [ids.ownerA, ids.ownerA, false, null, null]);
+});
+
+
+test('derives owner-scoped operational health from durable work and recovery evidence without a metrics store', { concurrency: false }, async () => {
+  const eligible = await createRun({ idempotency: key('operational-eligible') });
+  const delayed = await createRun({ idempotency: key('operational-delayed'), dueAt: new Date(Date.now() + 3_600_000).toISOString() });
+  const staleRun = await createRun({ idempotency: key('operational-stale') });
+  const { rows: [stale] } = await db.query(`update public.automation_work_items
+    set state='RUNNING',attempt_count=1,attempt_phase='CLAIMED',lease_owner='worker-operational-stale',lease_token=gen_random_uuid(),lease_until=now()-interval '1 second'
+    where run_id=$1 returning id`, [staleRun.run_id]);
+  assert.ok(stale?.id);
+
+  const beforeRecovery = await call(db, 'automation_get_owner_operational_health', [ids.ownerA, ids.ownerA]);
+  assert.equal(beforeRecovery.queue.eligibleCount >= 1, true);
+  assert.equal(beforeRecovery.queue.delayedCount >= 1, true);
+  assert.equal(beforeRecovery.leases.staleCount, 1);
+  assert.equal(beforeRecovery.leases.staleClaimedCount, 1);
+  assert.equal(beforeRecovery.leases.staleDispatchingCount, 0);
+  assert.equal(typeof beforeRecovery.observedAt, 'string');
+  assert.equal(Object.hasOwn(beforeRecovery, 'workerId'), false);
+  assert.equal(Object.hasOwn(beforeRecovery, 'input'), false);
+
+  await callSet(db, 'automation_recover_stale', [50]);
+  const afterRecovery = await call(db, 'automation_get_owner_operational_health', [ids.ownerA, ids.ownerA]);
+  assert.equal(afterRecovery.leases.staleCount, 0);
+  assert.equal(afterRecovery.recovery.recoveredLast24h >= 1, true);
+  const otherOwner = await call(db, 'automation_get_owner_operational_health', [ids.ownerB, ids.ownerB]);
+  assert.equal(otherOwner.recovery.recoveredLast24h, 0);
+  await assert.rejects(call(db, 'automation_get_owner_operational_health', [ids.ownerA, ids.actorA]), /AUTOMATION_OWNER_SCOPE_DENIED/);
+
+  for (const runId of [eligible.run_id, delayed.run_id, staleRun.run_id]) await cancel(runId);
 });

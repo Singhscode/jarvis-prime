@@ -7,6 +7,8 @@ import * as crm from '../crm/crm.service.js';
 import * as repository from './owner-workspace.repository.js';
 
 const EMPLOYEE_INVITATION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+// This narrow legacy path is a user-initiated Owner workspace-summary refresh.
+// It is intentionally separate from—and must never be treated as—Phase 11 automation.
 const AUTOMATION_WORKFLOW = 'workspace_summary';
 const AUTOMATION_JOB_TYPE = 'owner_workspace_summary';
 let automationWorkerRegistered = false;

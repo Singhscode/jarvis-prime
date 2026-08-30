@@ -1,4 +1,5 @@
 import { getDb } from '../../database/db.js';
+import { AUTOMATION_REGISTRY_VERSION, AUTOMATION_WORKER_VERSION } from './automation.execution.validation.js';
 
 function client() {
   const { client: db, usingMemory } = getDb();
@@ -42,6 +43,14 @@ export async function admitRecipeRun(values) {
     p_owner: values.ownerUserId, p_actor: values.actorUserId, p_actor_kind: values.actorKind,
     p_recipe_code: values.recipeCode, p_input: values.input, p_due_at: values.dueAt,
     p_idempotency: values.idempotencyKey, p_request_hash: values.requestSha256,
+  }));
+}
+export async function evaluateRecipeScorePolicy(values) {
+  return result(await client().rpc('automation_evaluate_recipe_score_policy', {
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_recipe_code: values.recipeCode,
+    p_input: values.input, p_idempotency: values.idempotencyKey, p_request_hash: values.requestSha256,
+    p_score: values.score, p_qualified: values.qualified, p_hot: values.hot,
+    p_decision: values.decision, p_reason: values.reasonCode, p_metadata: values.safeMetadata,
   }));
 }
 export async function listRecipes(ownerUserId, limit = 50) {
@@ -97,11 +106,13 @@ export async function listEmployeeCandidates(ownerUserId) {
   if (error) throw error;
   return data || [];
 }
-export async function getOwnerAutomationHealth(ownerUserId) {
-  const [runs, decisions] = await Promise.all([
+export async function getOwnerAutomationHealth(ownerUserId, actorUserId) {
+  const [runs, decisions, operational, compatibility] = await Promise.all([
     client().from('automation_runs').select('state').eq('owner_user_id', ownerUserId),
     client().from('automation_policy_decisions').select('decision,reason_code,created_at,run_id').eq('owner_user_id', ownerUserId).in('decision', ['BLOCK', 'HUMAN_REVIEW']).order('created_at', { ascending: false }).limit(50),
+    client().rpc('automation_get_owner_operational_health', { p_owner: ownerUserId, p_actor: actorUserId }),
+    client().rpc('automation_check_compatibility', { p_registry: AUTOMATION_REGISTRY_VERSION, p_worker: AUTOMATION_WORKER_VERSION }),
   ]);
-  if (runs.error) throw runs.error; if (decisions.error) throw decisions.error;
-  return { runs: runs.data || [], policyFailures: decisions.data || [] };
+  for (const response of [runs, decisions, operational, compatibility]) if (response.error) throw response.error;
+  return { runs: runs.data || [], policyFailures: decisions.data || [], operationalHealth: operational.data, compatibility: compatibility.data };
 }

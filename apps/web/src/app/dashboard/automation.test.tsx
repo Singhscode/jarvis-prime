@@ -26,6 +26,8 @@ describe('Owner automation runner', () => {
     });
     globalThis.fetch = fetch as unknown as typeof fetch;
     render(<DashboardLayout><OwnerAutomationWorkspace /></DashboardLayout>);
+    expect(await screen.findByText('Legacy manual summary')).toBeTruthy();
+    expect(screen.getByText(/not Phase 11 automation/)).toBeTruthy();
     await user.click(await screen.findByRole('button', { name: 'Run automation' }));
     expect(await screen.findByText('pending')).toBeTruthy();
     const calls = fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>;

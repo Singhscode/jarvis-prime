@@ -5,9 +5,11 @@ import { ACTION_CODES, assertActionCode, assertTransition, classifyError, retryD
 import { createDurableScheduleMaterializer, createEligibilityScheduler } from '../src/modules/automation/automation.execution.scheduler.js';
 import { createWorker } from '../src/modules/automation/automation.execution.worker.js';
 import { getPermittedRunActions } from '../src/modules/automation/automation.execution.service.js';
+import { getAutomationWorkerRuntimeConfig } from '../src/workers/automation-worker.runtime.js';
+import { createAutomationWorkerHealthServer, workerReadinessView } from '../src/workers/automation-worker.health.js';
 
 test('automation contracts allow only fixed actions, legal transitions, and deterministic safe retry classification', () => {
-  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY']);
+  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
   assert.equal(assertActionCode('ACT_ASSIGN'), 'ACT_ASSIGN');
   assert.throws(() => assertActionCode('ACT_EMAIL'), /AUTOMATION_ACTION_DISABLED/);
   assert.equal(assertTransition('RUNNING', 'COMPLETED'), 'COMPLETED');
@@ -206,4 +208,39 @@ test('server-derived run actions remain scoped to the authenticated actor and te
   assert.deepEqual(getPermittedRunActions(employee, { ...ownRun, requested_by_user_id: 'employee-2' }), { pause: false, resume: false, cancel: false, retry: false });
   assert.deepEqual(getPermittedRunActions(owner, { ...ownRun, state: 'COMPLETED' }), { pause: false, resume: false, cancel: false, retry: false });
   assert.deepEqual(getPermittedRunActions(owner, ownRun), { pause: true, resume: true, cancel: true, retry: true });
+});
+
+test('worker runtime configuration validates only durable-worker requirements and never treats a probe as execution authority', () => {
+  const runtime = getAutomationWorkerRuntimeConfig({
+    SUPABASE_URL: 'https://automation.test', SUPABASE_SERVICE_ROLE_KEY: 'service-role-test',
+    AUTOMATION_WORKER_ID: 'worker-test', AUTOMATION_WORKER_CLAIM_BATCH: '3', AUTOMATION_WORKER_HEALTH_PORT: '3101',
+  });
+  assert.deepEqual(runtime.workerOptions.claimBatch, 3);
+  assert.equal(runtime.healthPort, 3101);
+  assert.throws(() => getAutomationWorkerRuntimeConfig({ SUPABASE_URL: 'https://automation.test', SUPABASE_SERVICE_ROLE_KEY: '' }), /AUTOMATION_WORKER_DATABASE_CONFIG_REQUIRED/);
+  assert.throws(() => getAutomationWorkerRuntimeConfig({ SUPABASE_URL: 'https://automation.test', SUPABASE_SERVICE_ROLE_KEY: 'service-role-test', AUTOMATION_WORKER_POLL_MS: '10' }), /AUTOMATION_WORKER_CONFIG_INVALID_POLL_MS/);
+  assert.throws(() => getAutomationWorkerRuntimeConfig({ SUPABASE_URL: 'https://automation.test', SUPABASE_SERVICE_ROLE_KEY: 'service-role-test', AUTOMATION_WORKER_LEASE_SECONDS: '10', AUTOMATION_WORKER_HEARTBEAT_MS: '6000' }), /AUTOMATION_WORKER_CONFIG_INVALID_HEARTBEAT_MS/);
+});
+
+test('worker health probe reports local liveness and existing-worker readiness without work or secret data', async () => {
+  let status = { ready: false, draining: false, active: 0, compatibility: null };
+  const server = createAutomationWorkerHealthServer({ statusProvider: () => status, now: () => '2026-08-30T00:00:00.000Z' });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = server.address();
+    const live = await fetch(`http://127.0.0.1:${port}/live`);
+    assert.equal(live.status, 200); assert.deepEqual(await live.json(), { alive: true });
+    let ready = await fetch(`http://127.0.0.1:${port}/ready`);
+    assert.equal(ready.status, 503); assert.equal((await ready.json()).ready, false);
+    status = { ready: true, draining: false, active: 2, compatibility: { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V1', secret: 'must-not-appear' } };
+    ready = await fetch(`http://127.0.0.1:${port}/ready`);
+    const body = await ready.json();
+    assert.equal(ready.status, 200); assert.deepEqual(body, { ready: true, draining: false, active: 2, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V1' }, observedAt: '2026-08-30T00:00:00.000Z' });
+    assert.doesNotMatch(JSON.stringify(body), /secret|workerId|lease|input/i);
+    const draining = workerReadinessView({ ready: true, draining: true, active: 0 });
+    assert.equal(draining.ready, false); assert.equal(draining.draining, true); assert.equal(draining.active, 0); assert.equal(draining.compatibility, null);
+    assert.match(draining.observedAt, /^\d{4}-\d{2}-\d{2}T/);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });

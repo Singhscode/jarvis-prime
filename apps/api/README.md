@@ -49,6 +49,11 @@ see the whole thing work without any setup.
 | `node src/runner.js --task=inbound` | Simulate reply handling (dry-run demo) |
 | `node src/runner.js --doctor` | Print configuration & readiness report |
 | `npm test` | Run unit tests |
+| `npm run worker:automation` | Run the separately deployed Phase 11 durable worker |
+
+## Phase 11 durable worker
+
+The Phase 11 worker is a separate PostgreSQL-backed process, not part of the API server or the legacy Owner Workspace summary queue. It requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; it validates durable compatibility before claiming work and drains on `SIGTERM`. Deployment, migration, probe, recovery, and provider-separation requirements are in [`../../documentation/operations/phase11-automation-rollout.md`](../../documentation/operations/phase11-automation-rollout.md). Apollo remains disabled/deferred.
 
 ---
 

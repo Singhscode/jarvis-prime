@@ -1,6 +1,6 @@
 import { AppError } from '../../middleware/error-handler.js';
 import * as workspace from '../owner-workspace/owner-workspace.service.js';
-import { evaluateAdmissionPolicies, listPolicyRegistry } from './automation.recipe-policy.policy.js';
+import { evaluateAdmissionPolicies, evaluateScorePolicyV1, listPolicyRegistry } from './automation.recipe-policy.policy.js';
 import * as repository from './automation.recipe-policy.repository.js';
 import {
   RECIPE_LIFECYCLE_TRANSITIONS,
@@ -8,6 +8,7 @@ import {
   assertIdempotencyKey,
   assertRecipeCode,
   assertRecipeDefinition,
+  assertScorePolicyInput,
   sha256,
   stableJson,
 } from './automation.recipe-policy.validation.js';
@@ -132,6 +133,34 @@ export async function admitManualRun(userId, values, rawIdempotency) {
   } catch (error) { mapError(error); }
 }
 
+// Audit-only, deterministic evaluation: it binds an existing active Recipe version to
+// immutable score evidence but never calls the Step 2 admission RPC or creates work.
+export async function evaluateScorePolicy(userId, values, rawIdempotency) {
+  const actor = await scope(userId, { ownerOnly: true });
+  try {
+    const body = exact(values, ['recipeCode', 'input']);
+    const recipeCode = assertRecipeCode(body.recipeCode);
+    const input = assertScorePolicyInput(body.input);
+    const evaluation = evaluateScorePolicyV1(input);
+    const idempotencyKey = assertIdempotencyKey(rawIdempotency);
+    const requestSha256 = sha256(stableJson({ policy: 'POL_SCORE@V1', recipeCode, input }));
+    const persisted = await repository.evaluateRecipeScorePolicy({
+      ownerUserId: actor.ownerUserId, actorUserId: actor.actorUserId, recipeCode, input,
+      idempotencyKey, requestSha256, score: evaluation.safeMetadata.score,
+      qualified: evaluation.safeMetadata.qualified, hot: evaluation.safeMetadata.hot,
+      decision: evaluation.decision, reasonCode: evaluation.reasonCode,
+      safeMetadata: evaluation.safeMetadata,
+    });
+    return {
+      recipeCode, recipeVersionId: persisted.recipe_version_id,
+      configurationSha256: persisted.configuration_sha256, correlationId: persisted.correlation_id,
+      score: persisted.score, qualified: persisted.qualified, hot: persisted.hot,
+      reasons: persisted.reasons, decision: persisted.decision,
+      reasonCode: persisted.reason_code, replayed: persisted.replayed,
+    };
+  } catch (error) { mapError(error); }
+}
+
 // Exported only for focused tests of the static, fail-closed policy decision; database admission remains authoritative.
 export function evaluateFixedAdmissionPolicy(step) { return evaluateAdmissionPolicies(step); }
 
@@ -179,8 +208,24 @@ export async function getOwnerAssignmentProjection(userId) {
 export async function getOwnerAutomationHealth(userId) {
   const actor = await scope(userId, { ownerOnly: true });
   try {
-    const value = await repository.getOwnerAutomationHealth(actor.ownerUserId);
+    const value = await repository.getOwnerAutomationHealth(actor.ownerUserId, actor.actorUserId);
     const counts = value.runs.reduce((total, run) => ({ ...total, [run.state.toLowerCase()]: (total[run.state.toLowerCase()] || 0) + 1 }), {});
-    return { runCounts: counts, policyFailures: value.policyFailures.map((item) => ({ runId: item.run_id, decision: item.decision, reasonCode: item.reason_code, createdAt: item.created_at })) };
+    return {
+      runCounts: counts,
+      policyFailures: value.policyFailures.map((item) => ({ runId: item.run_id, decision: item.decision, reasonCode: item.reason_code, createdAt: item.created_at })),
+      operationalHealth: {
+        observedAt: value.operationalHealth.observedAt,
+        queue: value.operationalHealth.queue,
+        leases: value.operationalHealth.leases,
+        attention: value.operationalHealth.attention,
+        recovery: value.operationalHealth.recovery,
+        compatibility: {
+          ready: value.compatibility.ready === true,
+          schemaVersion: value.compatibility.schema_version,
+          registryVersion: value.compatibility.registry_version,
+          workerVersion: value.compatibility.worker_version,
+        },
+      },
+    };
   } catch (error) { mapError(error); }
 }

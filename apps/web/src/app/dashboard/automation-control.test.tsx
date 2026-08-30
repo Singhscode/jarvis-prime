@@ -11,7 +11,7 @@ const bootstrap = { success: true, data: { identity: { email: 'owner@example.tes
 const source = { label: 'Unavailable', status: 'unavailable', source: 'owner', window: 'current', asOf, reason: 'Unavailable' };
 const dashboard = { success: true, data: { asOf, window: 'today', metrics: [], attention: { ...source, items: [] }, recentActivity: { ...source, items: [] }, health: source } };
 
-const health = { success: true, data: { runCounts: { running: 2, waiting: 3, retryable: 1, failed: 4, blocked: 5, human_review: 6 }, policyFailures: [{ runId: 'run-1', decision: 'BLOCK', reasonCode: 'QUOTA_DENIED', createdAt: asOf }] } };
+const health = { success: true, data: { runCounts: { running: 2, waiting: 3, retryable: 1, failed: 4, blocked: 5, human_review: 6 }, policyFailures: [{ runId: 'run-1', decision: 'BLOCK', reasonCode: 'QUOTA_DENIED', createdAt: asOf }], operationalHealth: { observedAt: asOf, queue: { eligibleCount: 7, delayedCount: 1, oldestQueuedAt: asOf, oldestEligibleAt: asOf }, leases: { activeCount: 2, staleCount: 1, staleClaimedCount: 1, staleDispatchingCount: 0 }, attention: { retryableCount: 1, failedCount: 4, blockedCount: 5, humanReviewCount: 6 }, recovery: { recoveredLast24h: 3 }, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V1' } } } };
 const recipes = { success: true, data: [
   { id: 'recipe-1', code: 'RCP_LEAD_HANDOFF', status: 'ACTIVE', createdAt: asOf, updatedAt: asOf },
   { id: 'recipe-2', code: 'RCP_DRAFT_FLOW', status: 'DRAFT', createdAt: asOf, updatedAt: asOf },
@@ -77,6 +77,11 @@ describe('Owner automation control plane', () => {
     const values = ['2', '3', '1', '4', '5', '6'];
     for (const value of values) expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     expect(screen.getByText('Active recipes')).toBeTruthy();
+    expect(screen.getByText('Durable execution health')).toBeTruthy();
+    expect(screen.getByText(/Control plane:/)).toBeTruthy();
+    expect(screen.getByText('Eligible work')).toBeTruthy();
+    expect(screen.getByText('Stale leases')).toBeTruthy();
+    expect(screen.getByText('Recovered, 24h')).toBeTruthy();
     expect(screen.getByText('Block · Quota denied')).toBeTruthy();
     // PAUSED is a durable control condition, never invented as a run state in the browser.
     expect(screen.getByText('Pause is a durable control condition, not a run state.')).toBeTruthy();
