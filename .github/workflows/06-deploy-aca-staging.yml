@@ -1,0 +1,163 @@
+name: Deploy — Phase 11 Worker (ACA Staging)
+
+# =============================================================================
+# STAGING-ONLY deployment for the separately supervised Phase 11 automation
+# worker to Azure Container Apps.
+#
+# This workflow:
+#   - builds an immutable OCI image from an explicit reviewed Git SHA,
+#   - pushes it ONLY to a configured staging Azure Container Registry,
+#   - updates ONLY the staging worker Container App image.
+#
+# This workflow intentionally does NOT:
+#   - deploy the API App Service,
+#   - run remote migrations (no db:push, no Supabase project link),
+#   - activate or call Apollo / Hunter / Outreach / Calendar / webhooks,
+#   - inject any provider credential,
+#   - create Azure resources (see infrastructure/aca/staging.bicep for the
+#     one-time, human-approved resource provisioning).
+#
+# It is manual-dispatch only and pinned to the `staging` GitHub Environment so
+# it can never silently default to production resources.
+# =============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "Exact reviewed commit SHA to build and deploy (full 40-char SHA)."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aca-worker-staging
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build worker image and update staging worker
+    runs-on: ubuntu-latest
+
+    # HUMAN DECISION REQUIRED: the `staging` Environment must be configured in
+    # GitHub with the variables/secrets listed below and (recommended) required
+    # reviewers. This binds the run to staging-scoped OIDC federation only.
+    environment: staging
+
+    env:
+      # ---- Azure identity (OIDC federated credential scoped to staging) ------
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_STAGING_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_STAGING_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_STAGING_SUBSCRIPTION_ID }}
+
+      # ---- Staging Azure resource identifiers (non-secret) -------------------
+      # HUMAN DECISION REQUIRED: set these as GitHub Actions *variables* on the
+      # staging environment. They must reference staging resources only.
+      ACR_LOGIN_SERVER: ${{ vars.STAGING_ACR_LOGIN_SERVER }}   # e.g. myacrstaging.azurecr.io
+      ACR_NAME: ${{ vars.STAGING_ACR_NAME }}                   # e.g. myacrstaging
+      RESOURCE_GROUP: ${{ vars.STAGING_RESOURCE_GROUP }}
+      CONTAINER_APP_NAME: ${{ vars.STAGING_WORKER_CONTAINER_APP }}
+      IMAGE_REPOSITORY: ${{ vars.STAGING_WORKER_IMAGE_REPOSITORY }} # e.g. phase11-automation-worker
+
+    steps:
+      - name: Validate required staging configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in \
+            AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID \
+            ACR_LOGIN_SERVER ACR_NAME RESOURCE_GROUP CONTAINER_APP_NAME IMAGE_REPOSITORY; do
+            if [[ -z "${!key:-}" ]]; then
+              missing+=("$key")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required staging configuration: ${missing[*]}" >&2
+            echo "Configure these as secrets/variables on the 'staging' GitHub Environment." >&2
+            exit 1
+          fi
+          # Fail closed if anything looks like a production resource.
+          for value in "$ACR_LOGIN_SERVER" "$ACR_NAME" "$RESOURCE_GROUP" "$CONTAINER_APP_NAME"; do
+            lower="$(echo "$value" | tr '[:upper:]' '[:lower:]')"
+            if [[ "$lower" == *"prod"* || "$lower" == *"production"* ]]; then
+              echo "Refusing to run: '$value' looks like a production resource. This workflow is staging-only." >&2
+              exit 1
+            fi
+          done
+          echo "Staging configuration validated."
+
+      - name: Validate SHA input
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${{ inputs.git_sha }}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase commit SHA." >&2
+            exit 1
+          fi
+
+      - name: Check out the exact reviewed SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          persist-credentials: false
+
+      - name: Confirm checked-out SHA matches the requested SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "${{ inputs.git_sha }}" ]]; then
+            echo "Checked-out SHA ($actual) does not match requested SHA (${{ inputs.git_sha }})." >&2
+            exit 1
+          fi
+          echo "Building image from reviewed SHA: $actual"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to the staging Azure Container Registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name "$ACR_NAME"
+
+      - name: Build and push the immutable worker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:sha-${{ inputs.git_sha }}"
+          echo "IMAGE_REF=$image" >> "$GITHUB_ENV"
+          # Build from the repository ROOT context using the root Dockerfile.
+          docker build \
+            --file Dockerfile \
+            --tag "$image" \
+            --label "org.opencontainers.image.revision=${{ inputs.git_sha }}" \
+            .
+          docker push "$image"
+
+      - name: Update ONLY the staging worker Container App image
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Updates the image reference on the existing, human-provisioned
+          # staging worker Container App. Environment variables, secrets,
+          # ingress, probes, and scale are owned by the Bicep definition and
+          # are intentionally NOT set here.
+          az containerapp update \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "$IMAGE_REF"
+
+      - name: Report deployed image
+        shell: bash
+        run: |
+          echo "Staging worker Container App '$CONTAINER_APP_NAME' updated to image: $IMAGE_REF"
+          echo "Ingress remains disabled; provider activation remains OFF; no migrations were run."

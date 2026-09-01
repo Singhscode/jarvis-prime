@@ -1,0 +1,67 @@
+# =============================================================================
+# Docker build context exclusions for the Phase 11 automation worker image.
+#
+# Goal: keep the build context small and free of secrets, caches, tests, and
+# generated artifacts, while PRESERVING everything the image build needs:
+#   - /package.json and /package-lock.json (root workspace manifests)
+#   - /apps/api/package.json (workspace manifest)
+#   - /apps/api/src (worker runtime source)
+#
+# The Dockerfile copies only those paths, so anything not copied is never in
+# the image regardless of this file. These rules primarily protect the build
+# context and prevent secrets/large caches from being sent to the builder.
+# =============================================================================
+
+# --- Version control ---------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+.github
+
+# --- Dependencies (reinstalled inside the image) -----------------------------
+node_modules
+**/node_modules
+
+# --- Environment / secrets (never send to the build context) -----------------
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.template
+
+# --- Local caches / build outputs --------------------------------------------
+.turbo
+**/.turbo
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+out
+**/out
+.vercel
+
+# --- Test / coverage artifacts -----------------------------------------------
+coverage
+**/coverage
+**/*.log
+apps/api/test
+apps/api/integration
+apps/web
+
+# --- Editor / OS / tooling metadata ------------------------------------------
+.vscode
+.kiro
+.idea
+**/.DS_Store
+*.swp
+
+# --- Repo docs / infra not needed at runtime ---------------------------------
+documentation
+database
+infrastructure
+_review
+*.md
+!apps/api/README.md
