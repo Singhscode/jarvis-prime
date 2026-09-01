@@ -132,7 +132,6 @@ function withTimeout(execute, timeoutMs, kind) {
       }
       reject(error);
     }, timeoutMs);
-    timer.unref?.();
   });
   return Promise.race([execute(controller.signal), timeout]).finally(() => clearTimeout(timer));
 }
