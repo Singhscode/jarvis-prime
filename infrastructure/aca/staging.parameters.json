@@ -1,0 +1,48 @@
+{
+  "contentVersion": "1.0.0.0",
+  "_comment": "NON-SECRET staging placeholders only. Replace <...> with human-approved STAGING values before deployment. Do NOT put secret values here. logAnalyticsSharedKey and the Supabase secret VALUES are provided out-of-band (secure deploy input / Key Vault) and are intentionally absent. supabaseUrlSecretUri and supabaseServiceRoleKeySecretUri are Key Vault secret URIs, not secret values.",
+  "parameters": {
+    "location": {
+      "value": "<STAGING_AZURE_REGION>"
+    },
+    "managedEnvironmentName": {
+      "value": "<STAGING_ACA_ENVIRONMENT_NAME>"
+    },
+    "workerAppName": {
+      "value": "<STAGING_WORKER_CONTAINER_APP_NAME>"
+    },
+    "logAnalyticsCustomerId": {
+      "value": "<STAGING_LOG_ANALYTICS_CUSTOMER_ID_GUID>"
+    },
+    "acrLoginServer": {
+      "value": "<STAGING_ACR_LOGIN_SERVER>"
+    },
+    "workerImage": {
+      "value": "<STAGING_ACR_LOGIN_SERVER>/<WORKER_IMAGE_REPOSITORY>:sha-<40HEX_REVIEWED_SHA>"
+    },
+    "userAssignedIdentityResourceId": {
+      "value": "<STAGING_USER_ASSIGNED_IDENTITY_RESOURCE_ID>"
+    },
+    "supabaseUrlSecretUri": {
+      "value": "https://<STAGING_KEY_VAULT_NAME>.vault.azure.net/secrets/supabase-url"
+    },
+    "supabaseServiceRoleKeySecretUri": {
+      "value": "https://<STAGING_KEY_VAULT_NAME>.vault.azure.net/secrets/supabase-service-role-key"
+    },
+    "automationWorkerId": {
+      "value": "phase11-worker-staging-1"
+    },
+    "automationWorkerHealthPort": {
+      "value": 8080
+    },
+    "automationWorkerDrainGraceMs": {
+      "value": 30000
+    },
+    "workerCpu": {
+      "value": "0.25"
+    },
+    "workerMemory": {
+      "value": "0.5Gi"
+    }
+  }
+}
