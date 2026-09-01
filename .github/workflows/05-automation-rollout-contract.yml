@@ -1,0 +1,49 @@
+name: Phase 11 Rollout Contract
+
+on:
+  pull_request:
+    paths:
+      - 'database/automation-rollout-contract.json'
+      - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/supabase/migrations/**'
+      - 'documentation/operations/phase11-worker-deployment-contract.md'
+      - 'apps/api/src/workers/**'
+      - 'apps/api/src/modules/automation/**'
+      - 'apps/api/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/05-automation-rollout-contract.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'database/automation-rollout-contract.json'
+      - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/supabase/migrations/**'
+      - 'documentation/operations/phase11-worker-deployment-contract.md'
+      - 'apps/api/src/workers/**'
+      - 'apps/api/src/modules/automation/**'
+      - 'apps/api/package.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/05-automation-rollout-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-rollout-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:automation:rollout-contract
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+      - run: npm run db:reset
+      - run: TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres" npm run test:integration:automation --workspace=apps/api
+      - run: npm run test --workspace=apps/api -- test/automation-execution.test.js

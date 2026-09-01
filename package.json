@@ -18,6 +18,7 @@
     "db:reset": "supabase --workdir database start && supabase --workdir database db reset",
     "db:status": "supabase --workdir database migration list",
     "db:push": "supabase --workdir database db push",
+    "verify:automation:rollout-contract": "node database/scripts/verify-automation-rollout-contract.mjs",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run server --workspace=apps/api"
   },

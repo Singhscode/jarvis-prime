@@ -7,6 +7,7 @@ type Props = {
   loading: boolean;
   onChange: (credentials: { email: string; password: string }) => void;
   onSubmit: () => void;
+  portalLabel?: string;
   heading?: string;
   description?: string;
 };
@@ -17,6 +18,7 @@ export default function ClientSignIn({
   loading,
   onChange,
   onSubmit,
+  portalLabel = 'Client Portal',
   heading = 'Welcome back',
   description = 'Sign in to view your client workspace.',
 }: Props) {
@@ -24,7 +26,7 @@ export default function ClientSignIn({
     <section className="w-full max-w-md rounded-3xl border border-slate-700/60 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/30 sm:p-8">
       <div className="mb-8">
         <img src="/logo-white.svg" alt="JARVIS PRIME" className="h-8 w-auto" />
-        <p className="mt-7 text-sm font-medium text-cyan-400">Client Portal</p>
+        <p className="mt-7 text-sm font-medium text-cyan-400">{portalLabel}</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{heading}</h1>
         <p className="mt-2 text-sm text-slate-400">{description}</p>
       </div>
