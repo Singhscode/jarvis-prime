@@ -127,6 +127,38 @@ export async function listActiveClients() {
   return data || [];
 }
 
+export async function getProspectWithActiveClient(prospectId) {
+  if (typeof prospectId !== 'string' || !prospectId.trim()) return null;
+
+  const { client: dbClient, usingMemory } = getDb();
+  if (usingMemory) {
+    const prospect = mem.prospects.find((row) => row.id === prospectId) || null;
+    if (!prospect) return null;
+    const client = mem.clients.find(
+      (row) => row.id === prospect.client_id && row.status === 'active'
+    ) || null;
+    return client ? { prospect, client } : null;
+  }
+
+  const { data: prospect, error: prospectError } = await dbClient
+    .from('prospects')
+    .select('*')
+    .eq('id', prospectId)
+    .maybeSingle();
+  if (prospectError) throw new Error('Unable to resolve outreach prospect.');
+  if (!prospect?.client_id) return null;
+
+  const { data: activeClient, error: clientError } = await dbClient
+    .from('clients')
+    .select('*')
+    .eq('id', prospect.client_id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (clientError) throw new Error('Unable to resolve outreach client.');
+
+  return activeClient ? { prospect, client: activeClient } : null;
+}
+
 export async function insertProspects(rows) {
   if (rows.length === 0) return [];
   const { client, usingMemory } = getDb();

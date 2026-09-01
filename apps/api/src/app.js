@@ -130,6 +130,8 @@ export async function createApp(options = {}) {
   app.use('/api/client-portal', clientPortalRouter);
   const { default: ownerWorkspaceRouter } = await import('./modules/owner-workspace/owner-workspace.routes.js');
   app.use('/api/owner-workspace', ownerWorkspaceRouter);
+  const { default: salesAgentRouter } = await import('./modules/sales-agents/sales-agent.routes.js');
+  app.use('/api/sales-agents', salesAgentRouter);
   const { default: financeRouter } = await import('./modules/finance/finance.routes.js');
   app.use('/api/finance', financeRouter);
 

@@ -1,11 +1,9 @@
-// Email sending via configurable provider, with a hard safety gate.
+// Email rendering and transactional delivery with a hard marketing safety gate.
 //
-// - In dry-run mode, emails are NEVER sent. They're logged and recorded with
-//   status "dry_run" so you can review exactly what would have gone out.
-// - Every email gets a compliant footer (physical address + unsubscribe),
-//   which is legally required for cold outreach (CAN-SPAM / India DPDP).
-// - Now uses provider abstraction — swap Resend for SendGrid by setting
-//   EMAIL_PROVIDER=sendgrid in .env.
+// - Phase 15A marketing outreach can only be recorded by the persisted,
+//   Owner-approved dry-run release RPC; legacy callers always fail closed.
+// - The renderer adds the required physical-address and unsubscribe footer.
+// - Transactional account messages remain separate from marketing outreach.
 
 import { config } from '../config/config.js';
 import { log } from '../utils/logger.js';
@@ -21,7 +19,7 @@ async function getProvider() {
   return _provider;
 }
 
-function withFooter(body, prospectEmail) {
+export function renderOutboundEmail(body, prospectEmail) {
   const unsub = `${config.unsubscribeUrl}?email=${encodeURIComponent(prospectEmail || '')}`;
   return (
     `${body}\n\n` +
@@ -36,26 +34,18 @@ function withFooter(body, prospectEmail) {
  * Uses the configured email provider (Resend by default, switchable via config).
  * @returns {Promise<{status:'sent'|'dry_run'|'failed', providerId?:string, error?:string, finalBody:string}>}
  */
-export async function sendEmail({ to, subject, body }) {
-  const finalBody = withFooter(body, to);
+export async function sendEmail({ to, body }) {
+  const finalBody = renderOutboundEmail(body, to);
 
-  if (config.dryRun) {
-    log.dry(`Would email ${to} | subject: "${subject}"`);
-    return { status: 'dry_run', finalBody };
-  }
-
-  const provider = await getProvider();
-
-  if (!provider.isConfigured()) {
-    return { status: 'failed', error: `${provider.name} is not configured`, finalBody };
-  }
-
-  try {
-    const result = await provider.send(to, subject, finalBody);
-    return { ...result, finalBody };
-  } catch (err) {
-    return { status: 'failed', error: err.message, finalBody };
-  }
+  // Phase 15A routes every marketing release through the persisted approval
+  // RPC. Legacy callers cannot treat either application dry-run mode or a
+  // caller flag as release authority.
+  return {
+    status: 'failed',
+    error: 'Outreach requires a persisted Owner approval and release claim.',
+    errorCode: 'OUTBOUND_APPROVAL_REQUIRED',
+    finalBody,
+  };
 }
 
 // Optional founder alert via Telegram (redirected to unified notifications hub for backward compatibility).

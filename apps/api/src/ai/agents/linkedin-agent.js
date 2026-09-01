@@ -15,6 +15,10 @@
 import { config } from '../../config/config.js';
 import { log } from '../../utils/logger.js';
 
+// Phase 15A intentionally has no LinkedIn release capability. Keeping this
+// closed at the provider boundary prevents scheduler and orchestrator bypasses.
+const LINKEDIN_LIVE_RELEASE_ENABLED = false;
+
 // In-memory counters for daily limits (reset at midnight)
 const dailyCounters = { views: 0, connects: 0, dms: 0, resetDate: todayStr() };
 
@@ -61,24 +65,42 @@ function extractProfileId(linkedinUrl) {
  * Visit a prospect's LinkedIn profile.
  * This creates a notification on their end, warming them up before outreach.
  */
+function blockedLiveRelease(action, profileId) {
+  if (LINKEDIN_LIVE_RELEASE_ENABLED) return null;
+
+  log.warn(`[LinkedIn] ${action} blocked: persisted approval is required.`);
+  return {
+    status: 'approval_required',
+    action,
+    profileId,
+    errorCode: 'OUTBOUND_APPROVAL_REQUIRED',
+  };
+}
+
 export async function visitProfile(prospect) {
   checkReset();
-
-  if (dailyCounters.views >= config.linkedinDailyViews) {
-    log.warn(`LinkedIn daily view limit reached (${config.linkedinDailyViews})`);
-    return { status: 'limit_reached', action: 'profile_visit' };
-  }
 
   const profileId = extractProfileId(prospect.linkedin_url);
   if (!profileId) {
     return { status: 'skipped', reason: 'no_linkedin_url' };
   }
 
+  const blocked = blockedLiveRelease('profile_visit', profileId);
+  if (blocked) return blocked;
+
+  if (dailyCounters.views >= config.linkedinDailyViews) {
+    log.warn(`LinkedIn daily view limit reached (${config.linkedinDailyViews})`);
+    return { status: 'limit_reached', action: 'profile_visit' };
+  }
+
   dailyCounters.views++;
 
-  if (config.dryRun || !config.linkedinCookie) {
+  if (config.dryRun) {
     log.dry(`[LinkedIn] Would visit profile: ${prospect.full_name} (${profileId})`);
     return { status: 'dry_run', action: 'profile_visit', profileId };
+  }
+  if (!config.linkedinCookie) {
+    return { status: 'failed', action: 'profile_visit', errorCode: 'LINKEDIN_NOT_CONFIGURED' };
   }
 
   try {
@@ -104,23 +126,29 @@ export async function visitProfile(prospect) {
 export async function sendConnectionRequest(prospect, note) {
   checkReset();
 
-  if (dailyCounters.connects >= config.linkedinDailyConnects) {
-    log.warn(`LinkedIn daily connect limit reached (${config.linkedinDailyConnects})`);
-    return { status: 'limit_reached', action: 'connection_request' };
-  }
-
   const profileId = extractProfileId(prospect.linkedin_url);
   if (!profileId) {
     return { status: 'skipped', reason: 'no_linkedin_url' };
+  }
+
+  const blocked = blockedLiveRelease('connection_request', profileId);
+  if (blocked) return blocked;
+
+  if (dailyCounters.connects >= config.linkedinDailyConnects) {
+    log.warn(`LinkedIn daily connect limit reached (${config.linkedinDailyConnects})`);
+    return { status: 'limit_reached', action: 'connection_request' };
   }
 
   // Truncate note to LinkedIn's 300 char limit
   const truncatedNote = (note || '').slice(0, 300);
   dailyCounters.connects++;
 
-  if (config.dryRun || !config.linkedinCookie) {
+  if (config.dryRun) {
     log.dry(`[LinkedIn] Would send connection request to ${prospect.full_name}: "${truncatedNote.slice(0, 60)}..."`);
     return { status: 'dry_run', action: 'connection_request', profileId, note: truncatedNote };
+  }
+  if (!config.linkedinCookie) {
+    return { status: 'failed', action: 'connection_request', errorCode: 'LINKEDIN_NOT_CONFIGURED' };
   }
 
   try {
@@ -155,21 +183,27 @@ export async function sendConnectionRequest(prospect, note) {
 export async function sendDirectMessage(prospect, message) {
   checkReset();
 
-  if (dailyCounters.dms >= config.linkedinDailyDMs) {
-    log.warn(`LinkedIn daily DM limit reached (${config.linkedinDailyDMs})`);
-    return { status: 'limit_reached', action: 'direct_message' };
-  }
-
   const profileId = extractProfileId(prospect.linkedin_url);
   if (!profileId) {
     return { status: 'skipped', reason: 'no_linkedin_url' };
   }
 
+  const blocked = blockedLiveRelease('direct_message', profileId);
+  if (blocked) return blocked;
+
+  if (dailyCounters.dms >= config.linkedinDailyDMs) {
+    log.warn(`LinkedIn daily DM limit reached (${config.linkedinDailyDMs})`);
+    return { status: 'limit_reached', action: 'direct_message' };
+  }
+
   dailyCounters.dms++;
 
-  if (config.dryRun || !config.linkedinCookie) {
+  if (config.dryRun) {
     log.dry(`[LinkedIn] Would DM ${prospect.full_name}: "${(message || '').slice(0, 60)}..."`);
     return { status: 'dry_run', action: 'direct_message', profileId, message };
+  }
+  if (!config.linkedinCookie) {
+    return { status: 'failed', action: 'direct_message', errorCode: 'LINKEDIN_NOT_CONFIGURED' };
   }
 
   try {

@@ -19,6 +19,7 @@
     "test:integration:client-portal": "node --test integration/client-portal.postgres.integration.js",
     "test:integration:client-account-deletion": "node --test integration/client-account-deletion.postgres.integration.js",
     "test:integration:finance": "node --test integration/finance-billing.postgres.integration.js",
+    "test:integration:sales-agents": "node --test integration/sales-agent-approvals.postgres.integration.js",
     "employee:create": "node scripts/provision-employee.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",
     "test:watch": "node --test --watch"
@@ -27,7 +28,8 @@
     "@supabase/supabase-js": "^2.45.0",
     "busboy": "1.6.0",
     "cookie-parser": "1.4.7",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "zod": "3.25.76"
   },
   "engines": {
     "node": ">=18.0.0"

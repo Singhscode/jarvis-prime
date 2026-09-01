@@ -1,31 +1,31 @@
-// AI personalization. Uses the configured AI provider (Groq by default) to
-// write a short, human-sounding cold email tailored to each prospect.
-// Falls back to a solid template when AI isn't configured or in dry-run mode,
-// so the pipeline always produces a sendable message.
-//
-// Now uses provider abstraction — swap Groq for OpenAI by setting
-// AI_PROVIDER=openai in .env.
-
+import { randomUUID } from 'node:crypto';
 import { config } from '../../config/config.js';
 import { log } from '../../utils/logger.js';
-import { getAIProvider } from '../providers/ai/index.js';
+import {
+  canUseAIFallback,
+  executeStructuredAI,
+  validateAIExecutionBoundary,
+} from '../runtime.js';
+import { getAIProvider, validateAIConfig } from '../providers/ai/index.js';
+import { PERSONALIZATION_PROMPT_V1 } from './personalization-v1.js';
 
-// Cache the provider instance (lazy initialized)
-let _aiProvider = null;
+let cachedProvider = null;
 
-async function getProvider() {
-  if (!_aiProvider) {
-    _aiProvider = await getAIProvider();
+async function resolveProvider(injectedProvider) {
+  if (injectedProvider) return injectedProvider;
+  const liveConfig = validateAIConfig(config);
+  if (!liveConfig.apiKey.trim()) {
+    const error = new Error('Selected AI credentials are missing.');
+    error.code = 'AI_CONFIG_MISSING_CREDENTIALS';
+    throw error;
   }
-  return _aiProvider;
+  if (!cachedProvider) cachedProvider = await getAIProvider();
+  return cachedProvider;
 }
 
-// Step-based fallback templates (used when AI is off). Kept short, honest,
-// and non-spammy — first email opens a conversation, follow-ups add value.
 function templateFor(step, prospect, client) {
   const first = prospect.first_name || (prospect.full_name || 'there').split(' ')[0];
   const company = prospect.company || 'your team';
-  const clientName = client?.name || 'JARVIS PRIME';
 
   if (step <= 1) {
     return {
@@ -37,6 +37,7 @@ function templateFor(step, prospect, client) {
         `Best,\n${config.fromName}`,
     };
   }
+
   if (step === 2) {
     return {
       subject: `re: ${company}'s pipeline`,
@@ -47,6 +48,7 @@ function templateFor(step, prospect, client) {
         `Best,\n${config.fromName}`,
     };
   }
+
   return {
     subject: `last one, ${first}`,
     body:
@@ -56,43 +58,80 @@ function templateFor(step, prospect, client) {
   };
 }
 
-async function aiWrite(step, prospect, client) {
-  const first = prospect.first_name || (prospect.full_name || 'there').split(' ')[0];
-  const stepGuidance = {
-    1: 'This is the FIRST cold email. Open a conversation, be specific to their role/company, one clear ask for a short call.',
-    2: 'This is a FOLLOW-UP. Briefly add value or social proof, gentle nudge to a 15-min call.',
-    3: 'This is the FINAL break-up email. Polite, low-pressure, leave the door open.',
+function buildInput(step, prospect, client) {
+  const firstName = prospect.first_name || (prospect.full_name || '').split(' ')[0];
+  return {
+    step,
+    prospect: {
+      clientId: prospect.client_id,
+      fullName: prospect.full_name || firstName,
+      firstName,
+      title: prospect.title || '',
+      company: prospect.company || '',
+      industry: prospect.industry || '',
+    },
+    client: {
+      id: client.id,
+      name: client.name || 'JARVIS PRIME',
+      primaryIndustry: client.icp_industries?.[0] || 'B2B',
+    },
+    fromName: config.fromName,
   };
-
-  const prompt =
-    `You write short, human, non-spammy B2B cold emails for ${client?.name || 'an outbound agency'}.\n` +
-    `Recipient: ${prospect.full_name} — ${prospect.title || 'unknown title'} at ${prospect.company || 'unknown company'} (${prospect.industry || ''}).\n` +
-    `${stepGuidance[step] || stepGuidance[1]}\n` +
-    `Rules: under 90 words, no buzzwords, no fake flattery, plain text, address them as ${first}, sign as "${config.fromName}". ` +
-    `Return strict JSON: {"subject": "...", "body": "..."}.`;
-
-  const provider = await getProvider();
-  const result = await provider.generate(prompt, { json: true, temperature: 0.7 });
-  const parsed = JSON.parse(result.content);
-
-  if (!parsed.subject || !parsed.body) throw new Error('AI returned incomplete email');
-  return { subject: parsed.subject, body: parsed.body };
 }
 
 /**
- * Produce a personalized {subject, body} for a prospect at a given sequence step.
+ * Produce an AI-assisted draft or a deterministic safe template.
+ * Authorization, client scope, and input contracts are enforced before either path.
+ * This function does not send messages or write data.
  */
-export async function writeEmail(step, prospect, client) {
-  const provider = await getProvider();
-
-  if (config.dryRun || !provider.isConfigured()) {
-    return templateFor(step, prospect, client);
-  }
+export async function writeEmail(step, prospect, client, options = {}) {
+  const fallback = () => templateFor(step, prospect, client);
+  const clientId = client?.id;
+  const prospectClientId = prospect?.client_id;
+  const authorized = Boolean(clientId && prospectClientId && prospectClientId === clientId);
+  const context = options.context || {
+    requestId: options.requestId || randomUUID(),
+    actorType: 'system',
+    actorId: 'personalization-service',
+    clientId: clientId || 'unavailable',
+    authorized,
+  };
 
   try {
-    return await aiWrite(step, prospect, client);
-  } catch (err) {
-    log.warn(`AI personalization failed (${err.message}); using template instead.`);
-    return templateFor(step, prospect, client);
+    const contractStep = step === 4 || step === 5 ? 3 : step;
+    const input = buildInput(contractStep, prospect, client);
+    validateAIExecutionBoundary({ contract: PERSONALIZATION_PROMPT_V1, input, context });
+
+    if (config.dryRun || options.dryRun === true) return fallback();
+
+    const aiConfig = validateAIConfig(config, { requireCredentials: !options.provider });
+    const provider = await resolveProvider(options.provider);
+    if (!provider.isConfigured()) {
+      const error = new Error('Selected AI provider is not configured.');
+      error.code = 'provider_not_configured';
+      throw error;
+    }
+
+    const result = await executeStructuredAI({
+      provider,
+      contract: PERSONALIZATION_PROMPT_V1,
+      input,
+      context,
+      model: aiConfig.model,
+      maxTokens: aiConfig.maxTokens,
+      minimumConfidence: aiConfig.minimumConfidence,
+      pricing: aiConfig.pricing,
+      telemetry: options.telemetry,
+    });
+
+    return { subject: result.data.subject, body: result.data.body };
+  } catch (error) {
+    const code = error?.code || 'generation_failed';
+    if (!canUseAIFallback(error)) {
+      log.error(`AI personalization blocked code=${code}.`);
+      throw error;
+    }
+    log.warn(`AI personalization degraded code=${code}; using reviewed template.`);
+    return fallback();
   }
 }
