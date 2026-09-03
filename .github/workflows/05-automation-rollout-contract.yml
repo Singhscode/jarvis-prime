@@ -5,6 +5,7 @@ on:
     paths:
       - 'database/automation-rollout-contract.json'
       - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/scripts/verify-automation-rollout-contract.test.mjs'
       - 'database/supabase/migrations/**'
       - 'documentation/operations/phase11-worker-deployment-contract.md'
       - 'apps/api/src/workers/**'
@@ -18,6 +19,7 @@ on:
     paths:
       - 'database/automation-rollout-contract.json'
       - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/scripts/verify-automation-rollout-contract.test.mjs'
       - 'database/supabase/migrations/**'
       - 'documentation/operations/phase11-worker-deployment-contract.md'
       - 'apps/api/src/workers/**'
@@ -41,6 +43,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:automation:rollout-contract
+      - run: npm run test:automation:rollout-contract
       - uses: supabase/setup-cli@v1
         with:
           version: 2.109.1

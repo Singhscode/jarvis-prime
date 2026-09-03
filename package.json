@@ -19,6 +19,7 @@
     "db:status": "supabase --workdir database migration list",
     "db:push": "supabase --workdir database db push",
     "verify:automation:rollout-contract": "node database/scripts/verify-automation-rollout-contract.mjs",
+    "test:automation:rollout-contract": "node --test database/scripts/verify-automation-rollout-contract.test.mjs",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run server --workspace=apps/api"
   },
