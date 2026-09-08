@@ -158,9 +158,11 @@ describe('Owner automation control plane', () => {
     await user.click(screen.getByRole('button', { name: 'Emergency Stop' }));
     const confirm = (await screen.findAllByRole('button', { name: 'Emergency Stop' })).at(-1) as HTMLElement;
     await user.click(confirm);
-    expect(bodyOf(fetch, '/api/automation/controls', 'PUT').body).toEqual({
+    const control = bodyOf(fetch, '/api/automation/controls', 'PUT');
+    expect(control.body).toEqual({
       scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: true, reasonCode: 'OWNER_EMERGENCY_STOP',
     });
+    expect(control.init?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) });
   });
 
   it('surfaces the safe backend error without leaking internals', async () => {

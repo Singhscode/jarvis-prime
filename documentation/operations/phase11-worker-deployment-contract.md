@@ -32,7 +32,7 @@ Do not inject browser credentials, API JWT secrets, `APOLLO_API_KEY`, Hunter, Ou
 
 ## Manual migration release gate
 
-`database/automation-rollout-contract.json` pins the repository evidence for migrations `20260810000023` through `20260810000031`, including content hashes and compatibility versions. It detects source/history drift; it does not prove a remote migration ledger or authorize deployment.
+`database/automation-rollout-contract.json` pins the local candidate repository evidence for migrations `20260810000023` through `20260810000031`, plus forward-only local candidates `20260810000035` and `20260810000036`, including content hashes and compatibility versions. It detects source/history drift; it does not prove a remote migration ledger or authorize deployment.
 
 ### 1. Preflight — operator-owned, stop on any failure
 

@@ -120,7 +120,11 @@ export default function OwnerAutomationControlWorkspace() {
   async function mutate(path: string, init: RequestInit, success: string, after: 'run' | 'recipe' | 'reload') {
     setWorking(true); setDetailError(''); setNotice('');
     try {
-      await request<ApiBody<unknown>>(path, init);
+      try { await request<ApiBody<unknown>>(path, init); }
+      catch (caught) {
+        if (!new Headers(init.headers).has('Idempotency-Key')) throw caught;
+        await request<ApiBody<unknown>>(path, init);
+      }
       setNotice(success);
       if (after === 'run' && openRunId) await openRun(openRunId, true);
       if (after === 'recipe' && recipeDetail) await openRecipe(recipeDetail.recipe.id);
@@ -208,8 +212,8 @@ export default function OwnerAutomationControlWorkspace() {
     {tab === 'controls' && <div className="space-y-6">
       <section className={CARD}><h2 className="text-lg font-semibold">Owner-scope automation controls</h2><p className="mt-2 text-sm text-slate-300">These durable controls apply to your whole automation scope. The server keeps the strongest control authoritative.</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <button disabled={working} onClick={() => void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: true, emergencyStop: false, reasonCode: 'OWNER_PAUSED' }) }, 'Owner scope paused.', 'reload')} className={SECONDARY}>Pause new work</button>
-          <button disabled={working} onClick={() => void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: false, reasonCode: 'OWNER_RESUMED' }) }, 'Owner scope controls cleared.', 'reload')} className={SECONDARY}>Clear owner controls</button>
+          <button disabled={working} onClick={() => void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey() }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: true, emergencyStop: false, reasonCode: 'OWNER_PAUSED' }) }, 'Owner scope paused.', 'reload')} className={SECONDARY}>Pause new work</button>
+          <button disabled={working} onClick={() => void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey() }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: false, reasonCode: 'OWNER_RESUMED' }) }, 'Owner scope controls cleared.', 'reload')} className={SECONDARY}>Clear owner controls</button>
         </div>
       </section>
       <section className="rounded-2xl border border-red-400/30 bg-red-950/20 p-5"><h2 className="text-lg font-semibold text-red-100">Emergency stop</h2><p className="mt-2 text-sm text-slate-300">This will prevent new eligible automation work from executing in this Owner scope.</p><button ref={stopTrigger} type="button" disabled={working} onClick={() => setStopOpen(true)} className={`mt-4 ${DANGER}`}>Emergency Stop</button></section>
@@ -221,7 +225,7 @@ export default function OwnerAutomationControlWorkspace() {
         <p className="mt-3 text-sm text-slate-200">This will prevent new eligible automation work from executing in this Owner scope. Existing history is preserved and the server keeps this control authoritative until you clear it.</p>
         <div className="mt-5 flex justify-end gap-3">
           <button type="button" disabled={working} onClick={() => { setStopOpen(false); window.setTimeout(() => stopTrigger.current?.focus(), 0); }} className={SECONDARY}>Cancel</button>
-          <button ref={stopConfirm} type="button" disabled={working} onClick={() => { setStopOpen(false); void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: true, reasonCode: 'OWNER_EMERGENCY_STOP' }) }, 'Emergency stop is active for this Owner scope.', 'reload'); }} className="rounded-lg bg-red-300 px-4 py-2 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:cursor-not-allowed disabled:opacity-60">Emergency Stop</button>
+          <button ref={stopConfirm} type="button" disabled={working} onClick={() => { setStopOpen(false); void mutate('/api/automation/controls', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey() }, body: JSON.stringify({ scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: true, reasonCode: 'OWNER_EMERGENCY_STOP' }) }, 'Emergency stop is active for this Owner scope.', 'reload'); }} className="rounded-lg bg-red-300 px-4 py-2 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:cursor-not-allowed disabled:opacity-60">Emergency Stop</button>
         </div>
       </section>
     </div>}

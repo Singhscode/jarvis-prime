@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
-const AUTOMATION_MIGRATION = /^202608100000(2[3-9]|3[01])_.+\.sql$/;
+const AUTOMATION_MIGRATION = /^202608100000(2[3-9]|3[0-6])_.+\.sql$/;
 
 function fail(errors, message) { errors.push(message); }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
@@ -26,7 +26,7 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   if (contract.compatibility?.registryVersion !== 'AUTOMATION_REGISTRY_V1' || contract.compatibility?.workerVersion !== 'AUTOMATION_WORKER_V1') {
     fail(errors, 'compatibility versions do not match the durable worker contract');
   }
-  if (!Array.isArray(contract.migrations) || contract.migrations.length !== 9) fail(errors, 'exactly migrations 20260810000023 through 20260810000031 are required');
+  if (!Array.isArray(contract.migrations) || contract.migrations.length !== 11) fail(errors, 'exactly the eleven approved local candidate migrations (20260810000023–31, 35, and 36) are required');
 
   const expected = new Set(); let previous = '';
   for (const entry of contract.migrations || []) {

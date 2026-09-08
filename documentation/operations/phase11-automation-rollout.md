@@ -15,8 +15,8 @@ Run exactly `npm run worker:automation --workspace=apps/api` from the same teste
 - **Probes:** set `AUTOMATION_WORKER_HEALTH_PORT` and probe `GET /live` for process liveness and `GET /ready` for worker readiness. `/ready` is 200 only after database compatibility and startup stale recovery succeed, and becomes 503 while draining. It exposes no work, owner, provider, credential, or raw-result data.
 - **Alerts:** alert on a missing worker-ready probe, stale leases, growing eligible queue age/depth, `FAILED`/`BLOCKED`/`HUMAN_REVIEW` growth, and startup compatibility failures. Use the Owner health projection for Owner-scoped durable queue evidence; do not infer worker liveness from it.
 
-## Migration rollout: 20260810000023 through 20260810000031
-Historical migrations `20260810000023`–`20260810000030` are immutable. `20260810000031` adds only a read-only operational projection and indexes; it does not create metric storage or change execution behavior.
+## Migration rollout: local candidate chain 20260810000023 through 20260810000031, 20260810000035, and 20260810000036
+Historical migrations `20260810000023`–`20260810000031` are immutable. Local candidates `20260810000035` and `20260810000036` are forward-only controls/reliability hardening and require explicit remote-ledger and release approval before any non-local application.
 
 1. **Preflight:** record release SHA, `npm run db:status`, database capacity/maintenance window, current durable queue state, and that all providers remain disabled. Confirm `PHASE11_APOLLO_READ_ENABLED=false`; do not configure an enabled Apollo owner action. Ensure a tested backup/restore path exists before schema application.
 2. **Backup decision:** take or confirm a platform-approved backup before applying a remote migration. If a backup cannot be made or the restore owner cannot be reached, stop; do not apply schema changes.

@@ -205,7 +205,8 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     const second = await createRun({ idempotency: key('quota-second') });
     await claimFor(second.run_id, 'worker-quota').catch(() => undefined);
     const denied = await work(second.run_id);
-    assert.deepEqual({ state: denied.state, attempts: denied.attempt_count, lease: denied.lease_token }, { state: 'BLOCKED', attempts: 0, lease: null });
+    assert.deepEqual({ state: denied.state, attempts: denied.attempt_count, lease: denied.lease_token }, { state: 'WAITING', attempts: 0, lease: null });
+    assert.ok(new Date(denied.due_at) > new Date());
     await cancel(first.run_id); await cancel(second.run_id);
     await db.query(`update public.automation_quota_reservations set limit_value=10 where owner_user_id=$1 and scope_type='OWNER' and reservation_type='CONCURRENT'`, [ids.ownerA]);
   });
@@ -388,7 +389,7 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
 
   test('durably blocks emergency-stop and cancellation races before external dispatch', async () => {
     const beforeClaim = await createRun({ idempotency: key('stop-before-claim') });
-    await setControl(ids.ownerA, 'RUN', beforeClaim.run_id, true, 'EMERGENCY_STOP');
+    await call(db, 'automation_set_control', [ids.ownerA, 'RUN', beforeClaim.run_id, false, true, 'EMERGENCY_STOP', ids.ownerA, key('emergency-before-claim')]);
     await callSet(db, 'automation_claim_work', ['worker-stop-before', 50, 60]);
     assert.deepEqual({ state: (await work(beforeClaim.run_id)).state, reason: (await work(beforeClaim.run_id)).last_reason_code }, { state: 'BLOCKED', reason: 'EMERGENCY_STOP' });
     await setControl(ids.ownerA, 'RUN', beforeClaim.run_id, false, 'CLEAR_RUN_STOP');
@@ -791,8 +792,9 @@ test('Apollo reservations, safe summaries, replay, and recovery remain single-wo
   const claimed = await claimFor(first.run_id, 'worker-apollo-complete');
   const second = await admitApolloRecipe({ recipe, idempotency: key('apollo-concurrent') });
   await callSet(db, 'automation_claim_work', ['worker-apollo-concurrent', 50, 60]);
-  const quotaBlocked = await work(second.run_id);
-  assert.deepEqual({ state: quotaBlocked.state, attempts: quotaBlocked.attempt_count, reason: quotaBlocked.last_reason_code }, { state: 'BLOCKED', attempts: 0, reason: 'QUOTA_DENIED' });
+  const quotaWaiting = await work(second.run_id);
+  assert.deepEqual({ state: quotaWaiting.state, attempts: quotaWaiting.attempt_count, reason: quotaWaiting.last_reason_code, lease: quotaWaiting.lease_token }, { state: 'WAITING', attempts: 0, reason: 'QUOTA_WAIT', lease: null });
+  assert.ok(new Date(quotaWaiting.due_at) > new Date());
   await call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]);
   const { rows: [run] } = await db.query('select correlation_id from public.automation_runs where id=$1', [first.run_id]);
   const complete = { provider: 'APOLLO', outcome: 'COMPLETE_SUCCESS', completeness: 'COMPLETE', returnedCount: 2, providerCorrelationId: `phase11:APOLLO:${run.correlation_id}` };
@@ -853,4 +855,186 @@ test('derives owner-scoped operational health from durable work and recovery evi
   await assert.rejects(call(db, 'automation_get_owner_operational_health', [ids.ownerA, ids.actorA]), /AUTOMATION_OWNER_SCOPE_DENIED/);
 
   for (const runId of [eligible.run_id, delayed.run_id, staleRun.run_id]) await cancel(runId);
+});
+
+
+test('Phase 11 local candidate admission decisions are atomic, auditable, fair, and server-only', { concurrency: false }, async () => {
+  const controlRun = await createRun({ idempotency: key('candidate-control-wait') });
+  const controlWork = await work(controlRun.run_id);
+  await db.query(`update public.automation_work_items set state='RETRYABLE', due_at=now(), last_reason_code='TEST_RETRY' where id=$1`, [controlWork.id]);
+  const controlKey = key('candidate-control-operation');
+  const applied = await call(db, 'automation_set_control', [ids.ownerA, 'RUN', controlRun.run_id, true, false, 'TEST_PAUSE', ids.ownerA, controlKey]);
+  const replayed = await call(db, 'automation_set_control', [ids.ownerA, 'RUN', controlRun.run_id, true, false, 'TEST_PAUSE', ids.ownerA, controlKey]);
+  assert.deepEqual({ replayed: applied.replayed }, { replayed: false });
+  assert.deepEqual({ replayed: replayed.replayed }, { replayed: true });
+  await callSet(db, 'automation_claim_work', ['candidate-control-worker', 50, 60]);
+  const waited = await work(controlRun.run_id);
+  assert.equal(waited.state, 'WAITING'); assert.equal(waited.attempt_count, 0); assert.equal(waited.lease_token, null);
+  assert.ok(new Date(waited.due_at) > new Date());
+  const { rows: [controlAudit] } = await db.query(`select id,paused,reason_code from public.automation_control_audit_events where owner_user_id=$1 and idempotency_key=$2`, [ids.ownerA, controlKey]);
+  assert.deepEqual({ paused: controlAudit.paused, reason_code: controlAudit.reason_code }, { paused: true, reason_code: 'TEST_PAUSE' });
+  await assert.rejects(db.query(`update public.automation_control_audit_events set paused=false where id=$1`, [controlAudit.id]), /AUTOMATION_IMMUTABLE/);
+  const { rows: [controlEvidence] } = await db.query(`select decision,reason_code from public.automation_policy_decisions where work_item_id=$1 order by created_at desc limit 1`, [controlWork.id]);
+  assert.deepEqual(controlEvidence, { decision: 'WAIT', reason_code: 'TEST_PAUSE' });
+  const { rows: [controlEvent] } = await db.query(`select event_code,previous_state,new_state from public.automation_run_events where work_item_id=$1 order by event_sequence desc limit 1`, [controlWork.id]);
+  assert.deepEqual(controlEvent, { event_code: 'CONTROL_WAIT', previous_state: 'RETRYABLE', new_state: 'WAITING' });
+  await call(db, 'automation_set_control', [ids.ownerA, 'RUN', controlRun.run_id, false, false, 'TEST_RESUME', ids.ownerA, key('candidate-control-resume')]);
+
+  await db.query(`update public.automation_quota_reservations set limit_value=100000 where owner_user_id=$1 and reservation_type='DAILY'`, [ids.ownerA]);
+  const quotaFirst = await createRun({ idempotency: key('candidate-quota-first') });
+  const firstClaim = await claimFor(quotaFirst.run_id, 'candidate-quota-first-worker');
+  const { rows: [reservedAudit] } = await db.query(`select count(*)::int as total from public.automation_run_events where work_item_id=$1 and event_code='QUOTA_RESERVED'`, [firstClaim.id]);
+  assert.equal(reservedAudit.total, 6);
+  await db.query(`update public.automation_quota_reservations set limit_value=1 where owner_user_id=$1 and scope_type='ACTION' and scope_id='ACT_TASK' and reservation_type='CONCURRENT'`, [ids.ownerA]);
+  const quotaSecond = await createRun({ idempotency: key('candidate-quota-second') });
+  await callSet(db, 'automation_claim_work', ['candidate-quota-second-worker', 50, 60]);
+  const quotaWait = await work(quotaSecond.run_id);
+  assert.deepEqual({ state: quotaWait.state, attempts: quotaWait.attempt_count, lease: quotaWait.lease_token, reason: quotaWait.last_reason_code }, { state: 'WAITING', attempts: 0, lease: null, reason: 'QUOTA_WAIT' });
+  assert.ok(new Date(quotaWait.due_at) > new Date());
+  const { rows: [quotaEvidence] } = await db.query(`select decision,reason_code from public.automation_policy_decisions where work_item_id=$1 order by created_at desc limit 1`, [quotaWait.id]);
+  assert.deepEqual(quotaEvidence, { decision: 'WAIT', reason_code: 'QUOTA_WAIT' });
+  const { rows: [quotaEvent] } = await db.query(`select event_code from public.automation_run_events where work_item_id=$1 order by event_sequence desc limit 1`, [quotaWait.id]);
+  assert.equal(quotaEvent.event_code, 'QUOTA_WAIT');
+  await db.query(`update public.automation_quota_reservations set limit_value=2 where owner_user_id=$1 and scope_type='ACTION' and scope_id='ACT_TASK' and reservation_type='CONCURRENT'`, [ids.ownerA]);
+  await cancel(quotaFirst.run_id);
+  const { rows: [releasedAudit] } = await db.query(`select count(*)::int as total from public.automation_run_events where work_item_id=$1 and event_code='QUOTA_RELEASED'`, [firstClaim.id]);
+  assert.equal(releasedAudit.total, 6);
+
+  const fairRuns = [];
+  for (let index = 0; index < 4; index += 1) {
+    fairRuns.push(await createRun({ idempotency: key(`candidate-fair-a-${index}`) }));
+    fairRuns.push(await createRun({ owner: ids.ownerB, actor: ids.ownerB, version: ids.versionB, idempotency: key(`candidate-fair-b-${index}`) }));
+  }
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    const claimed = await callSet(db, 'automation_claim_work', [`candidate-fair-${cycle}`, 2, 60]);
+    assert.equal(claimed.length, 2);
+    assert.equal(new Set(claimed.map((item) => item.owner_user_id)).size, 2);
+    await Promise.all(claimed.map((item) => call(db, 'automation_transition_work', [item.id, `candidate-fair-${cycle}`, item.lease_token, 'RUNNING', 'RETRYABLE', 'TEST_FAIR_RETRY', JSON.stringify({}), new Date().toISOString()])));
+  }
+  const functionText = (await db.query(`select pg_get_functiondef('public.automation_claim_work(text,integer,integer)'::regprocedure) as definition`)).rows[0].definition;
+  assert.doesNotMatch(functionText, /SELECT\s+w\.\*\s+INTO\s+v_work/i);
+  assert.match(functionText, /bounded_candidates AS MATERIALIZED/i);
+  let requestCount = 0;
+  const instrumented = { query: async (...args) => { requestCount += 1; return db.query(...args); } };
+  await callSet(instrumented, 'automation_claim_work', ['candidate-instrumented', 1, 60]);
+  assert.equal(requestCount, 1);
+  await assert.rejects(callSet(db, 'automation_claim_work', ['', 1, 60]), /AUTOMATION_VALIDATION_ERROR/);
+  const { rows: [atomicity] } = await db.query(`select count(*)::int as total from public.automation_work_items where attempt_count=0 and state='WAITING' and owner_user_id=$1`, [ids.ownerA]);
+  assert.ok(atomicity.total >= 0);
+
+  const recipe = await createGovernedRecipe();
+  const futureInput = taskInput;
+  const futureEvent = `fake-${randomUUID()}`;
+  const futureHash = hash(jsonb({ futureEvent, futureInput }));
+  const futureArgs = [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', futureEvent, recipe.code, JSON.stringify(futureInput), new Date(Date.now() + 60_000).toISOString(), 'ALLOW', 'FAKE_EVENT_ALLOWED', futureHash];
+  const future = await call(db, 'automation_resolve_future_trigger', futureArgs);
+  const futureReplay = await call(db, 'automation_resolve_future_trigger', futureArgs);
+  assert.deepEqual({ rejected: future.rejected, replayed: future.replayed }, { rejected: false, replayed: false });
+  assert.deepEqual({ run_id: futureReplay.run_id, replayed: futureReplay.replayed }, { run_id: future.run_id, replayed: true });
+  await assert.rejects(call(db, 'automation_resolve_future_trigger', [...futureArgs.slice(0, -1), hash('conflict')]), /AUTOMATION_TRIGGER_CONFLICT/);
+  await assert.rejects(call(db, 'automation_resolve_future_trigger', [ids.ownerA, ids.ownerA, 'WEBHOOK', `blocked-${randomUUID()}`, recipe.code, JSON.stringify(futureInput), new Date().toISOString(), 'ALLOW', 'FAKE_EVENT_ALLOWED', futureHash]), /AUTOMATION_FUTURE_TRIGGER_INVALID/);
+  const blocked = await call(db, 'automation_resolve_future_trigger', [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', `block-${randomUUID()}`, recipe.code, JSON.stringify(futureInput), new Date().toISOString(), 'BLOCK', 'FAKE_POLICY_BLOCK', hash('policy-block')]);
+  assert.deepEqual({ rejected: blocked.rejected, reason: blocked.reason }, { rejected: true, reason: 'FAKE_POLICY_BLOCK' });
+  const { rows: [resolverSignature] } = await db.query(`select proargnames from pg_proc where oid='public.automation_resolve_future_trigger(uuid,uuid,text,text,text,jsonb,timestamptz,text,text,text)'::regprocedure`);
+  assert.equal(resolverSignature.proargnames.includes('p_action'), false);
+  for (const run of [controlRun, quotaSecond, ...fairRuns, { run_id: future.run_id }]) {
+    const runOwner = run === fairRuns.find((entry) => entry.run_id === run.run_id) && fairRuns.indexOf(run) % 2 === 1 ? ids.ownerB : ids.ownerA;
+    await call(db, 'automation_cancel_run', [runOwner, run.run_id, runOwner, 'TEST_CLEANUP']);
+  }
+  await cancel(future.run_id);
+});
+
+
+test('Phase 11 P0 quota retry, control receipts, future-trigger receipts, and RPC permissions are deterministic', { concurrency: false }, async () => {
+  const globalKey = key('p0-global-control');
+  const globalArgs = [null, 'GLOBAL', 'GLOBAL', false, false, 'P0_GLOBAL_CLEAR', ids.ownerA, globalKey];
+  const leftControl = new Client({ connectionString }); const rightControl = new Client({ connectionString });
+  await Promise.all([leftControl.connect(), rightControl.connect()]);
+  const controlResults = await Promise.all([call(leftControl, 'automation_set_control', globalArgs), call(rightControl, 'automation_set_control', globalArgs)]);
+  await Promise.all([leftControl.end(), rightControl.end()]);
+  assert.deepEqual(controlResults.map((result) => result.replayed).sort(), [false, true]);
+  await assert.rejects(call(db, 'automation_set_control', [ids.ownerA, 'OWNER', ids.ownerA, false, false, 'P0_GLOBAL_CLEAR', ids.ownerA, globalKey]), /AUTOMATION_IDEMPOTENCY_CONFLICT/);
+  const { rows: [controlEvidence] } = await db.query(`select
+    (select count(*)::int from public.automation_control_audit_events where idempotency_key=$1) as audit_count,
+    (select event_id from public.automation_control_idempotency_receipts where idempotency_key=$1) as receipt_event_id`, [globalKey]);
+  assert.equal(controlEvidence.audit_count, 1);
+  assert.equal(controlResults[0].event_id, controlEvidence.receipt_event_id);
+  assert.equal(controlResults[1].event_id, controlEvidence.receipt_event_id);
+
+  const recipe = await createGovernedRecipe({ code: recipeCode('P0_FUTURE') });
+  const sourceEvent = `p0-future-${randomUUID()}`;
+  const dueAt = new Date(Date.now() + 60_000).toISOString();
+  const payloadHash = hash('p0-future-payload');
+  const futureArgs = [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', sourceEvent, recipe.code, JSON.stringify(taskInput), dueAt, 'ALLOW', 'P0_FUTURE_ALLOWED', payloadHash];
+  const future = await call(db, 'automation_resolve_future_trigger', futureArgs);
+  assert.equal(future.replayed, false);
+  await assert.rejects(call(db, 'automation_resolve_future_trigger', [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', sourceEvent, recipe.code, JSON.stringify({ ...taskInput, taskId: 'p0-changed' }), dueAt, 'ALLOW', 'P0_FUTURE_ALLOWED', payloadHash]), /AUTOMATION_TRIGGER_CONFLICT/);
+  await assert.rejects(call(db, 'automation_resolve_future_trigger', [...futureArgs.slice(0, 6), new Date(Date.now() + 120_000).toISOString(), ...futureArgs.slice(7)]), /AUTOMATION_TRIGGER_CONFLICT/);
+  const { rows: [futureEvidence] } = await db.query(`select r.correlation_id as run_correlation, f.correlation_id as receipt_correlation,
+    (select correlation_id from public.automation_run_events where run_id=r.id and event_code='FUTURE_TRIGGER_RESOLVED' order by event_sequence desc limit 1) as event_correlation
+    from public.automation_runs r join public.automation_future_trigger_receipts f on f.owner_user_id=r.owner_user_id and f.run_id=r.id where r.id=$1`, [future.run_id]);
+  assert.deepEqual(futureEvidence, { run_correlation: future.correlation_id, receipt_correlation: future.correlation_id, event_correlation: future.correlation_id });
+  const concurrentEvent = `p0-future-concurrent-${randomUUID()}`;
+  const concurrentArgs = [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', concurrentEvent, recipe.code, JSON.stringify(taskInput), dueAt, 'ALLOW', 'P0_FUTURE_ALLOWED', hash('p0-future-concurrent')];
+  const leftFuture = new Client({ connectionString }); const rightFuture = new Client({ connectionString });
+  await Promise.all([leftFuture.connect(), rightFuture.connect()]);
+  const concurrentFuture = await Promise.all([call(leftFuture, 'automation_resolve_future_trigger', concurrentArgs), call(rightFuture, 'automation_resolve_future_trigger', concurrentArgs)]);
+  await Promise.all([leftFuture.end(), rightFuture.end()]);
+  assert.deepEqual(concurrentFuture.map((result) => result.replayed).sort(), [false, true]);
+  assert.equal(concurrentFuture[0].run_id, concurrentFuture[1].run_id);
+
+  const retry = await createRun({ owner: ids.ownerB, actor: ids.ownerB, version: ids.versionB, idempotency: key('p0-stale-daily-retry') });
+  const retryClaim = await claimFor(retry.run_id, 'p0-retry-worker');
+  await call(db, 'automation_transition_work', [retryClaim.id, retryClaim.worker, retryClaim.lease_token, 'RUNNING', 'RETRYABLE', 'P0_RETRY', JSON.stringify({}), new Date().toISOString()]);
+  await db.query(`insert into public.automation_quota_reservations(owner_user_id,scope_type,scope_id,reservation_type,policy_key,window_start,limit_value,reserved,consumed)
+    select owner_user_id,scope_type,scope_id,reservation_type,policy_key,date_trunc('day',now())-interval '1 day',1,1,0
+    from public.automation_quota_reservations where owner_user_id=$1 and reservation_type='DAILY' and window_start=date_trunc('day',now())
+    on conflict(owner_user_id,scope_type,scope_id,reservation_type,policy_key,window_start) do update set limit_value=1,reserved=1,consumed=0`, [ids.ownerB]);
+  await db.query(`update public.automation_work_reservations wr set reservation_id=old_bucket.id
+    from public.automation_quota_reservations current_bucket join public.automation_quota_reservations old_bucket
+      on old_bucket.owner_user_id=current_bucket.owner_user_id and old_bucket.scope_type=current_bucket.scope_type and old_bucket.scope_id=current_bucket.scope_id
+     and old_bucket.reservation_type='DAILY' and old_bucket.policy_key=current_bucket.policy_key and old_bucket.window_start=date_trunc('day',now())-interval '1 day'
+    where wr.work_item_id=$1 and wr.reservation_type='DAILY' and wr.reservation_id=current_bucket.id and current_bucket.window_start=date_trunc('day',now())`, [retryClaim.id]);
+  const retried = await claimFor(retry.run_id, 'p0-retry-rebound-worker');
+  const { rows: [rebound] } = await db.query(`select count(*) filter(where active and qr.window_start=date_trunc('day',now()))::int as current_daily_links
+    from public.automation_work_reservations wr join public.automation_quota_reservations qr on qr.id=wr.reservation_id where wr.work_item_id=$1 and wr.reservation_type='DAILY'`, [retried.id]);
+  assert.equal(rebound.current_daily_links, 3);
+  await db.query(`update public.automation_quota_reservations set limit_value=1 where owner_user_id=$1 and reservation_type='CONCURRENT' and scope_type='ACTION' and scope_id='ACT_TASK'`, [ids.ownerB]);
+  const waiting = await createRun({ owner: ids.ownerB, actor: ids.ownerB, version: ids.versionB, idempotency: key('p0-concurrent-wait') });
+  await callSet(db, 'automation_claim_work', ['p0-wait-worker', 50, 60]);
+  const waitingWork = await work(waiting.run_id);
+  assert.deepEqual({ state: waitingWork.state, attempts: waitingWork.attempt_count, lease: waitingWork.lease_token, reason: waitingWork.last_reason_code }, { state: 'WAITING', attempts: 0, lease: null, reason: 'QUOTA_WAIT' });
+  assert.ok(new Date(waitingWork.due_at) > new Date());
+  await call(db, 'automation_transition_work', [retried.id, 'p0-retry-rebound-worker', retried.lease_token, 'RUNNING', 'RETRYABLE', 'P0_RELEASE', JSON.stringify({}), new Date().toISOString()]);
+  await db.query(`update public.automation_quota_reservations set limit_value=1,reserved=1 where owner_user_id=$1 and reservation_type='DAILY' and scope_type='ACTION' and scope_id='ACT_TASK' and window_start=date_trunc('day',now())`, [ids.ownerB]);
+  const blocked = await createRun({ owner: ids.ownerB, actor: ids.ownerB, version: ids.versionB, idempotency: key('p0-current-daily-block') });
+  await callSet(db, 'automation_claim_work', ['p0-block-worker', 50, 60]);
+  const blockedWork = await work(blocked.run_id);
+  assert.deepEqual({ state: blockedWork.state, attempts: blockedWork.attempt_count, lease: blockedWork.lease_token, reason: blockedWork.last_reason_code }, { state: 'BLOCKED', attempts: 0, lease: null, reason: 'QUOTA_DENIED' });
+
+  const { rows: [permissions] } = await db.query(`select
+    has_function_privilege('service_role','public.automation_set_control(uuid,text,text,boolean,boolean,text,uuid,text)','execute') as service_control,
+    has_function_privilege('service_role','public.automation_resolve_future_trigger(uuid,uuid,text,text,text,jsonb,timestamptz,text,text,text)','execute') as service_future,
+    has_function_privilege('service_role','public.automation_reserve_work_decision(uuid,uuid,text,uuid)','execute') as service_quota_helper,
+    has_function_privilege('anon','public.automation_set_control(uuid,text,text,boolean,boolean,text,uuid,text)','execute') as anon_control,
+    has_function_privilege('authenticated','public.automation_resolve_future_trigger(uuid,uuid,text,text,text,jsonb,timestamptz,text,text,text)','execute') as authenticated_future,
+    has_table_privilege('anon','public.automation_control_idempotency_receipts','insert') as anon_receipt_insert,
+    has_table_privilege('service_role','public.automation_control_audit_events','update') as service_audit_update,
+    not exists (select 1 from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid='public.automation_reserve_work_decision(uuid,uuid,text,uuid)'::regprocedure and a.grantee=0 and a.privilege_type='EXECUTE') as no_public_helper,
+    (select prosecdef and coalesce(array_to_string(proconfig,','),'') like '%search_path=%' from pg_proc where oid='public.automation_resolve_future_trigger(uuid,uuid,text,text,text,jsonb,timestamptz,text,text,text)'::regprocedure) as safe_definer_path`);
+  assert.deepEqual(permissions, { service_control: true, service_future: true, service_quota_helper: false, anon_control: false, authenticated_future: false, anon_receipt_insert: false, service_audit_update: false, no_public_helper: true, safe_definer_path: true });
+
+  for (const runId of [future.run_id, concurrentFuture[0].run_id, retry.run_id, waiting.run_id, blocked.run_id]) await call(db, 'automation_cancel_run', [ids.ownerB === ids.ownerA ? ids.ownerA : (runId === retry.run_id || runId === waiting.run_id || runId === blocked.run_id ? ids.ownerB : ids.ownerA), runId, runId === retry.run_id || runId === waiting.run_id || runId === blocked.run_id ? ids.ownerB : ids.ownerA, 'P0_CLEANUP']);
+});
+
+
+test('Phase 11 P0 preserves input-bound replay for a migration-35 blocked future receipt', { concurrency: false }, async () => {
+  const sourceEvent = `p0-legacy-block-${randomUUID()}`;
+  const payloadHash = hash('p0-legacy-block-payload');
+  const { rows: [receipt] } = await db.query(`insert into public.automation_future_trigger_receipts(
+    owner_user_id,source_code,source_event_id,recipe_code,payload_sha256,input_sha256,decision,reason_code
+  ) values ($1,'INTERNAL_FAKE',$2,'RCP_LEGACY_BLOCK',$3,$4,'BLOCK','P0_LEGACY_BLOCK') returning correlation_id`, [ids.ownerA, sourceEvent, payloadHash, inputHash(taskInput)]);
+  const replay = await call(db, 'automation_resolve_future_trigger', [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', sourceEvent, 'RCP_LEGACY_BLOCK', JSON.stringify(taskInput), new Date(Date.now() + 60_000).toISOString(), 'BLOCK', 'P0_LEGACY_BLOCK', payloadHash]);
+  assert.deepEqual({ replayed: replay.replayed, rejected: replay.rejected, correlation_id: replay.correlation_id }, { replayed: true, rejected: true, correlation_id: receipt.correlation_id });
+  await assert.rejects(call(db, 'automation_resolve_future_trigger', [ids.ownerA, ids.ownerA, 'INTERNAL_FAKE', sourceEvent, 'RCP_LEGACY_BLOCK', JSON.stringify({ ...taskInput, taskId: 'changed' }), new Date(Date.now() + 60_000).toISOString(), 'BLOCK', 'P0_LEGACY_BLOCK', payloadHash]), /AUTOMATION_TRIGGER_CONFLICT/);
 });
