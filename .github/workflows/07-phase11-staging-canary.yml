@@ -1,0 +1,176 @@
+name: Phase 11 staging INTERNAL_FAKE canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: "Exact reviewed commit SHA to execute (full 40-character lowercase SHA)."
+        required: true
+        type: string
+      execute_canary:
+        description: "Run the one approved INTERNAL_FAKE canary after the no-write RPC preflight passes."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-staging-internal-fake-canary
+  cancel-in-progress: false
+
+jobs:
+  preflight-and-canary:
+    name: Verify staging runtime and run INTERNAL_FAKE canary
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Validate dispatch inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${{ inputs.git_sha }}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase commit SHA." >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.execute_canary }}" != "true" ]]; then
+            echo "Canary execution requires execute_canary=true." >&2
+            exit 1
+          fi
+
+      - name: Check out the exact reviewed SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          persist-credentials: false
+
+      - name: Confirm checked-out SHA matches the requested SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "${{ inputs.git_sha }}" ]]; then
+            echo "Checked-out SHA does not match the requested SHA." >&2
+            exit 1
+          fi
+          echo "Reviewed SHA verified."
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        shell: bash
+        run: npm ci
+
+      - name: Verify approved staging secrets are available
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${SUPABASE_URL:-}" ]] || missing+=("SUPABASE_URL (GitHub Environment: staging secret)")
+          [[ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]] || missing+=("SUPABASE_SERVICE_ROLE_KEY (GitHub Environment: staging secret)")
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required approved secret source: ${missing[*]}" >&2
+            exit 1
+          fi
+          echo "Approved staging secret references are available."
+
+      - name: Prove runtime injection in the Node child
+        env:
+          PHASE11_RUNTIME_TARGET: staging
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          const expectedProjectRef = 'ygflbvplksgljlamhbju';
+          const required = ['PHASE11_RUNTIME_TARGET', 'SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`PHASE11_RUNTIME_MISSING_${name}`);
+          }
+          if (process.env.PHASE11_RUNTIME_TARGET !== 'staging') throw new Error('PHASE11_RUNTIME_TARGET_INVALID');
+          const url = new URL(process.env.SUPABASE_URL);
+          const projectRef = url.hostname.endsWith('.supabase.co')
+            ? url.hostname.slice(0, -'.supabase.co'.length)
+            : '';
+          if (url.protocol !== 'https:' || url.username || url.password || projectRef !== expectedProjectRef) {
+            throw new Error('PHASE11_RUNTIME_TARGET_INVALID');
+          }
+          console.log('PHASE11_RUNTIME_TARGET: PRESENT');
+          console.log('SUPABASE_URL: PRESENT');
+          console.log('SUPABASE_SERVICE_ROLE_KEY: PRESENT');
+          console.log(`PROJECT_REFERENCE: ${projectRef}`);
+          NODE
+
+      - name: Run no-write RPC visibility preflight
+        env:
+          PHASE11_RUNTIME_TARGET: staging
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          const expectedProjectRef = 'ygflbvplksgljlamhbju';
+          const supabaseUrl = process.env.SUPABASE_URL;
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          if (process.env.PHASE11_RUNTIME_TARGET !== 'staging' || !supabaseUrl || !serviceRoleKey) {
+            throw new Error('PHASE11_RUNTIME_CONFIG_REQUIRED');
+          }
+          const target = new URL(supabaseUrl);
+          const projectRef = target.hostname.endsWith('.supabase.co')
+            ? target.hostname.slice(0, -'.supabase.co'.length)
+            : '';
+          if (target.protocol !== 'https:' || target.username || target.password || projectRef !== expectedProjectRef) {
+            throw new Error('PHASE11_RUNTIME_TARGET_INVALID');
+          }
+
+          // This source event is deliberately invalid for the canary admission contract.
+          // The function rejects it before admission, so this verifies API route/cache and
+          // service-role execution without creating a receipt, run, work item, or reservation.
+          const response = await fetch(`${target.origin}/rest/v1/rpc/automation_run_staging_internal_canary`, {
+            method: 'POST',
+            headers: {
+              apikey: serviceRoleKey,
+              authorization: `Bearer ${serviceRoleKey}`,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              p_owner: '7f110001-9d11-4c11-8111-000000000001',
+              p_actor: '7f110001-9d11-4c11-8111-000000000001',
+              p_source_event: 'PHASE11_RPC_VISIBILITY_PROBE_INVALID_SOURCE',
+              p_due_at: '2026-09-08T20:14:24.000Z',
+            }),
+          });
+          const payload = await response.text();
+          if (payload.includes('PGRST202')) throw new Error('PHASE11_RPC_PGRST202');
+          if (!payload.includes('AUTOMATION_CANARY_INVALID')) throw new Error('PHASE11_RPC_VISIBILITY_OR_EXECUTION_FAILED');
+          console.log('RPC visible: YES');
+          console.log('PGRST202: CLEARED');
+          console.log('Durable state: NONE');
+          NODE
+
+      - name: Execute the approved INTERNAL_FAKE staging canary
+        env:
+          PHASE11_RUNTIME_TARGET: staging
+          PHASE11_STAGING_CANARY_EXECUTE: '1'
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node apps/api/scripts/run-phase11-staging-canary.mjs \
+            --owner-id 7f110001-9d11-4c11-8111-000000000001 \
+            --actor-id 7f110001-9d11-4c11-8111-000000000001 \
+            --source-event-id CANARY_72E38D35760649159E865FB39152FE2D \
+            --due-at 2026-09-08T20:14:24.000Z \
+            --execute
