@@ -14,6 +14,9 @@
     { "file": "20260810000028_add_automation_icp_score_policy.sql", "sha256": "f2068757a882f7856d37976f060239dbce701734c6ebee8d40d69d2b8a5e6fdc" },
     { "file": "20260810000029_add_automation_apollo_readonly_action.sql", "sha256": "3337529943c1a769dd2dec4c8d3583307867df1bf1c8c01d42235f78485ab7c0" },
     { "file": "20260810000030_add_automation_apollo_operational_readiness.sql", "sha256": "0cd87609f63e6a3972340a6843b1ce6bf16e918b2e78d199d1e1f1f5a41e8d4a" },
-    { "file": "20260810000031_add_automation_operational_health.sql", "sha256": "31d6bb2a3982b8c5d4cb6c5185887019065c74194aeacf85cfd75144d65d0ed8" }
+    { "file": "20260810000031_add_automation_operational_health.sql", "sha256": "31d6bb2a3982b8c5d4cb6c5185887019065c74194aeacf85cfd75144d65d0ed8" },
+    { "file": "20260810000035_complete_phase11_local_candidate_controls.sql", "sha256": "ca8c92f8883f68cdc9654b3233e71050e65bdb9e33253931e44148ed0ccd3df0" },
+    { "file": "20260810000036_harden_phase11_p0_controls.sql", "sha256": "b35bb3aed105ddfd9cdd053877b0f95d228ba262bd2f5a1bd71a58d092e0812b" },
+    { "file": "20260810000037_add_phase11_internal_fake_canary.sql", "sha256": "f65ee2e7101749e614c9b22638a00734bb41a07818d82a7e4b155568504a5399" }
   ]
 }

@@ -61,6 +61,11 @@ export function createActionRegistry({ crmApi = crm, communicationsApi = communi
     }
     throw new Error('AUTOMATION_INVALID_TASK_MODE');
   }
+  async function internalFake(value) {
+    const execution = context(value);
+    exact(assertObject(execution.input, 'INTERNAL_FAKE_INPUT'), [], 'AUTOMATION_INVALID_INTERNAL_FAKE_INPUT');
+    return { safeMetadata: { mode: 'INTERNAL_FAKE_CANARY' } };
+  }
   async function notify(value) {
     const execution = context(value);
     const input = assertObject(execution.input, 'NOTIFY_INPUT');
@@ -80,7 +85,7 @@ export function createActionRegistry({ crmApi = crm, communicationsApi = communi
     }
     throw new Error('AUTOMATION_INVALID_NOTIFY_MODE');
   }
-  return Object.freeze({ ACT_ASSIGN: assign, ACT_TASK: task, ACT_NOTIFY: notify });
+  return Object.freeze({ ACT_ASSIGN: assign, ACT_TASK: task, ACT_NOTIFY: notify, ACT_INTERNAL_FAKE: internalFake });
 }
 
 const registry = createActionRegistry();
