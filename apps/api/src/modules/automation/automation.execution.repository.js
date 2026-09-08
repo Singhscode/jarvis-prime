@@ -35,8 +35,23 @@ export async function createDependentWork(ownerUserId, parentWorkItemId, sequenc
   return result(await client().rpc('automation_create_dependent_work', { p_owner: ownerUserId, p_parent: parentWorkItemId, p_sequence: sequence, p_input: input, p_due: dueAt }));
 }
 export async function recoverStale(limit = 50) { return result(await client().rpc('automation_recover_stale', { p_limit: limit })) || []; }
-export async function setControl({ ownerUserId, scopeType, scopeId, paused = false, emergencyStop = false, reasonCode, actorUserId }) {
-  return result(await client().rpc('automation_set_control', { p_owner: ownerUserId, p_scope_type: scopeType, p_scope_id: scopeId, p_paused: paused, p_emergency: emergencyStop, p_reason: reasonCode, p_actor: actorUserId }));
+export async function setControl({ ownerUserId, scopeType, scopeId, paused = false, emergencyStop = false, reasonCode, actorUserId, idempotencyKey }) {
+  if (typeof idempotencyKey !== 'string') throw new Error('AUTOMATION_IDEMPOTENCY_REQUIRED');
+  return result(await client().rpc('automation_set_control', { p_owner: ownerUserId, p_scope_type: scopeType, p_scope_id: scopeId, p_paused: paused, p_emergency: emergencyStop, p_reason: reasonCode, p_actor: actorUserId, p_idempotency: idempotencyKey }));
+}
+export async function resolveFutureTrigger(values) {
+  return result(await client().rpc('automation_resolve_future_trigger', {
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_source: values.sourceCode,
+    p_source_event: values.sourceEventId, p_recipe_code: values.recipeCode, p_input: values.input,
+    p_due_at: values.dueAt, p_decision: values.decision, p_reason: values.reasonCode,
+    p_payload_hash: values.payloadSha256,
+  }));
+}
+export async function runStagingCanary(values) {
+  return result(await client().rpc('automation_run_staging_internal_canary', {
+    p_owner: values.ownerUserId, p_actor: values.actorUserId,
+    p_source_event: values.sourceEventId, p_due_at: values.dueAt,
+  }));
 }
 export async function cancelRun(ownerUserId, runId, actorUserId, reasonCode = 'OWNER_CANCELLED') { return result(await client().rpc('automation_cancel_run', { p_owner: ownerUserId, p_run: runId, p_actor: actorUserId, p_reason: reasonCode })); }
 export async function setEmployeeRunPause(actorUserId, runId, operation) {

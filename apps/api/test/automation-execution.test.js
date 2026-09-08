@@ -4,12 +4,13 @@ import { createActionRegistry } from '../src/modules/automation/automation.execu
 import { ACTION_CODES, assertActionCode, assertTransition, classifyError, retryDelayMs } from '../src/modules/automation/automation.execution.validation.js';
 import { createDurableScheduleMaterializer, createEligibilityScheduler } from '../src/modules/automation/automation.execution.scheduler.js';
 import { createWorker } from '../src/modules/automation/automation.execution.worker.js';
+import { createAutomationObservability, redactAutomationValue } from '../src/modules/automation/automation.execution.observability.js';
 import { getPermittedRunActions } from '../src/modules/automation/automation.execution.service.js';
 import { getAutomationWorkerRuntimeConfig } from '../src/workers/automation-worker.runtime.js';
 import { createAutomationWorkerHealthServer, workerReadinessView } from '../src/workers/automation-worker.health.js';
 
 test('automation contracts allow only fixed actions, legal transitions, and deterministic safe retry classification', () => {
-  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
+  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_INTERNAL_FAKE', 'ACT_APOLLO_SEARCH']);
   assert.equal(assertActionCode('ACT_ASSIGN'), 'ACT_ASSIGN');
   assert.throws(() => assertActionCode('ACT_EMAIL'), /AUTOMATION_ACTION_DISABLED/);
   assert.equal(assertTransition('RUNNING', 'COMPLETED'), 'COMPLETED');
@@ -77,6 +78,10 @@ test('fixed action registry delegates only to the existing CRM and Communication
   await actions.ACT_TASK({ ...base, input: { mode: 'CREATE', projectId: 'project-1', name: 'Follow up' } });
   await actions.ACT_NOTIFY({ ...base, input: { mode: 'CREATE_THREAD', subject: 'Status', body: 'Update', participants: [{ kind: 'employee', employeeCode: 'JP-EMP-000001' }] } });
   await actions.ACT_NOTIFY({ ...base, actorUserId: 'employee-1', actorKind: 'employee', input: { mode: 'SEND_MESSAGE', threadId: 'thread-1', body: 'Update' } });
+  const beforeCanary = calls.length;
+  assert.deepEqual(await actions.ACT_INTERNAL_FAKE({ ...base, input: {} }), { safeMetadata: { mode: 'INTERNAL_FAKE_CANARY' } });
+  assert.equal(calls.length, beforeCanary);
+  await assert.rejects(actions.ACT_INTERNAL_FAKE({ ...base, input: { provider: 'APOLLO' } }), /AUTOMATION_INVALID_INTERNAL_FAKE_INPUT/);
   assert.deepEqual(calls, [
     ['updateTask', 'owner-1', 'project-1', 'task-1', { assigned_user_id: 'employee-1' }],
     ['updateTask', 'owner-1', 'project-1', 'task-1', { completed: true }],
@@ -243,4 +248,57 @@ test('worker health probe reports local liveness and existing-worker readiness w
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+
+test('worker observability emits bounded structured events and redacts sensitive values', async () => {
+  const entries = [];
+  const logger = { info: (...entry) => entries.push(entry), warn: (...entry) => entries.push(entry) };
+  const repository = {
+    checkReady: async () => true, recoverStale: async () => [],
+    claim: async () => [{ id: 'safe-work', run_id: 'safe-run', correlation_id: 'safe-correlation', owner_user_id: 'owner-secret', requested_by_user_id: 'actor-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: 'lease-secret', attempt_count: 1, input: { password: 'never-log' } }],
+    markDispatching: async () => ({ allowed: true }), transition: async () => {},
+  };
+  const worker = createWorker({ workerId: 'safe-worker', repositoryApi: repository, logger, actionResolver: () => async () => ({ safeMetadata: { token: 'never-log', count: 1 } }) });
+  await worker.start(); await worker.runOnce();
+  const serialized = JSON.stringify(entries);
+  assert.doesNotMatch(serialized, /owner-secret|lease-secret|never-log|"password":"never-log"|"token":"never-log"/i);
+  const transition = entries.map(([, value]) => value).find((value) => value.event === 'transition');
+  assert.deepEqual(Object.keys(transition).sort(), ['actionCode', 'actorCategory', 'attempt', 'correlationId', 'event', 'result', 'runId', 'sourceCategory', 'timestamp', 'transition', 'workId'].sort());
+  assert.deepEqual(transition.result, { token: '[REDACTED]', count: 1 });
+  assert.equal(worker.status.metrics.observability.claims, 1);
+  assert.equal(worker.status.metrics.observability.fairnessOwnerSamples, 1);
+  assert.deepEqual(redactAutomationValue({ authorization: 'x', nested: { payload: 'y', ok: true } }), { authorization: '[REDACTED]', nested: { payload: '[REDACTED]', ok: true } });
+});
+
+test('telemetry failures never interrupt worker startup, claims, actions, heartbeats, shutdown, or status', async () => {
+  const throwingLogger = {
+    get info() { throw new Error('logger info failed'); },
+    get warn() { throw new Error('logger warn failed'); },
+  };
+  const direct = createAutomationObservability({ logger: throwingLogger });
+  assert.doesNotThrow(() => { direct.log('startup', {}); direct.warn('heartbeat', {}); });
+
+  const throwingTelemetry = {
+    get metrics() { throw new Error('metrics failed'); },
+    log() { throw new Error('log failed'); }, warn() { throw new Error('warn failed'); },
+    claim() { throw new Error('claim failed'); }, transition() { throw new Error('transition failed'); }, recovered() { throw new Error('recovery failed'); },
+  };
+  const transitions = [];
+  const repository = {
+    checkReady: async () => ({ ready: true }), recoverStale: async () => [],
+    claim: async () => [{ id: 'telemetry-work', owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: 'telemetry-lease', attempt_count: 1, input: {} }],
+    markDispatching: async () => ({ allowed: true }), heartbeat: async () => { throw new Error('lease lost'); },
+    transition: async (...args) => transitions.push(args),
+  };
+  const worker = createWorker({ workerId: 'telemetry-worker', heartbeatMs: 1000, leaseSeconds: 10, logger: throwingLogger, observability: throwingTelemetry, repositoryApi: repository, actionResolver: () => async () => {
+    await new Promise((resolve) => setTimeout(resolve, 1050));
+    return { safeMetadata: {} };
+  } });
+  await worker.start();
+  assert.deepEqual(await worker.runOnce(), [{ id: 'telemetry-work', state: 'HUMAN_REVIEW' }]);
+  assert.equal(transitions[0][3], 'HUMAN_REVIEW');
+  assert.deepEqual(worker.status.metrics.observability, {});
+  await worker.shutdown({ graceMs: 1 });
+  assert.equal(worker.ready, false);
 });

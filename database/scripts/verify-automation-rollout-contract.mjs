@@ -5,15 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
-// Phase 11 ownership is the canonical automation naming family, not merely a
-// timestamp range. This deliberately accepts the one Owner/Employee control
-// migration that belongs to the Phase 11 control plane but lacks the word
-// "automation" in its filename.
-const PHASE11_AUTOMATION_MIGRATION = /^202608100000(?:2[3-9]|3[01])_(?:(?:add|fix)_automation_[a-z0-9_]+|add_employee_run_pause_control)\.sql$/;
-
-export function isPhase11AutomationMigration(fileName) {
-  return PHASE11_AUTOMATION_MIGRATION.test(fileName);
-}
+const AUTOMATION_MIGRATION = /^202608100000(?:2[3-9]|3[0-1]|3[5-7])_.+\.sql$/;
 
 function fail(errors, message) { errors.push(message); }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
@@ -34,11 +26,11 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   if (contract.compatibility?.registryVersion !== 'AUTOMATION_REGISTRY_V1' || contract.compatibility?.workerVersion !== 'AUTOMATION_WORKER_V1') {
     fail(errors, 'compatibility versions do not match the durable worker contract');
   }
-  if (!Array.isArray(contract.migrations) || contract.migrations.length !== 9) fail(errors, 'exactly migrations 20260810000023 through 20260810000031 are required');
+  if (!Array.isArray(contract.migrations) || contract.migrations.length !== 12) fail(errors, 'exactly the twelve approved local candidate migrations (20260810000023–31, 35, 36, and 37) are required');
 
   const expected = new Set(); let previous = '';
   for (const entry of contract.migrations || []) {
-    if (!entry || typeof entry.file !== 'string' || !isPhase11AutomationMigration(entry.file) || !/^[a-f0-9]{64}$/.test(entry.sha256 || '')) {
+    if (!entry || typeof entry.file !== 'string' || !AUTOMATION_MIGRATION.test(entry.file) || !/^[a-f0-9]{64}$/.test(entry.sha256 || '')) {
       fail(errors, 'migration manifest contains an invalid entry'); continue;
     }
     const version = entry.file.slice(0, 14);
@@ -52,7 +44,7 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   }
 
   const migrationDir = path.join(root, 'database', 'supabase', 'migrations');
-  const discovered = (await readdir(migrationDir)).filter(isPhase11AutomationMigration);
+  const discovered = (await readdir(migrationDir)).filter((name) => AUTOMATION_MIGRATION.test(name));
   for (const file of discovered) if (!expected.has(file)) fail(errors, `undeclared automation migration: ${file}`);
   for (const file of expected) if (!discovered.includes(file)) fail(errors, `declared automation migration is absent: ${file}`);
 
