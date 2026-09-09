@@ -18,5 +18,21 @@
     { "file": "20260810000035_complete_phase11_local_candidate_controls.sql", "sha256": "ca8c92f8883f68cdc9654b3233e71050e65bdb9e33253931e44148ed0ccd3df0" },
     { "file": "20260810000036_harden_phase11_p0_controls.sql", "sha256": "b35bb3aed105ddfd9cdd053877b0f95d228ba262bd2f5a1bd71a58d092e0812b" },
     { "file": "20260810000037_add_phase11_internal_fake_canary.sql", "sha256": "f65ee2e7101749e614c9b22638a00734bb41a07818d82a7e4b155568504a5399" }
+  ],
+  "productionApprovedMigrations": [
+    "20260810000023_add_automation_control_plane.sql",
+    "20260810000024_add_automation_execution_gap_controls.sql",
+    "20260810000025_fix_automation_daily_quota_window.sql",
+    "20260810000026_add_automation_recipe_policy_governance.sql",
+    "20260810000027_add_employee_run_pause_control.sql",
+    "20260810000028_add_automation_icp_score_policy.sql",
+    "20260810000029_add_automation_apollo_readonly_action.sql",
+    "20260810000030_add_automation_apollo_operational_readiness.sql",
+    "20260810000031_add_automation_operational_health.sql",
+    "20260810000035_complete_phase11_local_candidate_controls.sql",
+    "20260810000036_harden_phase11_p0_controls.sql"
+  ],
+  "stagingOnlyMigrations": [
+    "20260810000037_add_phase11_internal_fake_canary.sql"
   ]
 }

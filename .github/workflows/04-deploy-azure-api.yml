@@ -126,3 +126,12 @@ jobs:
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ${{ runner.temp }}/jarvis-prime-api
+
+      - name: Record deployed API SHA for paired worker release
+        shell: bash
+        run: |
+          {
+            echo "## Phase 11 production artifact pairing"
+            echo "- Deployed API release SHA: \`${{ github.sha }}\`"
+            echo "- The worker workflow verifies a successful run of this deployment workflow at this exact SHA before it can update the worker image."
+          } >> "$GITHUB_STEP_SUMMARY"

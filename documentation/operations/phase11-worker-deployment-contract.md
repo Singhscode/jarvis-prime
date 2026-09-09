@@ -1,58 +1,42 @@
 # Phase 11 Worker Deployment Contract
 
-This is a platform-neutral release contract, not a cloud manifest or authorization to provision infrastructure. The existing Azure workflow deploys the API only. A Phase 11 worker must be a separately supervised process and must **not** be co-hosted in the API request runtime, Vercel, the legacy `queue.js`, or `/api/owner-workspace/automation-runs`.
+This is a release contract, not a cloud-authorization record. The production API remains on Azure App Service; the Phase 11 worker must be a separately supervised, ingress-disabled service and must never be co-hosted in the API request runtime, Vercel, `queue.js`, or `/api/owner-workspace/automation-runs`.
 
-## Required process and identity
+## Required process, identity, and artifact pairing
 
-Run exactly:
+Run exactly `npm run worker:automation --workspace=apps/api` from the same reviewed commit as the paired production API release. PostgreSQL remains the sole work/lease/recovery authority; worker-local state and probes are never an execution authority.
 
-```sh
-npm run worker:automation --workspace=apps/api
-```
+The production API workflow deploys the App Service artifact and then records `github.sha` in its protected workflow summary. The manual production worker workflow requires that exact SHA twice—`api_release_sha` and `git_sha`—rejects any mismatch, checks out the SHA, verifies `git rev-parse HEAD`, and uses read-only GitHub Actions workflow evidence to require a successful `04-deploy-azure-api.yml` run at that SHA before Azure login. It then records the verified API/worker pair in its protected summary. Retain both successful workflow records with the release approval; code compatibility alone is not artifact-pairing evidence.
 
-Deploy the worker from the same reviewed API artifact SHA as the compatible API release. The deployment platform assigns a unique non-secret `AUTOMATION_WORKER_ID` per running process. PostgreSQL remains the sole work/lease/recovery authority; worker-local state and probes are not an execution authority.
+The runtime platform assigns a unique non-secret `AUTOMATION_WORKER_ID`. Its user-assigned managed identity needs only ACR pull and Key Vault read access; the GitHub Environment OIDC identity needs only ACR push and Container App image-update permissions. No client, provider, or browser identity is allowed.
 
-## Environment and least privilege
+## Environment, probes, supervision, and scale
 
-Inject only server-side worker configuration from an approved secret manager or runtime configuration channel:
+Inject only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from a production secret manager, plus non-secret bounded tuning (`AUTOMATION_WORKER_*`, `AUTOMATION_SCHEDULE_*`, and `AUTOMATION_WORKER_DRAIN_GRACE_MS`). `AUTOMATION_WORKER_HEALTH_PORT` is required for supervisor probes. Do not inject API JWT secrets, `APOLLO_API_KEY`, Hunter, Outreach, Calendar, webhook, or any other provider credential. `PHASE11_APOLLO_READ_ENABLED=false` is mandatory.
 
-- Required: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
-- Required operational setting: `AUTOMATION_WORKER_HEALTH_PORT` for the supervisor probe.
-- Non-secret bounded tuning: `AUTOMATION_WORKER_ID`, `AUTOMATION_WORKER_CLAIM_BATCH`, `AUTOMATION_WORKER_CONCURRENCY`, `AUTOMATION_WORKER_ACTION_CONCURRENCY`, `AUTOMATION_WORKER_LEASE_SECONDS`, `AUTOMATION_WORKER_HEARTBEAT_MS`, `AUTOMATION_WORKER_POLL_MS`, `AUTOMATION_SCHEDULE_INTERVAL_MS`, `AUTOMATION_SCHEDULE_BATCH`, and `AUTOMATION_WORKER_DRAIN_GRACE_MS`.
-
-Do not inject browser credentials, API JWT secrets, `APOLLO_API_KEY`, Hunter, Outreach, Calendar, webhook, or other provider credentials into this worker deployment. The service-role key is server-only, never logged, and must have access limited to the approved Supabase project. Startup fails before claiming work if database configuration or bounded worker configuration is invalid.
-
-## Supervision and probes
-
-- **Liveness:** `GET /live` must return HTTP 200 while the process can serve the local supervisor probe.
-- **Readiness:** `GET /ready` returns HTTP 200 only after durable compatibility verification and startup stale-lease recovery. It returns HTTP 503 before readiness, on compatibility failure, and while draining.
-- **Restart:** the approved platform must restart unexpected non-zero exits with bounded exponential backoff and alert after repeated failures. Do not use a tight restart loop.
-- **Drain:** on `SIGTERM`, stop new materialization/claims and retain the process for at least `AUTOMATION_WORKER_DRAIN_GRACE_MS` (30 seconds by default). Do not clear leases manually; a compatible replacement handles expired leases through PostgreSQL recovery.
-- **Replicas:** start with one worker replica. More replicas require a staging restart/scale/fairness rehearsal and remain safe only through durable PostgreSQL claims.
+- `GET /live` must return HTTP 200 while the process can serve its local supervisor probe.
+- `GET /ready` returns HTTP 200 only after durable compatibility verification and startup stale-lease recovery; it returns 503 before readiness, on compatibility failure, and while draining.
+- Start at exactly one replica. ACA uses `activeRevisionsMode: 'Single'`, `minReplicas: 1`, and `maxReplicas: 1`; a scale-out decision requires a separate staging fairness/restart rehearsal.
+- On `SIGTERM`, stop new materialization and claims. Retain the process for at least `AUTOMATION_WORKER_DRAIN_GRACE_MS` (30 seconds by default), and never clear leases manually. A compatible replacement recovers expired leases durably.
+- The platform owner must configure bounded unexpected-exit restart/backoff and alert after repeated failures. The repository does not invent unsupported ACA Bicep restart/backoff properties.
 
 ## Manual migration release gate
 
-`database/automation-rollout-contract.json` pins the repository evidence for migrations `20260810000023` through `20260810000031`, including content hashes and compatibility versions. It detects source/history drift; it does not prove a remote migration ledger or authorize deployment.
+`database/automation-rollout-contract.json` cryptographically pins the repository candidate chain 23–31, 35–37. Its literal **production-approved** subset is `20260810000023` through `20260810000031`, then `20260810000035`, then `20260810000036`. Migration 35 provides idempotent automation controls and immutable audit evidence; migration 36 adds global idempotency receipts and current-UTC-day DAILY reservation rebinding.
 
-### 1. Preflight — operator-owned, stop on any failure
+Migration `20260810000037_add_phase11_internal_fake_canary.sql` is unchanged, pinned staging-only canary evidence and is excluded from this production authorization. A local `db:reset` includes it solely to validate the clean repository source chain. Before any future remote database operation, the approved operator must compare the remote ledger. If 37 is pending remotely, stop: an unqualified `npm run db:push` would discover it after 36. This bundle does not authorize or provide a production migration application mechanism.
 
-1. Run `npm run verify:automation:rollout-contract`, `npm run db:reset`, and `npm run test:integration:automation --workspace=apps/api` against a disposable local database.
-2. Record the release SHA, reviewed migration manifest, durable compatibility result, and that all external providers remain disabled.
-3. An authorized production operator compares the approved remote migration ledger with the manifest. Any unknown, absent, edited, reordered, or privately held migration is a stop condition; do not edit migration history or ledger rows to repair it.
-4. Make an explicit backup/PITR and restore-owner decision using the approved production backup procedure. Stop if restore responsibility or evidence is unavailable.
-5. Confirm the target worker platform, secret-manager injection, supervisor probe routing, restart/backoff, drain grace, and alert ownership are approved. This document does not select those resources.
+Before separate production authorization, run `npm run verify:automation:rollout-contract`, `npm run db:reset`, and the disposable-local automation integration suite; record the release SHA, approved subset, remote ledger comparison, providers-disabled confirmation, and backup/PITR restore responsibility. Unknown, absent, edited, reordered, or private migrations are stop conditions. Never edit historical migrations or migration-ledger rows; a correction is a reviewed forward migration.
 
-### 2. Canary — after platform and deployment approval only
+## Deployment boundary
 
-Start one separate worker replica with conservative existing defaults. Require `/live` 200 and `/ready` 200; capture durable compatibility, queue/lease/recovery health, and a drain/stop rehearsal. Use only an approved internal-safe action for any smoke evidence. Do not use Apollo, Hunter, Outreach, Calendar, webhooks, or any provider as a canary.
+`production.bicep` is the one-time declarative owner of the production identity, Key Vault references, probes, ingress-disabled topology, single replica, and termination grace. The manual worker workflow is image-only: it builds `<acr>/<repository>:sha-<git_sha>` from the root `Dockerfile` and runs only `az containerapp update --image`. It never changes configuration, secrets, identity, ingress, probes, scale, or resources.
 
-### 3. Forward fix — never destructive rollback
-
-If compatibility, readiness, migration ledger, queue/recovery evidence, backup decision, or provider separation fails, stop and drain workers. Roll back the application/worker artifact if needed, but never delete, edit, reorder, or manually alter applied migrations. A database correction must be a reviewed timestamped forward migration followed by fresh local validation, preflight, and canary evidence.
+No production canary, migration, provider call, or customer-data operation is authorized by this contract. The fixed `ACT_INTERNAL_FAKE` canary remains staging-only and requires its separate staging execution authorization.
 
 ## CI boundary
 
-CI validates repository evidence only: static manifest integrity, clean local migration reset, disposable PostgreSQL automation integration, and worker runtime tests. **CI never runs `npm run db:push`**, links a Supabase project, uses production credentials, deploys the API or worker, or activates providers. Remote migration preflight, backup/restore, and canary actions remain explicit human-approved operations.
+CI validates repository evidence only: static manifest integrity, local template parsing, clean local migration reset, disposable PostgreSQL automation integration, and worker runtime tests. **CI never runs `npm run db:push`**, links a Supabase project, uses production credentials, deploys the API or worker, accesses production secrets, or activates providers.
 
 ## Legacy boundary
 

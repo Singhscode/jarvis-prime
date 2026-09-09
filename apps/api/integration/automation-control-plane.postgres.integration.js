@@ -92,8 +92,8 @@ async function apolloInputIsValid(input) {
 async function cancel(runId) {
   return call(db, 'automation_cancel_run', [ids.ownerA, runId, ids.ownerA, 'TEST_CLEANUP']);
 }
-async function setControl(ownerUserId, scopeType, scopeId, paused, reasonCode = 'TEST_PAUSE') {
-  return call(db, 'automation_set_control', [ownerUserId, scopeType, scopeId, paused, false, reasonCode, ids.ownerA]);
+async function setControl(ownerUserId, scopeType, scopeId, paused, reasonCode = 'TEST_PAUSE', emergency = false) {
+  return call(db, 'automation_set_control', [ownerUserId, scopeType, scopeId, paused, emergency, reasonCode, ids.ownerA]);
 }
 
 before(async () => {
@@ -138,6 +138,47 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
       has_function_privilege('service_role','public.automation_reserve_work(uuid,uuid,text,uuid)','execute') as helper_execute,
       has_table_privilege('anon','public.automation_runs','select') as anon_read`);
     assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, helper_execute: false, anon_read: false });
+  });
+
+  test('validates the clean candidate ledger, hardened control RPC, and UTC-day quota retry path', async () => {
+    const candidateVersions = [
+      '20260810000023', '20260810000024', '20260810000025', '20260810000026', '20260810000027',
+      '20260810000028', '20260810000029', '20260810000030', '20260810000031', '20260810000035',
+      '20260810000036', '20260810000037',
+    ];
+    const productionApprovedVersions = candidateVersions.slice(0, -1);
+    const { rows: ledger } = await db.query(`select version from supabase_migrations.schema_migrations
+      where version = any($1::text[]) order by version`, [candidateVersions]);
+    assert.deepEqual(ledger.map((entry) => entry.version), candidateVersions);
+    assert.deepEqual(productionApprovedVersions.slice(-3), ['20260810000031', '20260810000035', '20260810000036']);
+
+    const controlKey = key('hardened-control');
+    const controlArgs = [ids.ownerA, 'OWNER', ids.ownerA, true, false, 'TEST_PAUSE', ids.ownerA, controlKey];
+    const applied = await call(db, 'automation_set_control', controlArgs);
+    const replayed = await call(db, 'automation_set_control', controlArgs);
+    assert.deepEqual({ replayed: applied.replayed }, { replayed: false });
+    assert.deepEqual({ replayed: replayed.replayed, event_id: replayed.event_id }, { replayed: true, event_id: applied.event_id });
+    await assert.rejects(call(db, 'automation_set_control', [ids.ownerA, 'OWNER', ids.ownerA, false, false, 'TEST_RESUME', ids.ownerA, controlKey]), /AUTOMATION_IDEMPOTENCY_CONFLICT/);
+    const { rows: [controlEvidence] } = await db.query(`select
+      (select count(*)::int from public.automation_control_audit_events where idempotency_key=$1) as audit_count,
+      (select count(*)::int from public.automation_control_idempotency_receipts where idempotency_key=$1) as receipt_count`, [controlKey]);
+    assert.deepEqual(controlEvidence, { audit_count: 1, receipt_count: 1 });
+    await call(db, 'automation_set_control', [ids.ownerA, 'OWNER', ids.ownerA, false, false, 'TEST_RESUME', ids.ownerA, key('hardened-control-resume')]);
+
+    await db.query("set timezone = 'UTC'");
+    const retry = await createRun({ owner: ids.ownerB, actor: ids.ownerB, version: ids.versionB, idempotency: key('utc-midnight-retry') });
+    const claimed = await claimFor(retry.run_id, 'worker-utc-midnight');
+    await call(db, 'automation_transition_work', [claimed.id, claimed.worker, claimed.lease_token, 'RUNNING', 'RETRYABLE', 'TRANSIENT_FAILURE', JSON.stringify({}), new Date(Date.now() - 1_000).toISOString()]);
+    await db.query(`update public.automation_quota_reservations qr set window_start=date_trunc('day', now())-interval '1 day'
+      from public.automation_work_reservations wr
+      where wr.work_item_id=$1 and wr.reservation_id=qr.id and wr.reservation_type='DAILY'`, [claimed.id]);
+    const retried = await claimFor(retry.run_id, 'worker-utc-midnight-retry');
+    const { rows: [dailyLinks] } = await db.query(`select count(*)::int as total,
+      count(*) filter (where wr.active and qr.window_start=date_trunc('day', now()))::int as active_current_day
+      from public.automation_work_reservations wr join public.automation_quota_reservations qr on qr.id=wr.reservation_id
+      where wr.work_item_id=$1 and wr.reservation_type='DAILY'`, [retried.id]);
+    assert.deepEqual(dailyLinks, { total: 3, active_current_day: 3 });
+    await call(db, 'automation_cancel_run', [ids.ownerB, retry.run_id, ids.ownerB, 'TEST_CLEANUP']);
   });
 
   test('persists replay and conflicting trigger evidence without rolling back conflict audit history', async () => {
@@ -187,7 +228,7 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     await cancel(accepted.run_id);
   });
 
-  test('claims once under concurrency, reserves six durable links, and blocks quota denial without consuming attempts', async () => {
+  test('claims once under concurrency, reserves six durable links, and waits on concurrent quota without consuming attempts', async () => {
     const first = await createRun({ idempotency: key('quota-first') });
     const left = new Client({ connectionString }); const right = new Client({ connectionString });
     await Promise.all([left.connect(), right.connect()]);
@@ -205,7 +246,7 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     const second = await createRun({ idempotency: key('quota-second') });
     await claimFor(second.run_id, 'worker-quota').catch(() => undefined);
     const denied = await work(second.run_id);
-    assert.deepEqual({ state: denied.state, attempts: denied.attempt_count, lease: denied.lease_token }, { state: 'BLOCKED', attempts: 0, lease: null });
+    assert.deepEqual({ state: denied.state, attempts: denied.attempt_count, lease: denied.lease_token }, { state: 'WAITING', attempts: 0, lease: null });
     await cancel(first.run_id); await cancel(second.run_id);
     await db.query(`update public.automation_quota_reservations set limit_value=10 where owner_user_id=$1 and scope_type='OWNER' and reservation_type='CONCURRENT'`, [ids.ownerA]);
   });
@@ -388,14 +429,14 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
 
   test('durably blocks emergency-stop and cancellation races before external dispatch', async () => {
     const beforeClaim = await createRun({ idempotency: key('stop-before-claim') });
-    await setControl(ids.ownerA, 'RUN', beforeClaim.run_id, true, 'EMERGENCY_STOP');
+    await setControl(ids.ownerA, 'RUN', beforeClaim.run_id, true, 'EMERGENCY_STOP', true);
     await callSet(db, 'automation_claim_work', ['worker-stop-before', 50, 60]);
     assert.deepEqual({ state: (await work(beforeClaim.run_id)).state, reason: (await work(beforeClaim.run_id)).last_reason_code }, { state: 'BLOCKED', reason: 'EMERGENCY_STOP' });
     await setControl(ids.ownerA, 'RUN', beforeClaim.run_id, false, 'CLEAR_RUN_STOP');
 
     const afterClaim = await createRun({ idempotency: key('stop-after-claim') });
     const claimed = await claimFor(afterClaim.run_id, 'worker-stop-after');
-    await setControl(ids.ownerA, 'RUN', afterClaim.run_id, true, 'EMERGENCY_STOP');
+    await setControl(ids.ownerA, 'RUN', afterClaim.run_id, true, 'EMERGENCY_STOP', true);
     const denied = await call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]);
     assert.equal(denied.allowed, false);
     assert.equal((await work(afterClaim.run_id)).state, 'CANCELLED');
@@ -792,7 +833,7 @@ test('Apollo reservations, safe summaries, replay, and recovery remain single-wo
   const second = await admitApolloRecipe({ recipe, idempotency: key('apollo-concurrent') });
   await callSet(db, 'automation_claim_work', ['worker-apollo-concurrent', 50, 60]);
   const quotaBlocked = await work(second.run_id);
-  assert.deepEqual({ state: quotaBlocked.state, attempts: quotaBlocked.attempt_count, reason: quotaBlocked.last_reason_code }, { state: 'BLOCKED', attempts: 0, reason: 'QUOTA_DENIED' });
+  assert.deepEqual({ state: quotaBlocked.state, attempts: quotaBlocked.attempt_count, reason: quotaBlocked.last_reason_code }, { state: 'WAITING', attempts: 0, reason: 'QUOTA_WAIT' });
   await call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]);
   const { rows: [run] } = await db.query('select correlation_id from public.automation_runs where id=$1', [first.run_id]);
   const complete = { provider: 'APOLLO', outcome: 'COMPLETE_SUCCESS', completeness: 'COMPLETE', returnedCount: 2, providerCorrelationId: `phase11:APOLLO:${run.correlation_id}` };

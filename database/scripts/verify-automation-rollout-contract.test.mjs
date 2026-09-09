@@ -68,26 +68,25 @@ test('recognizes only the canonical Phase 11 automation naming family', () => {
   }
 });
 
-test('accepts canonical Phase 11 migrations alongside overlapping Phase 15A migrations', async (t) => {
+test('accepts the literal Phase 11 candidate chain and explicit production approval subset', async (t) => {
   const root = await createFixture(t);
 
   const result = await verifyAutomationRolloutContract(root);
 
-  assert.equal(result.migrations.length, 9);
-  assert.deepEqual(
-    result.migrations,
-    [
-      '20260810000023_add_automation_control_plane.sql',
-      '20260810000024_add_automation_execution_gap_controls.sql',
-      '20260810000025_fix_automation_daily_quota_window.sql',
-      '20260810000026_add_automation_recipe_policy_governance.sql',
-      '20260810000027_add_employee_run_pause_control.sql',
-      '20260810000028_add_automation_icp_score_policy.sql',
-      '20260810000029_add_automation_apollo_readonly_action.sql',
-      '20260810000030_add_automation_apollo_operational_readiness.sql',
-      '20260810000031_add_automation_operational_health.sql',
-    ],
-  );
+  assert.equal(result.migrations.length, 12);
+  assert.deepEqual(result.migrations.slice(-4), [
+    '20260810000031_add_automation_operational_health.sql',
+    '20260810000035_complete_phase11_local_candidate_controls.sql',
+    '20260810000036_harden_phase11_p0_controls.sql',
+    '20260810000037_add_phase11_internal_fake_canary.sql',
+  ]);
+  assert.deepEqual(result.productionMigrations.slice(-3), [
+    '20260810000031_add_automation_operational_health.sql',
+    '20260810000035_complete_phase11_local_candidate_controls.sql',
+    '20260810000036_harden_phase11_p0_controls.sql',
+  ]);
+  assert.equal(result.migrations.at(-1), '20260810000037_add_phase11_internal_fake_canary.sql');
+  assert.equal(result.productionMigrations.includes('20260810000037_add_phase11_internal_fake_canary.sql'), false);
 });
 
 test('fails when a required canonical Phase 11 migration is absent', async (t) => {
@@ -122,7 +121,7 @@ test('fails when canonical Phase 11 migration manifest order changes', async (t)
   [contract.migrations[0], contract.migrations[1]] = [contract.migrations[1], contract.migrations[0]];
   await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
-  await assert.rejects(verifyAutomationRolloutContract(root), /migration manifest is duplicated or out of order/);
+  await assert.rejects(verifyAutomationRolloutContract(root), /migration manifest must exactly match the literal approved candidate chain/);
 });
 
 test('fails when a canonical Phase 11 migration is not transaction-bounded', async (t) => {

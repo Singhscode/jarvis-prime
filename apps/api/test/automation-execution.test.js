@@ -152,6 +152,32 @@ test('durable schedule materializer serializes database scheduling and stops saf
   assert.equal(scheduler.running, false);
   assert.throws(() => createDurableScheduleMaterializer(), /AUTOMATION_INVALID_SCHEDULE_REPOSITORY/);
   assert.throws(() => createDurableScheduleMaterializer({ repositoryApi: { materializeSchedules: async () => {} }, batch: 26 }), /AUTOMATION_INVALID_SCHEDULE_BATCH/);
+  assert.throws(() => createDurableScheduleMaterializer({ repositoryApi: { materializeSchedules: async () => {} }, onError: 'not-a-function' }), /AUTOMATION_INVALID_SCHEDULE_ERROR_HANDLER/);
+});
+
+test('durable schedule materializer reports a rejected tick, re-arms once, recovers, and stops', async () => {
+  const scheduled = []; const failures = []; let calls = 0;
+  const scheduler = createDurableScheduleMaterializer({
+    repositoryApi: { materializeSchedules: async () => { calls += 1; if (calls === 1) throw new Error('transient materialization failure'); } },
+    intervalMs: 1000,
+    sleep: (callback) => { scheduled.push(callback); return scheduled.length; },
+    onError: (error) => failures.push(error.message),
+  });
+
+  scheduler.start();
+  await scheduled.shift()();
+  assert.equal(calls, 1);
+  assert.deepEqual(failures, ['transient materialization failure']);
+  assert.equal(scheduled.length, 1);
+
+  await scheduled.shift()();
+  assert.equal(calls, 2);
+  assert.equal(scheduled.length, 1);
+
+  scheduler.stop();
+  await scheduled.shift()();
+  assert.equal(calls, 2);
+  assert.equal(scheduler.running, false);
 });
 
 test('worker blocks startup on an incompatible durable execution contract', async () => {
