@@ -27,12 +27,12 @@ const runId = '22222222-2222-4222-8222-222222222222';
 const workId = '33333333-3333-4333-8333-333333333333';
 
 function waitingHistory() {
-  return { workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'WAITING', result: {} }], events: [] };
+  return { workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'WAITING', result_metadata: {} }], events: [] };
 }
 
 function completedHistory() {
   return {
-    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }],
+    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result_metadata: { mode: 'INTERNAL_FAKE_CANARY' } }],
     events: [{ code: 'RECIPE_ADMITTED' }, { code: 'FUTURE_TRIGGER_RESOLVED' }],
   };
 }
@@ -49,14 +49,16 @@ test('staging canary accepts only deterministic identity fields and forwards no 
   assert.throws(() => buildStagingCanaryRequest({ ...request, input: { url: 'https://example.test' } }), /AUTOMATION_CANARY_INVALID/);
 });
 
-test('staging canary requires completed fixed internal work and immutable admission lineage', async () => {
+test('staging canary requires repository-shaped completed internal work and immutable admission lineage', async () => {
   const history = {
     run: { id: runId },
-    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }],
+    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result_metadata: { mode: 'INTERNAL_FAKE_CANARY' } }],
     events: [{ code: 'RECIPE_ADMITTED' }, { code: 'FUTURE_TRIGGER_RESOLVED' }, { code: 'WORK_CLAIMED' }],
   };
   assert.deepEqual(assertStagingCanaryLineage(history), { runId: history.run.id, workItemId: history.workItems[0].id, state: 'COMPLETED' });
   assert.throws(() => assertStagingCanaryLineage({ ...history, workItems: [{ ...history.workItems[0], actionCode: 'ACT_APOLLO_SEARCH' }] }), /AUTOMATION_CANARY_LINEAGE_INVALID/);
+  assert.throws(() => assertStagingCanaryLineage({ ...history, workItems: [{ ...history.workItems[0], result_metadata: {} }] }), /AUTOMATION_CANARY_LINEAGE_INVALID/);
+  assert.throws(() => assertStagingCanaryLineage({ ...history, workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED' }] }), /AUTOMATION_CANARY_LINEAGE_INVALID/);
 });
 
 test('staging canary poll returns only after durable fixed-action completion', async () => {
