@@ -7,6 +7,15 @@ const STAGING_CANARY_HOSTNAME = `${STAGING_CANARY_PROJECT_REF}.supabase.co`;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SOURCE_EVENT = /^CANARY_[A-Z0-9][A-Z0-9_-]{7,110}$/;
 
+// Keep this aligned with the admission RPC's accepted future due_at window.
+export const STAGING_CANARY_MAX_FUTURE_DUE_MS = 10 * 60_000;
+// The deployed worker polls every five seconds before eligible work can be claimed.
+export const STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS = 5_000;
+// Preserves the prior post-eligibility completion allowance without an unbounded wait.
+export const STAGING_CANARY_COMPLETION_GRACE_MS = 90_000;
+export const STAGING_CANARY_MAX_OBSERVATION_MS = STAGING_CANARY_MAX_FUTURE_DUE_MS
+  + STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS + STAGING_CANARY_COMPLETION_GRACE_MS;
+
 function invalid() { throw new Error('AUTOMATION_CANARY_INVALID'); }
 function exact(value, fields) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some((key) => !fields.includes(key))) invalid();
@@ -18,6 +27,14 @@ function dueAt(value) {
   const date = new Date(value);
   if (Number.isNaN(date.valueOf())) invalid();
   return date.toISOString();
+}
+
+function completionDeadline(startedAt, normalizedDueAt) {
+  const dueAtMs = new Date(normalizedDueAt).valueOf();
+  const minimumDeadline = startedAt + STAGING_CANARY_COMPLETION_GRACE_MS;
+  const dueAwareDeadline = dueAtMs + STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS + STAGING_CANARY_COMPLETION_GRACE_MS;
+  const maximumDeadline = startedAt + STAGING_CANARY_MAX_OBSERVATION_MS;
+  return Math.min(maximumDeadline, Math.max(minimumDeadline, dueAwareDeadline));
 }
 
 export function resolveStagingCanaryRuntimeConfig(values = {
@@ -66,21 +83,24 @@ export function assertStagingCanaryLineage(history) {
   return Object.freeze({ runId: history.run?.id, workItemId: work[0].id, state: work[0].state });
 }
 
-export function createStagingCanary({ runCanary = repository.runStagingCanary, getRunHistory = repository.getRunHistory, runtimeConfig, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+export function createStagingCanary({ runCanary = repository.runStagingCanary, getRunHistory = repository.getRunHistory, runtimeConfig, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = () => Date.now() } = {}) {
   const assertRuntime = () => resolveStagingCanaryRuntimeConfig(runtimeConfig);
   return Object.freeze({
     async admit(values) { assertRuntime(); return runCanary(buildStagingCanaryRequest(values)); },
-    async awaitCompletion({ ownerUserId, runId, timeoutMs = 90_000, pollMs = 1_000 }) {
+    async awaitCompletion({ ownerUserId, runId, dueAt: workDueAt, pollMs = 1_000 }) {
       assertRuntime();
       const owner = uuid(ownerUserId);
-      if (typeof runId !== 'string' || !UUID.test(runId) || !Number.isInteger(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000 || !Number.isInteger(pollMs) || pollMs < 250 || pollMs > 5_000) invalid();
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() <= deadline) {
+      const normalizedDueAt = dueAt(workDueAt);
+      if (typeof runId !== 'string' || !UUID.test(runId) || !Number.isInteger(pollMs) || pollMs < 250 || pollMs > 5_000) invalid();
+      const deadline = completionDeadline(now(), normalizedDueAt);
+      while (now() <= deadline) {
         const history = await getRunHistory(owner, runId);
         try { return assertStagingCanaryLineage({ ...history, run: { id: runId } }); } catch (error) {
           if (error.message !== 'AUTOMATION_CANARY_LINEAGE_INVALID') throw error;
         }
-        await sleep(pollMs);
+        const remainingMs = deadline - now();
+        if (remainingMs <= 0) break;
+        await sleep(Math.min(pollMs, remainingMs));
       }
       throw new Error('AUTOMATION_CANARY_TIMEOUT');
     },

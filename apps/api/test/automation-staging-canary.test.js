@@ -1,6 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assertStagingCanaryLineage, buildStagingCanaryRequest, createStagingCanary } from '../src/modules/automation/automation.staging-canary.service.js';
+import {
+  assertStagingCanaryLineage,
+  buildStagingCanaryRequest,
+  createStagingCanary,
+  STAGING_CANARY_COMPLETION_GRACE_MS,
+  STAGING_CANARY_MAX_FUTURE_DUE_MS,
+  STAGING_CANARY_MAX_OBSERVATION_MS,
+  STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS,
+} from '../src/modules/automation/automation.staging-canary.service.js';
 
 const runtimeConfig = Object.freeze({
   runtimeTarget: 'staging',
@@ -15,9 +23,23 @@ const request = Object.freeze({
   dueAt: '2026-09-08T09:00:00.000Z',
 });
 
+const runId = '22222222-2222-4222-8222-222222222222';
+const workId = '33333333-3333-4333-8333-333333333333';
+
+function waitingHistory() {
+  return { workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'WAITING', result: {} }], events: [] };
+}
+
+function completedHistory() {
+  return {
+    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }],
+    events: [{ code: 'RECIPE_ADMITTED' }, { code: 'FUTURE_TRIGGER_RESOLVED' }],
+  };
+}
+
 test('staging canary accepts only deterministic identity fields and forwards no provider/action/input surface', async () => {
   const calls = [];
-  const canary = createStagingCanary({ runtimeConfig, runCanary: async (value) => { calls.push(value); return { run_id: '22222222-2222-4222-8222-222222222222' }; } });
+  const canary = createStagingCanary({ runtimeConfig, runCanary: async (value) => { calls.push(value); return { run_id: runId }; } });
   await canary.admit(request);
   await canary.admit(request);
   assert.deepEqual(calls, [request, request]);
@@ -29,8 +51,8 @@ test('staging canary accepts only deterministic identity fields and forwards no 
 
 test('staging canary requires completed fixed internal work and immutable admission lineage', async () => {
   const history = {
-    run: { id: '22222222-2222-4222-8222-222222222222' },
-    workItems: [{ id: '33333333-3333-4333-8333-333333333333', actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }],
+    run: { id: runId },
+    workItems: [{ id: workId, actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }],
     events: [{ code: 'RECIPE_ADMITTED' }, { code: 'FUTURE_TRIGGER_RESOLVED' }, { code: 'WORK_CLAIMED' }],
   };
   assert.deepEqual(assertStagingCanaryLineage(history), { runId: history.run.id, workItemId: history.workItems[0].id, state: 'COMPLETED' });
@@ -43,13 +65,53 @@ test('staging canary poll returns only after durable fixed-action completion', a
     runtimeConfig,
     getRunHistory: async () => {
       reads += 1;
-      return reads === 1
-        ? { workItems: [{ id: '33333333-3333-4333-8333-333333333333', actionCode: 'ACT_INTERNAL_FAKE', state: 'WAITING', result: {} }], events: [] }
-        : { workItems: [{ id: '33333333-3333-4333-8333-333333333333', actionCode: 'ACT_INTERNAL_FAKE', state: 'COMPLETED', result: { mode: 'INTERNAL_FAKE_CANARY' } }], events: [{ code: 'RECIPE_ADMITTED' }, { code: 'FUTURE_TRIGGER_RESOLVED' }] };
+      return reads === 1 ? waitingHistory() : completedHistory();
     },
     sleep: async () => {},
   });
-  const result = await canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId: '22222222-2222-4222-8222-222222222222', timeoutMs: 1_000, pollMs: 250 });
+  const result = await canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId, dueAt: request.dueAt, pollMs: 250 });
   assert.equal(reads, 2);
   assert.equal(result.state, 'COMPLETED');
+});
+
+test('staging canary observes future due work beyond the prior fixed 90-second deadline', async () => {
+  const startedAt = Date.parse('2026-09-09T08:54:14.000Z');
+  const dueAtMs = startedAt + 120_000;
+  const dueAt = new Date(dueAtMs).toISOString();
+  let nowMs = startedAt;
+  let reads = 0;
+  const canary = createStagingCanary({
+    runtimeConfig,
+    getRunHistory: async () => {
+      reads += 1;
+      return nowMs < dueAtMs + STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS ? waitingHistory() : completedHistory();
+    },
+    now: () => nowMs,
+    sleep: async (ms) => { nowMs += ms; },
+  });
+
+  const result = await canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId, dueAt, pollMs: STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS });
+
+  assert.equal(result.state, 'COMPLETED');
+  assert.equal(nowMs, dueAtMs + STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS);
+  assert.ok(nowMs - startedAt > STAGING_CANARY_COMPLETION_GRACE_MS);
+  assert.ok(reads > 1);
+});
+
+test('staging canary caps future-due observation at the admission window plus worker and completion allowance', async () => {
+  const startedAt = Date.parse('2026-09-09T08:54:14.000Z');
+  const dueAt = new Date(startedAt + STAGING_CANARY_MAX_FUTURE_DUE_MS).toISOString();
+  let nowMs = startedAt;
+  const canary = createStagingCanary({
+    runtimeConfig,
+    getRunHistory: async () => waitingHistory(),
+    now: () => nowMs,
+    sleep: async (ms) => { nowMs += ms; },
+  });
+
+  await assert.rejects(
+    canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId, dueAt, pollMs: STAGING_CANARY_WORKER_POLL_ALLOWANCE_MS }),
+    /AUTOMATION_CANARY_TIMEOUT/,
+  );
+  assert.equal(nowMs - startedAt, STAGING_CANARY_MAX_OBSERVATION_MS);
 });

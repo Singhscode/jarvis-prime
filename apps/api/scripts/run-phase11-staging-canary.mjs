@@ -24,6 +24,6 @@ if (!process.argv.includes('--execute')) {
   console.log(JSON.stringify({ runtimeTarget: runtimeConfig.runtimeTarget, projectReferenceValidation: 'pass' }));
   const canary = createStagingCanary({ runtimeConfig });
   const admitted = await canary.admit(request);
-  const lineage = await canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId: admitted.run_id });
+  const lineage = await canary.awaitCompletion({ ownerUserId: request.ownerUserId, runId: admitted.run_id, dueAt: request.dueAt });
   console.log(JSON.stringify({ mode: 'executed', admitted, lineage }, null, 2));
 }
