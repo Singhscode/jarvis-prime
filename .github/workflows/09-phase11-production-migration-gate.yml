@@ -1,0 +1,113 @@
+name: Phase 11 Production Migration Gate
+
+# This manual, repository-owned gate is the only Phase 11 production migration
+# path. It never invokes `supabase db push`, deploys an artifact, or activates a
+# provider. The protected Environment supplies runtime-only database access.
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only inspection, or the explicit 35-then-36 delivery path.
+        required: true
+        type: choice
+        options:
+          - inspect
+          - apply
+      confirmation:
+        description: Select the confirmation matching the requested operation.
+        required: true
+        type: choice
+        options:
+          - INSPECT_ONLY
+          - APPLY_35_THEN_36
+      git_sha:
+        description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-production-migration-gate
+  cancel-in-progress: false
+
+jobs:
+  phase11-migration-gate:
+    runs-on: ubuntu-latest
+    # Protected reviewers and the runtime-only secret/variable live here. No
+    # production value is committed to this workflow.
+    environment: jarvis-prime-api / production
+
+    steps:
+      - name: Validate manual operation and reviewed SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Refusing to run outside main." >&2
+            exit 1
+          fi
+          if [[ ! "${{ inputs.git_sha }}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase SHA." >&2
+            exit 1
+          fi
+          case "${{ inputs.operation }}:${{ inputs.confirmation }}" in
+            inspect:INSPECT_ONLY|apply:APPLY_35_THEN_36) ;;
+            *) echo "Operation and confirmation do not match." >&2; exit 1 ;;
+          esac
+
+      - name: Check out the exact reviewed main-branch SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm requested SHA is reachable from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main
+          [[ "$(git rev-parse HEAD)" == "${{ inputs.git_sha }}" ]]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run verify:automation:rollout-contract
+      - name: Print immutable migration boundary
+        run: node database/scripts/phase11-production-migration-gate.mjs --describe
+
+      # The gate itself opens BEGIN READ ONLY before reading the ledger. This
+      # preflight is mandatory even for apply and emits IDs/status only.
+      - name: Read-only production ledger preflight
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        run: node database/scripts/phase11-production-migration-gate.mjs --inspect
+
+      - name: Selectively apply only 35 then 36
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        run: node database/scripts/phase11-production-migration-gate.mjs --apply
+
+      - name: Read-only post-delivery ledger verification
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        run: node database/scripts/phase11-production-migration-gate.mjs --inspect
+
+      - name: Report constrained boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Phase 11 migration gate completed."
+          echo "No API/worker deployment, provider activation, or generic db push was performed."

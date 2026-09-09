@@ -20,6 +20,8 @@
     "db:push": "supabase --workdir database db push",
     "verify:automation:rollout-contract": "node database/scripts/verify-automation-rollout-contract.mjs",
     "test:automation:rollout-contract": "node --test database/scripts/verify-automation-rollout-contract.test.mjs",
+    "test:phase11:migration-gate": "node --test database/scripts/phase11-production-migration-gate.test.mjs",
+    "describe:phase11:migration-gate": "node database/scripts/phase11-production-migration-gate.mjs --describe",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "npm run server --workspace=apps/api"
   },
