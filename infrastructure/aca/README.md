@@ -1,10 +1,6 @@
-# Phase 11 Automation Worker — Staging Azure Container Apps
+# Phase 11 Automation Worker — Azure Container Apps
 
-This directory holds the **staging-only** infrastructure definition for running the
-separately supervised Phase 11 automation worker on Azure Container Apps (ACA).
-
-The API continues to run unchanged on Azure App Service. The worker is a distinct,
-ingress-disabled ACA workload and must never be co-hosted inside the API process.
+This directory holds **undeployed** Azure Container Apps declarations for the separately supervised Phase 11 worker. `staging.*` is staging-only; `production.*` is production-only. The API remains on Azure App Service. Neither worker may be co-hosted inside the API process.
 
 ## Artifacts
 
@@ -12,9 +8,10 @@ ingress-disabled ACA workload and must never be co-hosted inside the API process
 | --- | --- |
 | `../../Dockerfile` | Root-context OCI image for the worker (`npm run worker:automation --workspace=apps/api`). |
 | `../../.dockerignore` | Keeps secrets, caches, tests, and unrelated files out of the build context. |
-| `../../.github/workflows/06-deploy-aca-staging.yml` | Manual staging deploy: build image from a reviewed SHA, push to staging ACR, update the staging worker Container App image only. |
-| `staging.bicep` | Declarative staging ACA environment + worker Container App. |
-| `staging.parameters.json` | Non-secret staging placeholders. No secret values. |
+| `../../.github/workflows/06-deploy-aca-staging.yml` | Manual staging image-only worker update. |
+| `../../.github/workflows/08-deploy-aca-production.yml` | Manual, protected-environment production image-only update; requires an exact API/worker SHA match. |
+| `staging.bicep` / `staging.parameters.json` | Staging ACA environment + worker declaration and non-secret placeholders. |
+| `production.bicep` / `production.parameters.json` | Production ACA environment + worker declaration and non-secret placeholders. It is not applied by this release bundle. |
 
 ## What this does NOT do
 
@@ -44,43 +41,44 @@ Injected at runtime only:
 - Scale: `minReplicas: 1`, `maxReplicas: 1`. More replicas require a separate approved staging restart/scale/fairness rehearsal.
 - Termination grace: derived as `AUTOMATION_WORKER_DRAIN_GRACE_MS / 1000 + 10` seconds, so ACA always allows the worker to finish draining (default worker drain grace is 30 seconds).
 
-## Required GitHub configuration (staging Environment)
+## Required GitHub configuration
 
-Secrets:
+The staging workflow uses the protected `staging` Environment and its existing `AZURE_STAGING_*` secrets plus `STAGING_*` variables. The production workflow uses the protected `jarvis-prime-api / production` Environment only:
 
-- `AZURE_STAGING_CLIENT_ID`
-- `AZURE_STAGING_TENANT_ID`
-- `AZURE_STAGING_SUBSCRIPTION_ID`
+Secrets: `AZURE_PRODUCTION_CLIENT_ID`, `AZURE_PRODUCTION_TENANT_ID`, `AZURE_PRODUCTION_SUBSCRIPTION_ID`.
 
-Variables:
+Variables: `PRODUCTION_ACR_LOGIN_SERVER`, `PRODUCTION_ACR_NAME`, `PRODUCTION_RESOURCE_GROUP`, `PRODUCTION_WORKER_CONTAINER_APP`, `PRODUCTION_WORKER_IMAGE_REPOSITORY`.
 
-- `STAGING_ACR_LOGIN_SERVER`
-- `STAGING_ACR_NAME`
-- `STAGING_RESOURCE_GROUP`
-- `STAGING_WORKER_CONTAINER_APP`
-- `STAGING_WORKER_IMAGE_REPOSITORY`
+The production workflow refuses a missing protected value, a staging-named production identifier, a non-lowercase-40 SHA, an API/worker SHA mismatch, or the absence of a successful `04-deploy-azure-api.yml` deployment workflow for that exact SHA. It checks out the requested SHA, verifies `git rev-parse HEAD`, builds the root `Dockerfile`, tags `<acr>/<repository>:sha-<git_sha>`, and makes only `az containerapp update --image`. It never applies Bicep or migrations.
 
-The workflow fails fast if any are missing and refuses values that look like production.
+## Production topology and pairing
 
-## Human decisions still required (HUMAN DECISION REQUIRED)
+`production.bicep` declares a separate, ingress-disabled worker with `activeRevisionsMode: 'Single'`, a production user-assigned identity, Key Vault references only for `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, `/live` and `/ready` probes, `minReplicas: 1`/`maxReplicas: 1`, and termination grace equal to drain grace plus ten seconds. `PHASE11_APOLLO_READ_ENABLED=false` is explicit and there are no provider credentials.
 
-1. Staging ACR, ACA environment, region, compute size, and image-retention policy.
-2. User-assigned managed identity, its ACR pull role, and its least-privilege Key Vault secret-read access.
-3. Staging Key Vault and the two Supabase secret entries (`supabase-url`, `supabase-service-role-key`).
-4. Log Analytics workspace (customer ID + shared key provided as a secure deploy input, never committed).
-5. Alert thresholds and on-call ownership for probe failures, restarts, stale leases, and queue growth — not defined here.
-6. Staging Supabase project + migration-ledger and backup/restore confirmation before the worker connects.
+ACA does not have a repository-approved Bicep property for bounded restart/backoff, so this template intentionally does not invent one. Before provisioning, the production platform owner must bind ACA’s platform restart behavior to a bounded incident/alert policy as required by `phase11-worker-deployment-contract.md`.
+
+For an artifact pair, the successful API deployment records its `github.sha` in the workflow summary. The worker dispatch must supply that exact value as both `api_release_sha` and `git_sha`; before Azure login, the workflow uses its read-only GitHub Actions permission to require a successful `04-deploy-azure-api.yml` run at that exact SHA. It then writes the verified pair to its protected workflow summary. Keep both successful workflow records with the release approval.
+
+## Production prerequisites still requiring platform approval
+
+1. Production ACR, ACA environment, region, compute size, image-retention policy, and Container App name.
+2. Production user-assigned managed identity with only `AcrPull` and least-privilege Key Vault secret-read access.
+3. Production Key Vault references for `supabase-url` and `supabase-service-role-key`; neither value belongs in Git, parameters, workflow logs, or this repository.
+4. Production Log Analytics workspace customer ID plus its shared key supplied only as a secure provisioning input.
+5. Protected GitHub Environment OIDC identity with only ACR push and Container App update rights, plus protected production resource variables.
+6. Bounded restart/backoff and alert/on-call policy for failed probes, repeated exits, stale leases, and queue growth.
+7. Recorded successful paired API/worker workflow summaries at the same reviewed SHA, a remote migration-ledger decision, and backup/restore ownership before any production authorization.
 
 ## One-time provisioning (human-approved, outside CI)
 
 ```sh
-# Example only. Run against a STAGING resource group with approved values.
+# Example only. Run against an approved environment with approved values.
 az deployment group create \
-  --resource-group <STAGING_RESOURCE_GROUP> \
-  --template-file infrastructure/aca/staging.bicep \
-  --parameters @infrastructure/aca/staging.parameters.json \
+  --resource-group <PRODUCTION_RESOURCE_GROUP> \
+  --template-file infrastructure/aca/production.bicep \
+  --parameters @infrastructure/aca/production.parameters.json \
   --parameters logAnalyticsSharedKey=<secure-input> \
                workerImage=<acr>/<repo>:sha-<reviewed-sha>
 ```
 
-Then deploy new images via the `06-deploy-aca-staging.yml` workflow.
+This command is documentation only; this release bundle does not run it. After separately authorized provisioning, use the matching protected manual worker workflow.
