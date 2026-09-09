@@ -76,7 +76,7 @@ export function assertStagingCanaryLineage(history) {
   const work = history?.workItems;
   const eventCodes = new Set((history?.events || []).map((event) => event.code));
   if (!Array.isArray(work) || work.length !== 1 || work[0].actionCode !== 'ACT_INTERNAL_FAKE' || work[0].state !== 'COMPLETED'
-      || work[0]?.result?.mode !== 'INTERNAL_FAKE_CANARY'
+      || work[0]?.result_metadata?.mode !== 'INTERNAL_FAKE_CANARY'
       || !eventCodes.has('RECIPE_ADMITTED') || !eventCodes.has('FUTURE_TRIGGER_RESOLVED')) {
     throw new Error('AUTOMATION_CANARY_LINEAGE_INVALID');
   }
