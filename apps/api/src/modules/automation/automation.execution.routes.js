@@ -19,7 +19,7 @@ router.post('/runs/:runId/resume', mutationLimiter, handle(async (req, res) => r
 router.post('/runs/:runId/cancel', mutationLimiter, handle(async (req, res) => respond(res, await automation.cancelRun(req.user.sub, req.params.runId, req.body))));
 router.post('/work/:workItemId/retry', mutationLimiter, handle(async (req, res) => respond(res, await automation.resumeRetry(req.user.sub, req.params.workItemId, req.body, req.get('Idempotency-Key')))));
 router.post('/work/:workItemId/review-resolution', mutationLimiter, handle(async (req, res) => respond(res, await automation.resolveHumanReview(req.user.sub, req.params.workItemId, req.body, req.get('Idempotency-Key')))));
-router.put('/controls', mutationLimiter, handle(async (req, res) => respond(res, await automation.setOwnerControl(req.user.sub, req.body))));
+router.put('/controls', mutationLimiter, handle(async (req, res) => respond(res, await automation.setOwnerControl(req.user.sub, req.body, req.get('Idempotency-Key')))));
 router.post('/schedules/daily', mutationLimiter, handle(async (req, res) => respond(res, await automation.createDailySchedule(req.user.sub, req.body), 201)));
 
 export default router;

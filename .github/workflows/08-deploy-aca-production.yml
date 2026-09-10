@@ -110,6 +110,32 @@ jobs:
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
 
+      # Read-only evidence only. A known-ready baseline is required before an
+      # image mutation so a failed future release has an auditable, human-reviewed
+      # recovery reference. This workflow never rolls back automatically.
+      - name: Capture ready worker baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          show_app() {
+            az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP"
+          }
+          baseline_revision="$(show_app --query 'properties.latestRevisionName' -o tsv)"
+          baseline_ready_revision="$(show_app --query 'properties.latestReadyRevisionName' -o tsv)"
+          baseline_image="$(show_app --query 'properties.template.containers[?name==`automation-worker`].image | [0]' -o tsv)"
+          if [[ -z "$baseline_revision" || -z "$baseline_ready_revision" || -z "$baseline_image" || "$baseline_revision" != "$baseline_ready_revision" ]]; then
+            echo 'Refusing worker release: no unambiguous currently-ready worker baseline.' >&2
+            exit 1
+          fi
+          {
+            echo "BASELINE_REVISION=$baseline_revision"
+            echo "BASELINE_IMAGE=$baseline_image"
+          } >> "$GITHUB_ENV"
+          {
+            echo "- Worker baseline ready revision: \`$baseline_ready_revision\`"
+            echo "- Worker baseline image: \`$baseline_image\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Authenticate to the production Azure Container Registry
         shell: bash
         run: |
@@ -131,8 +157,43 @@ jobs:
           set -euo pipefail
           az containerapp update --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --image "$IMAGE_REF"
 
+      # ACA readiness is authoritative here: the ingress-disabled worker's local
+      # /ready probe passes only after compatibility and stale-lease recovery.
+      - name: Verify desired worker revision is ACA-ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 600))
+          latest_revision=''
+          ready_revision=''
+          observed_image=''
+          while (( SECONDS < deadline )); do
+            latest_revision="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.latestRevisionName' -o tsv)"
+            ready_revision="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.latestReadyRevisionName' -o tsv)"
+            observed_image="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.template.containers[?name==`automation-worker`].image | [0]' -o tsv)"
+            if [[ -n "$latest_revision" && "$latest_revision" == "$ready_revision" && "$observed_image" == "$IMAGE_REF" ]]; then
+              {
+                echo "- Worker desired image: \`$IMAGE_REF\`"
+                echo "- Worker ACA-ready revision: \`$ready_revision\`"
+                echo "- Worker readiness result: exact desired image is ACA-ready"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          {
+            echo "- Worker desired image: \`$IMAGE_REF\`"
+            echo "- Worker observed latest revision: \`${latest_revision:-none}\`"
+            echo "- Worker observed ready revision: \`${ready_revision:-none}\`"
+            echo "- Worker observed image: \`${observed_image:-none}\`"
+            echo "- Worker readiness result: timed out; no automatic rollback was attempted"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo 'Worker update did not become ACA-ready with the desired image within ten minutes.' >&2
+          exit 1
+
       - name: Report constrained release boundary
         shell: bash
         run: |
-          echo "Production worker image updated: $IMAGE_REF"
+          echo "Production worker image updated and ACA-readiness verified: $IMAGE_REF"
+          echo "Baseline evidence was recorded for an authorized manual recovery decision; no rollback was attempted."
           echo "No migrations, secret changes, configuration changes, provider activation, or resource provisioning were performed."

@@ -49,7 +49,7 @@ Secrets: `AZURE_PRODUCTION_CLIENT_ID`, `AZURE_PRODUCTION_TENANT_ID`, `AZURE_PROD
 
 Variables: `PRODUCTION_ACR_LOGIN_SERVER`, `PRODUCTION_ACR_NAME`, `PRODUCTION_RESOURCE_GROUP`, `PRODUCTION_WORKER_CONTAINER_APP`, `PRODUCTION_WORKER_IMAGE_REPOSITORY`.
 
-The production workflow refuses a missing protected value, a staging-named production identifier, a non-lowercase-40 SHA, an API/worker SHA mismatch, or the absence of a successful `04-deploy-azure-api.yml` deployment workflow for that exact SHA. It checks out the requested SHA, verifies `git rev-parse HEAD`, builds the root `Dockerfile`, tags `<acr>/<repository>:sha-<git_sha>`, and makes only `az containerapp update --image`. It never applies Bicep or migrations.
+The production workflow refuses a missing protected value, a staging-named production identifier, a non-lowercase-40 SHA, an API/worker SHA mismatch, the absence of a successful `04-deploy-azure-api.yml` deployment workflow for that exact SHA, or an ambiguous currently-ready ACA baseline. It checks out the requested SHA, verifies `git rev-parse HEAD`, records the existing ready worker revision/image, builds the root `Dockerfile`, tags `<acr>/<repository>:sha-<git_sha>`, and makes only `az containerapp update --image`. It then fails closed unless ACA reports the exact desired image as its latest ready revision within ten minutes. The summary records non-secret baseline and outcome evidence; it never performs automatic rollback, applies Bicep, or runs migrations.
 
 ## Production topology and pairing
 
