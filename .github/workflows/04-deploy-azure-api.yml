@@ -25,6 +25,7 @@ env:
 jobs:
   verify-build-deploy:
     name: Verify, package, and deploy API
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: "jarvis-prime-api / production"
     permissions:
@@ -34,6 +35,29 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require the triggering ref and SHA to be on origin/main
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Production API deployment is permitted only from refs/heads/main; got ${GITHUB_REF}." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "Production API deployment SHA ${GITHUB_SHA} is not reachable from origin/main." >&2
+            exit 1
+          fi
+
+          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
+            echo "Checked-out SHA does not match the triggering SHA." >&2
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
