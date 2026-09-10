@@ -81,14 +81,14 @@ export async function getRunHistory(userId, runId) {
     return { run: runView(run, actor), workItems: history.workItems.map((work) => ({ id: work.id, sequence: work.sequence, dependencyWorkItemId: work.dependency_work_item_id, actionCode: work.action_code, state: work.state, dueAt: work.due_at, attemptCount: work.attempt_count, maxAttempts: work.max_attempts, reasonCode: work.last_reason_code, result: work.result_metadata, createdAt: work.created_at, startedAt: work.started_at, completedAt: work.completed_at })), events: history.events.map((event) => ({ sequence: event.event_sequence, code: event.event_code, actionCode: event.action_code, actorSource: event.actor_source, previousState: event.previous_state, newState: event.new_state, reasonCode: event.reason_code, metadata: event.safe_metadata, createdAt: event.created_at })), decisions: history.decisions.map((decision) => ({ policyCode: decision.policy_code, policyVersion: decision.policy_version, decision: decision.decision, reasonCode: decision.reason_code, createdAt: decision.created_at })) };
   } catch (error) { mapError(error); }
 }
-export async function setOwnerControl(userId, values) {
+export async function setOwnerControl(userId, values, rawIdempotency) {
   const actor = await scope(userId, { ownerOnly: true }); const body = exact(values, ['scopeType', 'scopeId', 'paused', 'emergencyStop', 'reasonCode']);
   if (!['OWNER', 'RECIPE', 'RUN', 'PROVIDER'].includes(body.scopeType) || typeof body.scopeId !== 'string' || typeof body.paused !== 'boolean' || typeof body.emergencyStop !== 'boolean') invalid();
   const scopeId = body.scopeType === 'OWNER' ? actor.ownerUserId : body.scopeId;
   if (body.scopeType === 'OWNER' && scopeId !== actor.ownerUserId) denied();
   if (body.scopeType === 'PROVIDER' && !['INTERNAL', 'APOLLO'].includes(scopeId)) invalid();
   if (['RECIPE', 'RUN'].includes(body.scopeType) && !(await repository.getOwnedResource(actor.ownerUserId, body.scopeType, uuid(scopeId)))) denied();
-  try { await repository.setControl({ ownerUserId: actor.ownerUserId, scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop, reasonCode: reason(body.reasonCode, 'OWNER_CONTROL'), actorUserId: actor.actorUserId }); return { scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop }; }
+  try { await repository.setControl({ ownerUserId: actor.ownerUserId, scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop, reasonCode: reason(body.reasonCode, 'OWNER_CONTROL'), actorUserId: actor.actorUserId, idempotencyKey: idempotency(rawIdempotency) }); return { scopeType: body.scopeType, scopeId, paused: body.paused, emergencyStop: body.emergencyStop }; }
   catch (error) { mapError(error); }
 }
 export async function cancelRun(userId, runId, values = {}) {
