@@ -185,3 +185,70 @@ test('production worker deployment requires trusted main source before Azure OID
   assert.match(stagingWorkflow, /IMAGE_REPOSITORY: \$\{\{ vars\.STAGING_WORKER_IMAGE_REPOSITORY \}\}/);
   assert.doesNotMatch(stagingWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
 });
+
+test('first production worker image bootstrap is manual, provenance-gated, and ACR-push-only', async () => {
+  const bootstrapWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '10-bootstrap-aca-production-image.yml'),
+    'utf8',
+  );
+
+  assert.match(bootstrapWorkflow, /on:\n  workflow_dispatch:/);
+  assert.doesNotMatch(bootstrapWorkflow, /^  (?:push|pull_request|schedule|workflow_call):/m);
+
+  const jobMainGate = "if: github.ref == 'refs/heads/main'";
+  const productionEnvironment = 'environment: jarvis-prime-api / production';
+  const shaFormat = 'if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then';
+  const pairedSha = 'if [[ "${{ inputs.git_sha }}" != "${{ inputs.api_release_sha }}" ]]';
+  const expectedRepository = 'if [[ "$IMAGE_REPOSITORY" != "phase11-automation-worker" ]]';
+  const checkout = `uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.git_sha }}
+          fetch-depth: 0`;
+  const refreshedMain = 'git fetch --no-tags origin main:refs/remotes/origin/main';
+  const ancestry = 'git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main';
+  const checkedOutHead = 'actual="$(git rev-parse HEAD)"';
+  const requestedShaEquality = 'if [[ "$actual" != "${{ inputs.git_sha }}" ]]';
+  const apiEvidence = 'api_runs="repos/${GITHUB_REPOSITORY}/actions/workflows/04-deploy-azure-api.yml/runs?head_sha=${{ inputs.api_release_sha }}&status=completed&per_page=100"';
+  const successfulApiRun = 'if (( successful_api_runs < 1 )); then';
+  const azureLogin = 'uses: azure/login@v2';
+  const acrLogin = 'az acr login --name "$ACR_NAME"';
+  const immutableImage = 'image="${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:sha-${{ inputs.git_sha }}"';
+  const rootDockerfileBuild = 'docker build --file Dockerfile --tag "$image"';
+  const imagePush = 'docker push "$image"';
+
+  const positions = [
+    jobMainGate,
+    productionEnvironment,
+    shaFormat,
+    pairedSha,
+    expectedRepository,
+    checkout,
+    refreshedMain,
+    ancestry,
+    checkedOutHead,
+    requestedShaEquality,
+    apiEvidence,
+    successfulApiRun,
+    azureLogin,
+    acrLogin,
+    immutableImage,
+    rootDockerfileBuild,
+    imagePush,
+  ].map((marker) => {
+    const position = bootstrapWorkflow.indexOf(marker);
+    assert.notEqual(position, -1, `bootstrap workflow must contain ${marker}`);
+    return position;
+  });
+
+  for (let index = 1; index < positions.length; index += 1) {
+    assert.ok(positions[index - 1] < positions[index], 'bootstrap trust checks must complete before Azure login and ACR push');
+  }
+
+  assert.match(bootstrapWorkflow, /IMAGE_REPOSITORY: \$\{\{ vars\.PRODUCTION_WORKER_IMAGE_REPOSITORY \}\}/);
+  assert.doesNotMatch(bootstrapWorkflow, /STAGING_|environment: staging/);
+  assert.doesNotMatch(bootstrapWorkflow, /INTERNAL_FAKE|docker pull|:\s*latest\b/i);
+  assert.doesNotMatch(bootstrapWorkflow, /az containerapp\b|az deployment\b|\bbicep\s+(?:build|deploy)\b|az keyvault\b|az identity\b|az role assignment\b|az monitor\b/i);
+
+  const azureCliCommands = [...bootstrapWorkflow.matchAll(/^\s*(az\s+.+)$/gm)].map(([, command]) => command);
+  assert.deepEqual(azureCliCommands, [acrLogin]);
+});
