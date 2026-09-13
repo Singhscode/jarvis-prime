@@ -137,3 +137,51 @@ test('fails when a canonical Phase 11 migration is not transaction-bounded', asy
 
   await assert.rejects(verifyAutomationRolloutContract(root), /migration is not transaction-bounded: 20260810000028_add_automation_icp_score_policy\.sql/);
 });
+
+test('production worker deployment requires trusted main source before Azure OIDC', async () => {
+  const productionWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '08-deploy-aca-production.yml'),
+    'utf8',
+  );
+  const stagingWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '06-deploy-aca-staging.yml'),
+    'utf8',
+  );
+
+  const jobMainGate = "if: github.ref == 'refs/heads/main'";
+  const pairedSha = 'if [[ "${{ inputs.git_sha }}" != "${{ inputs.api_release_sha }}" ]]';
+  const checkout = `uses: actions/checkout@v4
+        with:
+          ref: \${{ inputs.git_sha }}
+          fetch-depth: 0`;
+  const refreshedMain = 'git fetch --no-tags origin main:refs/remotes/origin/main';
+  const ancestry = 'git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main';
+  const checkedOutHead = 'actual="$(git rev-parse HEAD)"';
+  const requestedShaEquality = 'if [[ "$actual" != "${{ inputs.git_sha }}" ]]';
+  const successfulApiRun = 'if (( successful_api_runs < 1 )); then';
+  const azureLogin = 'uses: azure/login@v2';
+
+  const positions = [
+    jobMainGate,
+    pairedSha,
+    checkout,
+    refreshedMain,
+    ancestry,
+    checkedOutHead,
+    requestedShaEquality,
+    successfulApiRun,
+    azureLogin,
+  ].map((marker) => {
+    const position = productionWorkflow.indexOf(marker);
+    assert.notEqual(position, -1, `production workflow must contain ${marker}`);
+    return position;
+  });
+
+  for (let index = 1; index < positions.length; index += 1) {
+    assert.ok(positions[index - 1] < positions[index], 'source trust checks must complete before Azure login');
+  }
+
+  assert.match(stagingWorkflow, /environment: staging/);
+  assert.match(stagingWorkflow, /IMAGE_REPOSITORY: \$\{\{ vars\.STAGING_WORKER_IMAGE_REPOSITORY \}\}/);
+  assert.doesNotMatch(stagingWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
+});
