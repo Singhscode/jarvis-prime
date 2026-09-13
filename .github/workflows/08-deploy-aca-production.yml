@@ -28,6 +28,7 @@ concurrency:
 jobs:
   build-and-deploy:
     name: Build paired worker image and update production worker
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # This protected Environment owns production OIDC credentials and resource
     # identifiers; none are committed in this workflow.
@@ -76,14 +77,26 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Confirm checked-out SHA and verify paired API deployment
+      - name: Require trusted main source and paired API deployment
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Production worker deployment is permitted only from refs/heads/main; got ${GITHUB_REF}." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main; then
+            echo "Production worker SHA ${{ inputs.git_sha }} is not reachable from origin/main." >&2
+            exit 1
+          fi
+
           actual="$(git rev-parse HEAD)"
           if [[ "$actual" != "${{ inputs.git_sha }}" ]]; then
             echo "Checked-out SHA ($actual) does not match requested SHA (${{ inputs.git_sha }})." >&2
