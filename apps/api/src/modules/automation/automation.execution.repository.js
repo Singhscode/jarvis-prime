@@ -30,6 +30,9 @@ export async function markDispatching(workItemId, workerId, leaseToken) { return
 export async function transition(workItemId, workerId, leaseToken, nextState, reasonCode, metadata = {}, dueAt = null) {
   return result(await client().rpc('automation_transition_work', { p_work: workItemId, p_worker: workerId, p_token: leaseToken, p_expected: 'RUNNING', p_next: nextState, p_reason: reasonCode, p_result: metadata, p_due: dueAt }));
 }
+export async function relinquishUnstartedClaim(workItemId, workerId, leaseToken) {
+  return result(await client().rpc('automation_relinquish_unstarted_claim', { p_work: workItemId, p_worker: workerId, p_token: leaseToken }));
+}
 export async function createDependentWork(ownerUserId, parentWorkItemId, sequence, input, dueAt = null) {
   return result(await client().rpc('automation_create_dependent_work', { p_owner: ownerUserId, p_parent: parentWorkItemId, p_sequence: sequence, p_input: input, p_due: dueAt }));
 }

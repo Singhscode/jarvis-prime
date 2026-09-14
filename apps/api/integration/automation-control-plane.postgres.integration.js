@@ -136,17 +136,18 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
       ])) as rls,
       has_table_privilege('service_role','public.automation_work_items','insert') as service_insert,
       has_function_privilege('service_role','public.automation_claim_work(text,integer,integer)','execute') as claim_execute,
+      has_function_privilege('service_role','public.automation_relinquish_unstarted_claim(uuid,text,uuid)','execute') as claim_release_execute,
       has_function_privilege('service_role','public.automation_reserve_work(uuid,uuid,text,uuid)','execute') as helper_execute,
       has_function_privilege('service_role','public.automation_admit_internal_resource_trigger(uuid,uuid,text,text,jsonb,jsonb,timestamptz)','execute') as internal_trigger_execute,
       has_table_privilege('anon','public.automation_runs','select') as anon_read`);
-    assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, helper_execute: false, internal_trigger_execute: true, anon_read: false });
+    assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, claim_release_execute: true, helper_execute: false, internal_trigger_execute: true, anon_read: false });
   });
 
   test('validates the unified automation ledger, hardened control RPC, and UTC-day quota retry path', async () => {
     const unifiedAutomationVersions = [
       '20260810000023', '20260810000024', '20260810000025', '20260810000026', '20260810000027',
       '20260810000028', '20260810000029', '20260810000030', '20260810000031', '20260810000035',
-      '20260810000036',
+      '20260810000036', '20260810000040',
     ];
     const { rows: ledger } = await db.query(`select version from supabase_migrations.schema_migrations
       where version = any($1::text[]) order by version`, [unifiedAutomationVersions]);
@@ -310,6 +311,23 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     await cancel(ambiguous.run_id);
   });
 
+  test('relinquishes only an unstarted current lease during graceful drain without consuming retry budget', async () => {
+    const run = await createRun({ idempotency: key('worker-drain-relinquish') });
+    const claimed = await claimFor(run.run_id, 'worker-drain-owner');
+    const released = await call(db, 'automation_relinquish_unstarted_claim', [claimed.id, claimed.worker, claimed.lease_token]);
+    assert.deepEqual(released, { work_item_id: claimed.id, state: 'WAITING', relinquished: true });
+    const { rows: [releasedWork] } = await db.query(`select state,attempt_count,attempt_id,attempt_phase,lease_owner,lease_token,lease_until,last_reason_code,
+      (select count(*)::int from public.automation_work_reservations where work_item_id=$1 and active) as active_reservations
+      from public.automation_work_items where id=$1`, [claimed.id]);
+    assert.deepEqual(releasedWork, { state: 'WAITING', attempt_count: 0, attempt_id: null, attempt_phase: null, lease_owner: null, lease_token: null, lease_until: null, last_reason_code: 'WORKER_DRAINING', active_reservations: 0 });
+    const { rows: releaseEvents } = await db.query(`select event_code,previous_state,new_state,reason_code from public.automation_run_events where work_item_id=$1 and event_code='WORK_CLAIM_RELEASED'`, [claimed.id]);
+    assert.deepEqual(releaseEvents, [{ event_code: 'WORK_CLAIM_RELEASED', previous_state: 'RUNNING', new_state: 'WAITING', reason_code: 'WORKER_DRAINING' }]);
+    await assert.rejects(call(db, 'automation_mark_dispatching', [claimed.id, claimed.worker, claimed.lease_token]), /AUTOMATION_LEASE_LOST/);
+    const reclaimed = await claimFor(run.run_id, 'worker-drain-replacement');
+    assert.equal(reclaimed.attempt_count, 1);
+    await call(db, 'automation_transition_work', [reclaimed.id, reclaimed.worker, reclaimed.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ ok: true }), null]);
+  });
+
   test('cancels nonterminal work, protects terminal results, and retains the due-claim index path', async () => {
     const terminal = await createRun({ idempotency: key('terminal') });
     const claimed = await claimFor(terminal.run_id, 'worker-terminal');
@@ -386,9 +404,10 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
       ((date '2026-11-01' + time '01:30') at time zone 'America/New_York') as fall_back`);
     assert.equal(dst.spring_forward.toISOString(), '2026-03-08T07:30:00.000Z');
     assert.equal(dst.fall_back.toISOString(), '2026-11-01T06:30:00.000Z');
-    const contract = await call(db, 'automation_check_compatibility', ['AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V1']);
-    assert.deepEqual(contract, { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V1' });
-    await assert.rejects(call(db, 'automation_check_compatibility', ['stale', 'AUTOMATION_WORKER_V1']), /AUTOMATION_COMPATIBILITY_MISMATCH/);
+    const contract = await call(db, 'automation_check_compatibility', ['AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V2']);
+    assert.deepEqual(contract, { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V2' });
+    await assert.rejects(call(db, 'automation_check_compatibility', ['stale', 'AUTOMATION_WORKER_V2']), /AUTOMATION_COMPATIBILITY_MISMATCH/);
+    await assert.rejects(call(db, 'automation_check_compatibility', ['AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V1']), /AUTOMATION_COMPATIBILITY_MISMATCH/);
     const { rows: scheduleRuns } = await db.query('select run_id from public.automation_schedule_occurrences where schedule_id=any($1::uuid[]) and run_id is not null', [[schedule.schedule_id, peerSchedule.schedule_id]]);
     for (const { run_id: runId } of scheduleRuns) await cancel(runId);
   });
