@@ -40,9 +40,21 @@ function validateInputSchema(schema) {
   for (const [name, property] of Object.entries(schema.properties)) {
     if (!FIELD.test(name)) invalid('AUTOMATION_RECIPE_SCHEMA_INVALID');
     exact(property, ['type'], 'AUTOMATION_RECIPE_SCHEMA_INVALID');
-    if (!['string', 'number', 'boolean', 'object', 'array'].includes(property.type)) invalid('AUTOMATION_RECIPE_SCHEMA_INVALID');
+    if (!['string', 'number', 'boolean', 'object', 'array', 'resourceRef'].includes(property.type)) invalid('AUTOMATION_RECIPE_SCHEMA_INVALID');
   }
 }
+function validateCondition(condition) {
+  exact(condition, ['type', 'field', 'equals'], 'AUTOMATION_RECIPE_CONDITION_INVALID');
+  if (condition.type !== 'RESULT_BOOLEAN_EQUALS' || typeof condition.field !== 'string' || !FIELD.test(condition.field) || typeof condition.equals !== 'boolean') invalid('AUTOMATION_RECIPE_CONDITION_INVALID');
+}
+export function assertResourceReference(value) {
+  exact(value, ['organizationId', 'campaignId', 'prospectId'], 'AUTOMATION_RESOURCE_REFERENCE_INVALID');
+  if (typeof value.organizationId !== 'string' || !UUID.test(value.organizationId)
+      || (Object.hasOwn(value, 'campaignId') && (typeof value.campaignId !== 'string' || !UUID.test(value.campaignId)))
+      || (Object.hasOwn(value, 'prospectId') && (typeof value.prospectId !== 'string' || !UUID.test(value.prospectId)))) invalid('AUTOMATION_RESOURCE_REFERENCE_INVALID');
+  return value;
+}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function validatePolicies(policies) {
   if (!Array.isArray(policies) || policies.length < 1 || new Set(policies).size !== policies.length || !policies.includes('POL_APPROVAL@V1') || policies.some((policy) => !FIXED_POLICY_KEYS.includes(policy))) invalid('AUTOMATION_POLICY_INVALID');
 }
@@ -67,16 +79,17 @@ export function assertRecipeDefinition(value, expectedCode = null) {
   let previousCode = null;
   const seen = new Set();
   value.steps.forEach((step, index) => {
-    exact(step, ['stepCode', 'sequence', 'actionCode', 'dependsOn', 'input', 'policies', 'requiresHumanReview'], 'AUTOMATION_RECIPE_GRAPH_INVALID');
+    exact(step, ['stepCode', 'sequence', 'actionCode', 'dependsOn', 'input', 'policies', 'requiresHumanReview', 'condition'], 'AUTOMATION_RECIPE_GRAPH_INVALID');
     if (!STEP.test(step.stepCode) || seen.has(step.stepCode) || !Number.isInteger(step.sequence) || step.sequence !== index + 1 || !RECIPE_ACTION_CODES.includes(step.actionCode) || typeof step.requiresHumanReview !== 'boolean') invalid('AUTOMATION_RECIPE_GRAPH_INVALID');
     seen.add(step.stepCode);
     validatePolicies(step.policies);
     if (index === 0) {
-      if (Object.hasOwn(step, 'dependsOn') || Object.hasOwn(step, 'input')) invalid('AUTOMATION_RECIPE_GRAPH_INVALID');
+      if (Object.hasOwn(step, 'dependsOn') || Object.hasOwn(step, 'input') || Object.hasOwn(step, 'condition')) invalid('AUTOMATION_RECIPE_GRAPH_INVALID');
     } else {
       if (step.dependsOn !== previousCode) invalid('AUTOMATION_RECIPE_GRAPH_INVALID');
       object(step.input, 'AUTOMATION_RECIPE_GRAPH_INVALID');
       safeJson(step.input);
+      if (Object.hasOwn(step, 'condition')) validateCondition(step.condition);
     }
     previousCode = step.stepCode;
   });
@@ -88,7 +101,8 @@ export function assertRecipeInput(definition, input) {
   if (Object.keys(input).some((key) => !Object.hasOwn(properties, key)) || required.some((key) => !Object.hasOwn(input, key))) invalid('AUTOMATION_RECIPE_INPUT_INVALID');
   for (const [key, value] of Object.entries(input)) {
     const type = properties[key].type;
-    if ((type === 'array' && !Array.isArray(value)) || (type === 'object' && (!value || Array.isArray(value) || typeof value !== 'object')) || (type !== 'array' && type !== 'object' && typeof value !== type)) invalid('AUTOMATION_RECIPE_INPUT_INVALID');
+    if (type === 'resourceRef') assertResourceReference(value);
+    else if ((type === 'array' && !Array.isArray(value)) || (type === 'object' && (!value || Array.isArray(value) || typeof value !== 'object')) || (type !== 'array' && type !== 'object' && typeof value !== type)) invalid('AUTOMATION_RECIPE_INPUT_INVALID');
   }
   return input;
 }

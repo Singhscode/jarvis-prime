@@ -131,13 +131,15 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     const { rows: [state] } = await db.query(`select
       (select bool_and(relrowsecurity) from pg_class where oid=any(array[
         'public.automation_runs'::regclass,'public.automation_work_items'::regclass,
-        'public.automation_work_reservations'::regclass,'public.automation_run_events'::regclass
+        'public.automation_work_reservations'::regclass,'public.automation_run_events'::regclass,
+        'public.automation_run_resource_references'::regclass,'public.automation_internal_trigger_receipts'::regclass
       ])) as rls,
       has_table_privilege('service_role','public.automation_work_items','insert') as service_insert,
       has_function_privilege('service_role','public.automation_claim_work(text,integer,integer)','execute') as claim_execute,
       has_function_privilege('service_role','public.automation_reserve_work(uuid,uuid,text,uuid)','execute') as helper_execute,
+      has_function_privilege('service_role','public.automation_admit_internal_resource_trigger(uuid,uuid,text,text,jsonb,jsonb,timestamptz)','execute') as internal_trigger_execute,
       has_table_privilege('anon','public.automation_runs','select') as anon_read`);
-    assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, helper_execute: false, anon_read: false });
+    assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, helper_execute: false, internal_trigger_execute: true, anon_read: false });
   });
 
   test('validates the unified automation ledger, hardened control RPC, and UTC-day quota retry path', async () => {
@@ -892,4 +894,52 @@ test('derives owner-scoped operational health from durable work and recovery evi
   await assert.rejects(call(db, 'automation_get_owner_operational_health', [ids.ownerA, ids.actorA]), /AUTOMATION_OWNER_SCOPE_DENIED/);
 
   for (const runId of [eligible.run_id, delayed.run_id, staleRun.run_id]) await cancel(runId);
+});
+
+
+test('admits only owner-scoped internal resource triggers and materializes bounded conditional successors', { concurrency: false }, async () => {
+  const organizationId = randomUUID(); const campaignId = randomUUID(); const prospectId = randomUUID();
+  const foreignOrganizationId = randomUUID();
+  await db.query(`insert into public.clients(id,name,status,owner_user_id) values ($1,'Automation Organization','active',$2),($3,'Foreign Organization','active',$4)`, [organizationId, ids.ownerA, foreignOrganizationId, ids.ownerB]);
+  await db.query(`insert into public.campaigns(id,client_id,name,status) values ($1,$2,'Automation Campaign','active')`, [campaignId, organizationId]);
+  await db.query(`insert into public.prospects(id,client_id,full_name,email,source) values ($1,$2,'Automation Prospect',$3,'manual')`, [prospectId, organizationId, `resource-${prospectId}@test.local`]);
+  const resourceRef = { organizationId, campaignId, prospectId };
+  const code = recipeCode('RESOURCE_CONDITION');
+  const definition = {
+    recipeCode: code,
+    inputSchema: { properties: { resourceRef: { type: 'resourceRef' }, mode: { type: 'string' } }, required: ['resourceRef', 'mode'] },
+    steps: [
+      { stepCode: 'STEP_TASK', sequence: 1, actionCode: 'ACT_TASK', policies: ['POL_APPROVAL@V1', 'POL_LIMIT@V1'], requiresHumanReview: false },
+      { stepCode: 'STEP_NOTIFY', sequence: 2, actionCode: 'ACT_NOTIFY', dependsOn: 'STEP_TASK', input: { mode: 'SEND_MESSAGE', threadId: 'thread-resource', body: 'Condition passed' }, condition: { type: 'RESULT_BOOLEAN_EQUALS', field: 'shouldNotify', equals: true }, policies: ['POL_APPROVAL@V1'], requiresHumanReview: false },
+    ],
+  };
+  const created = await call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, code, JSON.stringify(definition), hash(jsonb(definition))]);
+  for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, transition]);
+  const input = { resourceRef, mode: 'UPDATE' }; const dueAt = new Date(Date.now() + 3_600_000).toISOString();
+  const admitted = await call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-0001', code, JSON.stringify(resourceRef), JSON.stringify(input), dueAt]);
+  const replay = await call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-0001', code, JSON.stringify(resourceRef), JSON.stringify(input), dueAt]);
+  assert.equal(admitted.replayed, false); assert.equal(replay.replayed, true); assert.equal(replay.run_id, admitted.run_id);
+  const { rows: [reference] } = await db.query(`select organization_id,campaign_id,prospect_id,snapshot_sha256 from public.automation_run_resource_references where run_id=$1`, [admitted.run_id]);
+  assert.deepEqual({ organization_id: reference.organization_id, campaign_id: reference.campaign_id, prospect_id: reference.prospect_id }, { organization_id: organizationId, campaign_id: campaignId, prospect_id: prospectId });
+  await assert.rejects(call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-0001', code, JSON.stringify(resourceRef), JSON.stringify({ ...input, mode: 'CHANGED' }), dueAt]), /AUTOMATION_TRIGGER_CONFLICT/);
+  await assert.rejects(call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-cross-owner', code, JSON.stringify({ organizationId: foreignOrganizationId }), JSON.stringify({ resourceRef: { organizationId: foreignOrganizationId }, mode: 'UPDATE' }), dueAt]), /AUTOMATION_RESOURCE_SCOPE_DENIED/);
+  await assert.rejects(call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-mismatch', code, JSON.stringify(resourceRef), JSON.stringify({ resourceRef: { organizationId }, mode: 'UPDATE' }), dueAt]), /AUTOMATION_RESOURCE_REFERENCE_MISMATCH/);
+  const { rows: [invalidResourceInput] } = await db.query(`select public.automation_recipe_input_is_valid($1::jsonb,$2::jsonb) as valid`, [JSON.stringify(definition), JSON.stringify({ resourceRef: { organizationId: null }, mode: 'UPDATE' })]);
+  assert.equal(invalidResourceInput.valid, false);
+  await assert.rejects(call(db, 'automation_admit_recipe_run', [ids.ownerA, ids.ownerA, 'owner', code, JSON.stringify({ resourceRef: { organizationId: foreignOrganizationId }, mode: 'UPDATE' }), dueAt, key('manual-resource-cross-owner'), hash('manual-resource-cross-owner')]), /AUTOMATION_RESOURCE_SCOPE_DENIED/);
+  await db.query(`update public.automation_work_items set due_at=now()-interval '1 second' where run_id=$1`, [admitted.run_id]);
+  const root = await claimFor(admitted.run_id, 'worker-resource-condition-false');
+  await call(db, 'automation_transition_work', [root.id, root.worker, root.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: false }), null]);
+  const { rows: afterFalse } = await db.query(`select sequence from public.automation_work_items where run_id=$1 order by sequence`, [admitted.run_id]);
+  assert.deepEqual(afterFalse.map((row) => row.sequence), [1]);
+  const { rows: [conditionEvent] } = await db.query(`select event_code from public.automation_run_events where run_id=$1 and event_code='RECIPE_CONDITION_NOT_MET'`, [admitted.run_id]);
+  assert.equal(conditionEvent.event_code, 'RECIPE_CONDITION_NOT_MET');
+
+  const trueRun = await call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-0002', code, JSON.stringify(resourceRef), JSON.stringify(input), dueAt]);
+  await db.query(`update public.automation_work_items set due_at=now()-interval '1 second' where run_id=$1`, [trueRun.run_id]);
+  const trueRoot = await claimFor(trueRun.run_id, 'worker-resource-condition-true');
+  await call(db, 'automation_transition_work', [trueRoot.id, trueRoot.worker, trueRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: true }), null]);
+  const { rows: afterTrue } = await db.query(`select sequence,state from public.automation_work_items where run_id=$1 order by sequence`, [trueRun.run_id]);
+  assert.deepEqual(afterTrue, [{ sequence: 1, state: 'COMPLETED' }, { sequence: 2, state: 'WAITING' }]);
+  await cancel(admitted.run_id); await cancel(trueRun.run_id);
 });

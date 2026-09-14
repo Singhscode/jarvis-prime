@@ -47,6 +47,15 @@ export async function resolveFutureTrigger(values) {
     p_payload_hash: values.payloadSha256,
   }));
 }
+// Service-role-only internal integration boundary. It delegates to governed recipe
+// admission and therefore never supplies a version, action, provider, or policy result.
+export async function admitInternalResourceTrigger(values) {
+  return result(await client().rpc('automation_admit_internal_resource_trigger', {
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_source_event: values.sourceEventId,
+    p_recipe_code: values.recipeCode, p_resource_reference: values.resourceReference,
+    p_input: values.input, p_due_at: values.dueAt,
+  }));
+}
 export async function cancelRun(ownerUserId, runId, actorUserId, reasonCode = 'OWNER_CANCELLED') { return result(await client().rpc('automation_cancel_run', { p_owner: ownerUserId, p_run: runId, p_actor: actorUserId, p_reason: reasonCode })); }
 export async function setEmployeeRunPause(actorUserId, runId, operation) {
   return result(await client().rpc('automation_set_employee_run_pause', { p_actor: actorUserId, p_run: runId, p_operation: operation }));
