@@ -10,6 +10,11 @@ on:
       - 'package-lock.json'
       - '.github/workflows/04-deploy-azure-api.yml'
   workflow_dispatch:
+    inputs:
+      git_sha:
+        description: Exact reviewed API SHA to deploy (40 lowercase hex characters).
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -25,20 +30,43 @@ env:
 jobs:
   verify-build-deploy:
     name: Verify, package, and deploy API
+    # This gate prevents checkout, protected Environment access, and Azure OIDC
+    # login for a dispatch that is not on the canonical production branch.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: "jarvis-prime-api / production"
+    env:
+      REQUESTED_GIT_SHA: ${{ inputs.git_sha || github.sha }}
+      AZURE_WEBAPP_RESOURCE_GROUP: ${{ vars.PRODUCTION_RESOURCE_GROUP }}
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - name: Check out repository
+      - name: Validate exact deployment SHA and protected production configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$REQUESTED_GIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Production API deployment SHA must be a full 40-character lowercase commit SHA." >&2
+            exit 1
+          fi
+          if [[ -z "$AZURE_WEBAPP_RESOURCE_GROUP" ]]; then
+            echo "Missing required protected production configuration: PRODUCTION_RESOURCE_GROUP." >&2
+            exit 1
+          fi
+          if [[ "$(tr '[:upper:]' '[:lower:]' <<< "$AZURE_WEBAPP_RESOURCE_GROUP")" == *"staging"* ]]; then
+            echo "Refusing to run: the production API resource group references staging." >&2
+            exit 1
+          fi
+
+      - name: Check out the exact requested SHA
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.REQUESTED_GIT_SHA }}
           fetch-depth: 0
 
-      - name: Require the triggering ref and SHA to be on origin/main
+      - name: Require trusted main source and exact checked-out SHA
         shell: bash
         run: |
           set -euo pipefail
@@ -49,15 +77,17 @@ jobs:
           fi
 
           git fetch --no-tags origin main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
-            echo "Production API deployment SHA ${GITHUB_SHA} is not reachable from origin/main." >&2
+          if ! git merge-base --is-ancestor "$REQUESTED_GIT_SHA" origin/main; then
+            echo "Production API deployment SHA $REQUESTED_GIT_SHA is not reachable from origin/main." >&2
             exit 1
           fi
 
-          if [[ "$(git rev-parse HEAD)" != "${GITHUB_SHA}" ]]; then
-            echo "Checked-out SHA does not match the triggering SHA." >&2
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "$REQUESTED_GIT_SHA" ]]; then
+            echo "Checked-out SHA ($actual) does not match requested SHA ($REQUESTED_GIT_SHA)." >&2
             exit 1
           fi
+          echo "RELEASE_SHA=$actual" >> "$GITHUB_ENV"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -151,11 +181,51 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ${{ runner.temp }}/jarvis-prime-api
 
+      - name: Require deployed API readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          api_host="$(az webapp show --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_WEBAPP_RESOURCE_GROUP" --query defaultHostName -o tsv)"
+          if [[ -z "$api_host" || "$api_host" == "null" ]]; then
+            echo 'Unable to resolve the deployed production API hostname.' >&2
+            exit 1
+          fi
+
+          ready_url="https://${api_host}/ready"
+          max_attempts=30
+          delay_seconds=2
+          for (( attempt = 1; attempt <= max_attempts; attempt += 1 )); do
+            if curl --fail --silent --show-error --max-time 10 "$ready_url" | jq -e '.ready == true' >/dev/null; then
+              {
+                echo "## Phase 11 production API readiness"
+                echo "- Endpoint: \`GET /ready\`"
+                echo "- Result: HTTP 200 with \`ready=true\`"
+                echo "- Attempts: \`$attempt\`"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            if (( attempt < max_attempts )); then
+              sleep "$delay_seconds"
+              delay_seconds=$(( delay_seconds < 30 ? delay_seconds * 2 : 30 ))
+            fi
+          done
+
+          {
+            echo "## Phase 11 production API readiness"
+            echo "- Endpoint: \`GET /ready\`"
+            echo "- Result: readiness did not return HTTP 200 with \`ready=true\` after \`$max_attempts\` bounded attempts"
+            echo "- Automatic rollback: not attempted"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "API readiness did not succeed after ${max_attempts} attempts." >&2
+          exit 1
+
       - name: Record deployed API SHA for paired worker release
         shell: bash
         run: |
           {
             echo "## Phase 11 production artifact pairing"
-            echo "- Deployed API release SHA: \`${{ github.sha }}\`"
+            echo "- Deployed API release SHA: \`${RELEASE_SHA}\`"
             echo "- The worker workflow verifies a successful run of this deployment workflow at this exact SHA before it can update the worker image."
           } >> "$GITHUB_STEP_SUMMARY"

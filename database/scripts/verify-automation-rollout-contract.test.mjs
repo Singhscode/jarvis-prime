@@ -252,3 +252,80 @@ test('first production worker image bootstrap is manual, provenance-gated, and A
   const azureCliCommands = [...bootstrapWorkflow.matchAll(/^\s*(az\s+.+)$/gm)].map(([, command]) => command);
   assert.deepEqual(azureCliCommands, [acrLogin]);
 });
+
+test('production API release requires exact SHA provenance and deployed API readiness', async () => {
+  const apiWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '04-deploy-azure-api.yml'),
+    'utf8',
+  );
+  const workerWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '08-deploy-aca-production.yml'),
+    'utf8',
+  );
+  const bootstrapWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '10-bootstrap-aca-production-image.yml'),
+    'utf8',
+  );
+
+  assert.match(apiWorkflow, /workflow_dispatch:\n    inputs:\n      git_sha:/);
+  assert.match(apiWorkflow, /required: true\n        type: string/);
+  assert.match(apiWorkflow, /environment: "jarvis-prime-api \/ production"/);
+  assert.doesNotMatch(apiWorkflow, /STAGING_|environment:\s*staging|environment:\s*Preview/);
+
+  const jobMainGate = "if: github.ref == 'refs/heads/main'";
+  const requestedSha = 'REQUESTED_GIT_SHA: ${{ inputs.git_sha || github.sha }}';
+  const shaFormat = 'if [[ ! "$REQUESTED_GIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then';
+  const checkout = `uses: actions/checkout@v4
+        with:
+          ref: \${{ env.REQUESTED_GIT_SHA }}
+          fetch-depth: 0`;
+  const refreshedMain = 'git fetch --no-tags origin main:refs/remotes/origin/main';
+  const ancestry = 'git merge-base --is-ancestor "$REQUESTED_GIT_SHA" origin/main';
+  const checkedOutHead = 'actual="$(git rev-parse HEAD)"';
+  const requestedShaEquality = 'if [[ "$actual" != "$REQUESTED_GIT_SHA" ]]';
+  const releaseSha = 'echo "RELEASE_SHA=$actual" >> "$GITHUB_ENV"';
+  const azureLogin = 'uses: azure/login@v2';
+  const appServiceDeploy = 'uses: azure/webapps-deploy@v3';
+  const appHost = 'az webapp show --name "$AZURE_WEBAPP_NAME" --resource-group "$AZURE_WEBAPP_RESOURCE_GROUP" --query defaultHostName -o tsv';
+  const readinessEndpoint = 'ready_url="https://${api_host}/ready"';
+  const boundedAttempts = 'max_attempts=30';
+  const readinessSuccess = "curl --fail --silent --show-error --max-time 10 \"$ready_url\" | jq -e '.ready == true' >/dev/null";
+  const readinessFailure = 'echo "API readiness did not succeed after ${max_attempts} attempts." >&2';
+  const pairingSummary = 'echo "- Deployed API release SHA: \\`${RELEASE_SHA}\\`"';
+
+  const positions = [
+    jobMainGate,
+    requestedSha,
+    shaFormat,
+    checkout,
+    refreshedMain,
+    ancestry,
+    checkedOutHead,
+    requestedShaEquality,
+    releaseSha,
+    azureLogin,
+    appServiceDeploy,
+    appHost,
+    readinessEndpoint,
+    boundedAttempts,
+    readinessSuccess,
+    readinessFailure,
+    pairingSummary,
+  ].map((marker) => {
+    const position = apiWorkflow.indexOf(marker);
+    assert.notEqual(position, -1, `API workflow must contain ${marker}`);
+    return position;
+  });
+
+  for (let index = 1; index < positions.length; index += 1) {
+    assert.ok(positions[index - 1] < positions[index], 'API SHA checks, deployment, readiness, and pairing evidence must stay ordered');
+  }
+
+  assert.doesNotMatch(apiWorkflow, /db:push|phase11-production-migration-gate|az containerapp\b|az acr\b|az keyvault\b|\bbicep\b/i);
+  assert.match(apiWorkflow, /Automatic rollback: not attempted/);
+  assert.match(apiWorkflow, /GET \/ready/);
+  assert.doesNotMatch(apiWorkflow, /health\/deep|GET \/health|GET \/live/);
+
+  assert.match(workerWorkflow, /az containerapp update/);
+  assert.match(bootstrapWorkflow, /az acr login/);
+});
