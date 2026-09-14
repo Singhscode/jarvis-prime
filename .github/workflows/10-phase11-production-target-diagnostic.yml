@@ -1,0 +1,30 @@
+name: Phase 11 Production Target Diagnostic
+
+# Manual, one-time diagnostic only. It parses the protected Environment value
+# locally and emits fixed PASS/FAIL statuses; it never creates a database client.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-production-target:
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Parse protected production target locally
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        run: node database/scripts/validate-phase11-production-target.mjs
