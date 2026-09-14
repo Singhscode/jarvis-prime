@@ -109,7 +109,7 @@ before(async () => {
     `actor-a-${ids.actorA}@test.local`, `actor-b-${ids.actorB}@test.local`,
   ]);
   await db.query(`insert into public.automation_recipes(id,owner_user_id,code,status,created_by_user_id) values
-    ($1,$3,'RCP_TEST_A','APPROVED',$3),($2,$4,'RCP_TEST_B','APPROVED',$4)`, [ids.recipeA, ids.recipeB, ids.ownerA, ids.ownerB]);
+    ($1,$3,'RCP_TEST_A','ACTIVE',$3),($2,$4,'RCP_TEST_B','ACTIVE',$4)`, [ids.recipeA, ids.recipeB, ids.ownerA, ids.ownerB]);
   await db.query(`insert into public.automation_recipe_versions(id,owner_user_id,recipe_id,version,status,definition,configuration_sha256,created_by_user_id,approved_by_user_id,approved_at) values
     ($1,$3,$5,1,'APPROVED','{"actions":[{"key":"ACTION_1","action_code":"ACT_TASK","provider_code":"INTERNAL"}]}',$7,$3,$3,now()),($2,$4,$6,1,'APPROVED','{"actions":[{"key":"ACTION_1","action_code":"ACT_TASK","provider_code":"INTERNAL"}]}',$8,$4,$4,now())`, [
     ids.versionA, ids.versionB, ids.ownerA, ids.ownerB, ids.recipeA, ids.recipeB,
@@ -327,9 +327,10 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     assert.match(plan.rows.map((row) => row['QUERY PLAN']).join('\n'), /automation_work_items_due_claim_idx/);
   });
 
-  test('materializes daily schedules exactly once with database timezone and compatibility contracts', async () => {
+  test('materializes governed daily schedules exactly once through the existing queue with database timezone and compatibility contracts', async () => {
+    const recipe = await createGovernedRecipe({ code: recipeCode('SCHEDULED') });
     const schedule = await call(db, 'automation_create_daily_schedule', [
-      ids.ownerA, ids.ownerA, ids.versionA, hash(`config:${ids.versionA}`), 'ACT_TASK', JSON.stringify(taskInput), 'America/New_York', '09:30:00',
+      ids.ownerA, ids.ownerA, recipe.code, JSON.stringify(taskInput), 'America/New_York', '09:30:00',
     ]);
     await db.query(`update public.automation_schedules set next_occurrence_at=now()-interval '1 minute' where id=$1`, [schedule.schedule_id]);
     const left = new Client({ connectionString }); const right = new Client({ connectionString });
@@ -340,9 +341,13 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     await Promise.all([left.end(), right.end()]);
     const created = [...leftRows, ...rightRows].filter(Boolean);
     assert.equal(created.length, 1);
-    const { rows: [occurrence] } = await db.query(`select o.occurrence_key,o.run_id,o.work_item_id,s.next_occurrence_at > now() as advanced
-      from public.automation_schedule_occurrences o join public.automation_schedules s on s.id=o.schedule_id where o.schedule_id=$1`, [schedule.schedule_id]);
+    const { rows: [occurrence] } = await db.query(`select o.occurrence_key,o.run_id,o.work_item_id,s.next_occurrence_at > now() as advanced,
+      t.source_code,r.recipe_version_id,w.action_code
+      from public.automation_schedule_occurrences o join public.automation_schedules s on s.id=o.schedule_id
+      join public.automation_runs r on r.id=o.run_id join public.automation_trigger_inbox t on t.id=r.trigger_inbox_id
+      join public.automation_work_items w on w.id=o.work_item_id where o.schedule_id=$1`, [schedule.schedule_id]);
     assert.ok(occurrence.run_id); assert.ok(occurrence.work_item_id); assert.equal(occurrence.advanced, true);
+    assert.deepEqual({ source_code: occurrence.source_code, recipe_version_id: occurrence.recipe_version_id, action_code: occurrence.action_code }, { source_code: 'SCHEDULE', recipe_version_id: recipe.recipe_version_id, action_code: 'ACT_TASK' });
     assert.equal((await callSet(db, 'automation_materialize_schedules', [25])).length, 0);
     // A bounded catch-up leaves further past occurrences for the next durable wake/restart.
     await db.query(`update public.automation_schedules set catch_up_limit=1,next_occurrence_at=now()-interval '3 days' where id=$1`, [schedule.schedule_id]);
@@ -350,7 +355,32 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     const { rows: [behind] } = await db.query('select next_occurrence_at <= now() as behind from public.automation_schedules where id=$1', [schedule.schedule_id]);
     assert.equal(behind.behind, true);
     assert.equal((await callSet(db, 'automation_materialize_schedules', [25])).length, 1);
-    await assert.rejects(call(db, 'automation_create_daily_schedule', [ids.ownerA, ids.ownerA, ids.versionA, hash(`config:${ids.versionA}`), 'ACT_TASK', JSON.stringify(taskInput), 'Not/A_Timezone', '09:30:00']), /AUTOMATION_VALIDATION_ERROR/);
+
+    const peerRecipe = await createGovernedRecipe({ code: recipeCode('SCHEDULED_PEER') });
+    const peerSchedule = await call(db, 'automation_create_daily_schedule', [
+      ids.ownerA, ids.ownerA, peerRecipe.code, JSON.stringify(taskInput), 'America/New_York', '10:30:00',
+    ]);
+    const { rows: [beforePause] } = await db.query('select count(*)::int as occurrences from public.automation_schedule_occurrences where schedule_id=$1', [schedule.schedule_id]);
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'PAUSE']);
+    await db.query(`update public.automation_schedules set next_occurrence_at=now()-interval '1 minute' where id=any($1::uuid[])`, [[schedule.schedule_id, peerSchedule.schedule_id]]);
+    const pausedBatch = await callSet(db, 'automation_materialize_schedules', [25]);
+    assert.equal(pausedBatch.length, 1); assert.equal(pausedBatch[0].schedule_id, peerSchedule.schedule_id);
+    const { rows: [pausedSchedule] } = await db.query(`select enabled,next_occurrence_at>now() as advanced,disabled_reason_code,
+      (select count(*)::int from public.automation_schedule_occurrences where schedule_id=$1) as occurrences
+      from public.automation_schedules where id=$1`, [schedule.schedule_id]);
+    assert.deepEqual(pausedSchedule, { enabled: true, advanced: true, disabled_reason_code: 'WORKFLOW_PAUSED', occurrences: beforePause.occurrences });
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'ACTIVATE']);
+
+    const definitionV2 = structuredClone(recipe.definition); definitionV2.steps[1].input.body = 'Scheduled version two';
+    const scheduleVersion2 = await call(db, 'automation_create_recipe_version', [ids.ownerA, ids.ownerA, recipe.recipe_id, JSON.stringify(definitionV2), hash(jsonb(definitionV2))]);
+    for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, scheduleVersion2.recipe_version_id, transition]);
+    await db.query(`update public.automation_schedules set next_occurrence_at=now()-interval '1 day' where id=any($1::uuid[])`, [[schedule.schedule_id, peerSchedule.schedule_id]]);
+    const supersededBatch = await callSet(db, 'automation_materialize_schedules', [25]);
+    assert.equal(supersededBatch.length, 1); assert.equal(supersededBatch[0].schedule_id, peerSchedule.schedule_id);
+    const { rows: [supersededSchedule] } = await db.query('select enabled,disabled_reason_code from public.automation_schedules where id=$1', [schedule.schedule_id]);
+    assert.deepEqual(supersededSchedule, { enabled: false, disabled_reason_code: 'SCHEDULE_VERSION_SUPERSEDED' });
+
+    await assert.rejects(call(db, 'automation_create_daily_schedule', [ids.ownerA, ids.ownerA, recipe.code, JSON.stringify(taskInput), 'Not/A_Timezone', '09:30:00']), /AUTOMATION_VALIDATION_ERROR/);
     const { rows: [dst] } = await db.query(`select
       ((date '2026-03-08' + time '02:30') at time zone 'America/New_York') as spring_forward,
       ((date '2026-11-01' + time '01:30') at time zone 'America/New_York') as fall_back`);
@@ -359,7 +389,7 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     const contract = await call(db, 'automation_check_compatibility', ['AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V1']);
     assert.deepEqual(contract, { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V1' });
     await assert.rejects(call(db, 'automation_check_compatibility', ['stale', 'AUTOMATION_WORKER_V1']), /AUTOMATION_COMPATIBILITY_MISMATCH/);
-    const { rows: scheduleRuns } = await db.query('select run_id from public.automation_schedule_occurrences where schedule_id=$1 and run_id is not null', [schedule.schedule_id]);
+    const { rows: scheduleRuns } = await db.query('select run_id from public.automation_schedule_occurrences where schedule_id=any($1::uuid[]) and run_id is not null', [[schedule.schedule_id, peerSchedule.schedule_id]]);
     for (const { run_id: runId } of scheduleRuns) await cancel(runId);
   });
 
@@ -503,6 +533,87 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     assert.deepEqual(evidence, { policy_code: 'POL_APPROVAL', policy_version: 'V1', decision: 'ALLOW', reason_code: 'RECIPE_APPROVED', recipe_version_id: recipe.recipe_version_id, configuration_sha256: hash(jsonb(recipe.definition)) });
     await assert.rejects(admitGovernedRecipe({ recipe: { ...recipe, code: recipeCode('MISSING') } }), /AUTOMATION_RECIPE_NOT_ACTIVE/);
     await cancel(admitted.run_id);
+  });
+
+  test('enforces four-state workflow lifecycle and immutable run version bindings across publication', async () => {
+    const code = recipeCode('LIFECYCLE_ENGINE');
+    const definitionV1 = governedDefinition(code);
+    const created = await call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, code, JSON.stringify(definitionV1), hash(jsonb(definitionV1))]);
+    const review = await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, 'SUBMIT_REVIEW']);
+    assert.deepEqual({ status: review.status, version_status: review.version_status }, { status: 'DRAFT', version_status: 'REVIEW' });
+    await assert.rejects(call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, 'ACTIVATE']), /AUTOMATION_LIFECYCLE_INVALID/);
+    const approved = await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, 'APPROVE']);
+    assert.deepEqual({ status: approved.status, version_status: approved.version_status }, { status: 'DRAFT', version_status: 'APPROVED' });
+    assert.equal((await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, 'ACTIVATE'])).status, 'ACTIVE');
+    await assert.rejects(call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, 'ACTIVATE']), /AUTOMATION_LIFECYCLE_INVALID/);
+
+    const admitted = await admitGovernedRecipe({ recipe: { ...created, code, definition: definitionV1 }, idempotency: key('lifecycle-v1-binding'), dueAt: new Date(Date.now() + 3_600_000).toISOString() });
+    const definitionV2 = governedDefinition(code); definitionV2.steps[1].input.body = 'Version two';
+    const version2 = await call(db, 'automation_create_recipe_version', [ids.ownerA, ids.ownerA, created.recipe_id, JSON.stringify(definitionV2), hash(jsonb(definitionV2))]);
+    for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, transition]);
+    const { rows: [binding] } = await db.query(`select recipe_version_id,configuration_sha256 from public.automation_runs where id=$1`, [admitted.run_id]);
+    assert.deepEqual(binding, { recipe_version_id: created.recipe_version_id, configuration_sha256: hash(jsonb(definitionV1)) });
+    await assert.rejects(db.query(`update public.automation_runs set recipe_version_id=$1 where id=$2`, [version2.recipe_version_id, admitted.run_id]), /AUTOMATION_RUN_BINDING_IMMUTABLE/);
+    await assert.rejects(db.query(`update public.automation_runs set request_sha256=$1 where id=$2`, [hash('changed-binding'), admitted.run_id]), /AUTOMATION_RUN_BINDING_IMMUTABLE/);
+
+    assert.equal((await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'PAUSE'])).status, 'PAUSED');
+    await assert.rejects(call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'PAUSE']), /AUTOMATION_LIFECYCLE_INVALID/);
+    assert.equal((await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'ACTIVATE'])).status, 'ACTIVE');
+    await assert.rejects(call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'ARCHIVE']), /AUTOMATION_LIFECYCLE_INVALID/);
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'PAUSE']);
+    assert.equal((await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'ARCHIVE'])).status, 'ARCHIVED');
+    await assert.rejects(call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, version2.recipe_version_id, 'ACTIVATE']), /AUTOMATION_LIFECYCLE_INVALID/);
+    await cancel(admitted.run_id);
+  });
+
+  test('defers successors while workflow-paused, resumes exactly once, and never resumes cancelled work', async () => {
+    const recipe = await createGovernedRecipe({ code: recipeCode('PAUSE_CONTINUATION') });
+    const run = await admitGovernedRecipe({ recipe, idempotency: key('pause-continuation') });
+    const root = await claimFor(run.run_id, 'worker-pause-continuation');
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'PAUSE']);
+    await call(db, 'automation_transition_work', [root.id, root.worker, root.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ ok: true }), null]);
+    const { rows: pausedWork } = await db.query(`select sequence,state from public.automation_work_items where run_id=$1 order by sequence`, [run.run_id]);
+    assert.deepEqual(pausedWork, [{ sequence: 1, state: 'COMPLETED' }]);
+    const { rows: [deferred] } = await db.query(`select status,reason_code from public.automation_deferred_successors where run_id=$1`, [run.run_id]);
+    assert.deepEqual(deferred, { status: 'PENDING', reason_code: 'WORKFLOW_PAUSED' });
+    const { rows: [pausedRun] } = await db.query(`select state,completed_at from public.automation_runs where id=$1`, [run.run_id]);
+    assert.deepEqual(pausedRun, { state: 'WAITING', completed_at: null });
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'ACTIVATE']);
+    await call(db, 'automation_resume_deferred_successors', [ids.ownerA, recipe.recipe_id, run.run_id, 100]);
+    const { rows: resumedWork } = await db.query(`select sequence,state from public.automation_work_items where run_id=$1 order by sequence`, [run.run_id]);
+    assert.deepEqual(resumedWork, [{ sequence: 1, state: 'COMPLETED' }, { sequence: 2, state: 'WAITING' }]);
+    const { rows: [resumeEvidence] } = await db.query(`select
+      (select count(*)::int from public.automation_work_items where run_id=$1 and sequence=2) as successors,
+      (select count(*)::int from public.automation_run_events where run_id=$1 and event_code='RECIPE_SUCCESSOR_COMPILED') as compiled_events,
+      (select min(event_sequence) from public.automation_run_events where run_id=$1 and event_code='WORK_TRANSITION') <
+      (select min(event_sequence) from public.automation_run_events where run_id=$1 and event_code='RECIPE_SUCCESSOR_DEFERRED') as parent_before_defer`, [run.run_id]);
+    assert.deepEqual(resumeEvidence, { successors: 1, compiled_events: 1, parent_before_defer: true });
+    const child = await claimFor(run.run_id, 'worker-pause-continuation-child');
+    await call(db, 'automation_transition_work', [child.id, child.worker, child.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ delivered: true }), null]);
+    assert.equal((await db.query(`select state from public.automation_runs where id=$1`, [run.run_id])).rows[0].state, 'COMPLETED');
+
+    const cancelledRun = await admitGovernedRecipe({ recipe, idempotency: key('pause-cancelled-continuation') });
+    const cancelledRoot = await claimFor(cancelledRun.run_id, 'worker-pause-cancelled');
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'PAUSE']);
+    await call(db, 'automation_transition_work', [cancelledRoot.id, cancelledRoot.worker, cancelledRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ ok: true }), null]);
+    await cancel(cancelledRun.run_id);
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'ACTIVATE']);
+    const { rows: cancelledSuccessors } = await db.query(`select sequence from public.automation_work_items where run_id=$1 and sequence>1`, [cancelledRun.run_id]);
+    assert.equal(cancelledSuccessors.length, 0);
+    const { rows: [cancelledDeferred] } = await db.query(`select status from public.automation_deferred_successors where run_id=$1`, [cancelledRun.run_id]);
+    assert.equal(cancelledDeferred.status, 'CANCELLED');
+
+    const archivedRun = await admitGovernedRecipe({ recipe, idempotency: key('pause-archived-continuation') });
+    const archivedRoot = await claimFor(archivedRun.run_id, 'worker-pause-archived');
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'PAUSE']);
+    await call(db, 'automation_transition_work', [archivedRoot.id, archivedRoot.worker, archivedRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ ok: true }), null]);
+    await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, recipe.recipe_id, recipe.recipe_version_id, 'ARCHIVE']);
+    const { rows: [archivedEvidence] } = await db.query(`select
+      (select status from public.automation_deferred_successors where run_id=$1) as deferred_status,
+      (select state from public.automation_runs where id=$1) as run_state,
+      (select count(*)::int from public.automation_work_items where run_id=$1 and sequence>1) as successors,
+      (select count(*)::int from public.automation_run_events where run_id=$1 and event_code='RECIPE_SUCCESSOR_TERMINATED') as termination_events`, [archivedRun.run_id]);
+    assert.deepEqual(archivedEvidence, { deferred_status: 'TERMINATED', run_state: 'COMPLETED', successors: 0, termination_events: 1 });
   });
 
   test('rejects invalid Recipes, enforces Employee assignment scope, and compiles fixed successor work in the Step 2 transaction', async () => {
@@ -934,12 +1045,22 @@ test('admits only owner-scoped internal resource triggers and materializes bound
   assert.deepEqual(afterFalse.map((row) => row.sequence), [1]);
   const { rows: [conditionEvent] } = await db.query(`select event_code from public.automation_run_events where run_id=$1 and event_code='RECIPE_CONDITION_NOT_MET'`, [admitted.run_id]);
   assert.equal(conditionEvent.event_code, 'RECIPE_CONDITION_NOT_MET');
+  const { rows: [falseRunState] } = await db.query(`select state,completed_at is not null as completed from public.automation_runs where id=$1`, [admitted.run_id]);
+  assert.deepEqual(falseRunState, { state: 'COMPLETED', completed: true });
 
   const trueRun = await call(db, 'automation_admit_internal_resource_trigger', [ids.ownerA, ids.ownerA, 'resource-event-0002', code, JSON.stringify(resourceRef), JSON.stringify(input), dueAt]);
   await db.query(`update public.automation_work_items set due_at=now()-interval '1 second' where run_id=$1`, [trueRun.run_id]);
   const trueRoot = await claimFor(trueRun.run_id, 'worker-resource-condition-true');
   await call(db, 'automation_transition_work', [trueRoot.id, trueRoot.worker, trueRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: true }), null]);
+  const duplicate = await call(db, 'automation_transition_work', [trueRoot.id, trueRoot.worker, trueRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: true }), null]);
+  assert.equal(duplicate.late, true);
+  const child = await claimFor(trueRun.run_id, 'worker-resource-condition-child');
+  await call(db, 'automation_transition_work', [child.id, child.worker, child.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ delivered: true }), null]);
   const { rows: afterTrue } = await db.query(`select sequence,state from public.automation_work_items where run_id=$1 order by sequence`, [trueRun.run_id]);
-  assert.deepEqual(afterTrue, [{ sequence: 1, state: 'COMPLETED' }, { sequence: 2, state: 'WAITING' }]);
-  await cancel(admitted.run_id); await cancel(trueRun.run_id);
+  assert.deepEqual(afterTrue, [{ sequence: 1, state: 'COMPLETED' }, { sequence: 2, state: 'COMPLETED' }]);
+  const { rows: [trueEvidence] } = await db.query(`select
+    (select count(*)::int from public.automation_work_items where run_id=$1 and sequence=2) as successors,
+    (select count(*)::int from public.automation_run_events where run_id=$1 and event_code='RECIPE_SUCCESSOR_COMPILED') as compiled_events,
+    (select state from public.automation_runs where id=$1) as run_state`, [trueRun.run_id]);
+  assert.deepEqual(trueEvidence, { successors: 1, compiled_events: 1, run_state: 'COMPLETED' });
 });

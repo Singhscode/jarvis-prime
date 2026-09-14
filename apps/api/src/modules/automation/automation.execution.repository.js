@@ -19,9 +19,8 @@ export async function createTriggerRun(values) {
 }
 export async function createDailySchedule(values) {
   return result(await client().rpc('automation_create_daily_schedule', {
-    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_recipe_version: values.recipeVersionId,
-    p_configuration_hash: values.configurationSha256, p_action: values.actionCode, p_input: values.input,
-    p_timezone: values.timezone, p_local_time: values.localTime,
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_recipe_code: values.recipeCode,
+    p_input: values.input, p_timezone: values.timezone, p_local_time: values.localTime,
   }));
 }
 export async function materializeSchedules(limit = 25) { return result(await client().rpc('automation_materialize_schedules', { p_limit: limit })) || []; }

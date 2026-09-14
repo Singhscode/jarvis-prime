@@ -4,7 +4,7 @@ export const RECIPE_ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT
 export const FIXED_POLICY_KEYS = Object.freeze(['POL_APPROVAL@V1', 'POL_LIMIT@V1']);
 export const DISABLED_POLICY_CODES = Object.freeze(['POL_REPLY']);
 export const RECIPE_LIFECYCLE_TRANSITIONS = Object.freeze(['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE', 'PAUSE', 'ARCHIVE']);
-export const RECIPE_STATUSES = Object.freeze(['DRAFT', 'REVIEW', 'APPROVED', 'ACTIVE', 'PAUSED', 'ARCHIVED']);
+export const RECIPE_STATUSES = Object.freeze(['DRAFT', 'ACTIVE', 'PAUSED', 'ARCHIVED']);
 
 const CODE = /^RCP_[A-Z0-9_]{3,60}$/;
 const STEP = /^[A-Z][A-Z0-9_]{2,60}$/;
