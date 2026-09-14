@@ -22,9 +22,9 @@ Inject only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` from a production sec
 
 ## Manual migration release gate
 
-`database/automation-rollout-contract.json` cryptographically pins the repository candidate chain 23–31, 35–37. Its literal **production-approved** subset is `20260810000023` through `20260810000031`, then `20260810000035`, then `20260810000036`. Migration 35 provides idempotent automation controls and immutable audit evidence; migration 36 adds global idempotency receipts and current-UTC-day DAILY reservation rebinding.
+`database/automation-rollout-contract.json` cryptographically pins the unified repository chain 23–31, 35, and 36. Its approved sequence is `20260810000023` through `20260810000031`, then `20260810000035`, then `20260810000036`. Migration 35 provides idempotent automation controls and immutable audit evidence; migration 36 adds global idempotency receipts and current-UTC-day DAILY reservation rebinding.
 
-Migration `20260810000037_add_phase11_internal_fake_canary.sql` is unchanged, pinned staging-only canary evidence and is excluded from this production authorization. A local `db:reset` includes it solely to validate the clean repository source chain. Before any future remote database operation, the approved operator must compare the remote ledger. If 37 is pending remotely, stop: an unqualified `npm run db:push` would discover it after 36. This bundle does not authorize or provide a production migration application mechanism.
+Migration `20260810000037_add_phase11_internal_fake_canary.sql` remains unchanged as source-only historical evidence outside rollout-contract validation. A local `db:reset` still applies it while the file remains in the migration directory. Before any future remote database operation, the approved operator must compare the remote ledger. If 37 is pending remotely, stop: an unqualified `npm run db:push` would discover it after 36. This bundle does not authorize or provide a production migration application mechanism.
 
 Before separate production authorization, run `npm run verify:automation:rollout-contract`, `npm run db:reset`, and the disposable-local automation integration suite; record the release SHA, approved subset, remote ledger comparison, providers-disabled confirmation, and backup/PITR restore responsibility. Unknown, absent, edited, reordered, or private migrations are stop conditions. Never edit historical migrations or migration-ledger rows; a correction is a reviewed forward migration.
 
@@ -32,7 +32,7 @@ Before separate production authorization, run `npm run verify:automation:rollout
 
 `production.bicep` is the one-time declarative owner of the production identity, Key Vault references, probes, ingress-disabled topology, single replica, and termination grace. The manual worker workflow is image-only: it builds `<acr>/<repository>:sha-<git_sha>` from the root `Dockerfile` and runs only `az containerapp update --image`. It never changes configuration, secrets, identity, ingress, probes, scale, or resources.
 
-No production canary, migration, provider call, or customer-data operation is authorized by this contract. The fixed `ACT_INTERNAL_FAKE` canary remains staging-only and requires its separate staging execution authorization.
+No production canary, migration, provider call, or customer-data operation is authorized by this contract. Migration 37 is retained as source-only historical evidence pending separate retirement; this repository no longer provides an INTERNAL_FAKE canary execution path.
 
 ## CI boundary
 

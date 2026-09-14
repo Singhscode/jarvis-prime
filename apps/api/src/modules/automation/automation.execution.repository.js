@@ -47,12 +47,6 @@ export async function resolveFutureTrigger(values) {
     p_payload_hash: values.payloadSha256,
   }));
 }
-export async function runStagingCanary(values) {
-  return result(await client().rpc('automation_run_staging_internal_canary', {
-    p_owner: values.ownerUserId, p_actor: values.actorUserId,
-    p_source_event: values.sourceEventId, p_due_at: values.dueAt,
-  }));
-}
 export async function cancelRun(ownerUserId, runId, actorUserId, reasonCode = 'OWNER_CANCELLED') { return result(await client().rpc('automation_cancel_run', { p_owner: ownerUserId, p_run: runId, p_actor: actorUserId, p_reason: reasonCode })); }
 export async function setEmployeeRunPause(actorUserId, runId, operation) {
   return result(await client().rpc('automation_set_employee_run_pause', { p_actor: actorUserId, p_run: runId, p_operation: operation }));

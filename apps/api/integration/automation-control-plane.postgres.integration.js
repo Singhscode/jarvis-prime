@@ -140,17 +140,15 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     assert.deepEqual(state, { rls: true, service_insert: false, claim_execute: true, helper_execute: false, anon_read: false });
   });
 
-  test('validates the clean candidate ledger, hardened control RPC, and UTC-day quota retry path', async () => {
-    const candidateVersions = [
+  test('validates the unified automation ledger, hardened control RPC, and UTC-day quota retry path', async () => {
+    const unifiedAutomationVersions = [
       '20260810000023', '20260810000024', '20260810000025', '20260810000026', '20260810000027',
       '20260810000028', '20260810000029', '20260810000030', '20260810000031', '20260810000035',
-      '20260810000036', '20260810000037',
+      '20260810000036',
     ];
-    const productionApprovedVersions = candidateVersions.slice(0, -1);
     const { rows: ledger } = await db.query(`select version from supabase_migrations.schema_migrations
-      where version = any($1::text[]) order by version`, [candidateVersions]);
-    assert.deepEqual(ledger.map((entry) => entry.version), candidateVersions);
-    assert.deepEqual(productionApprovedVersions.slice(-3), ['20260810000031', '20260810000035', '20260810000036']);
+      where version = any($1::text[]) order by version`, [unifiedAutomationVersions]);
+    assert.deepEqual(ledger.map((entry) => entry.version), unifiedAutomationVersions);
 
     const controlKey = key('hardened-control');
     const controlArgs = [ids.ownerA, 'OWNER', ids.ownerA, true, false, 'TEST_PAUSE', ids.ownerA, controlKey];

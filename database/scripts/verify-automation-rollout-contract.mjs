@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
-const AUTOMATION_MIGRATION_CANDIDATE = /^202608100000(?:2[3-9]|3[01]|3[5-7])_.+\.sql$/;
+const AUTOMATION_MIGRATION_CANDIDATE = /^202608100000(?:2[3-9]|3[01]|3[5-6])_.+\.sql$/;
 
 export const APPROVED_AUTOMATION_MIGRATIONS = Object.freeze([
   '20260810000023_add_automation_control_plane.sql',
@@ -19,10 +19,8 @@ export const APPROVED_AUTOMATION_MIGRATIONS = Object.freeze([
   '20260810000031_add_automation_operational_health.sql',
   '20260810000035_complete_phase11_local_candidate_controls.sql',
   '20260810000036_harden_phase11_p0_controls.sql',
-  '20260810000037_add_phase11_internal_fake_canary.sql',
 ]);
-export const PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS = Object.freeze(APPROVED_AUTOMATION_MIGRATIONS.slice(0, -1));
-export const STAGING_ONLY_AUTOMATION_MIGRATIONS = Object.freeze([APPROVED_AUTOMATION_MIGRATIONS.at(-1)]);
+export const PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS = APPROVED_AUTOMATION_MIGRATIONS;
 
 export function isPhase11AutomationMigration(filename) {
   return APPROVED_AUTOMATION_MIGRATIONS.includes(filename);
@@ -52,13 +50,10 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   }
   const manifestFiles = Array.isArray(contract.migrations) ? contract.migrations.map(({ file }) => file) : [];
   if (!sameOrderedList(manifestFiles, APPROVED_AUTOMATION_MIGRATIONS)) {
-    fail(errors, 'migration manifest must exactly match the literal approved candidate chain (20260810000023–31, 35, 36, and staging-only 37)');
+    fail(errors, 'migration manifest must exactly match the unified automation chain (20260810000023–31, 35, and 36)');
   }
   if (!sameOrderedList(contract.productionApprovedMigrations, PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS)) {
-    fail(errors, 'production migration approval must exactly end with 20260810000031 → 20260810000035 → 20260810000036');
-  }
-  if (!sameOrderedList(contract.stagingOnlyMigrations, STAGING_ONLY_AUTOMATION_MIGRATIONS)) {
-    fail(errors, 'migration 20260810000037 must remain the sole staging-only migration artifact');
+    fail(errors, 'unified automation migration approval must exactly end with 20260810000031 → 20260810000035 → 20260810000036');
   }
 
   const expected = new Set(APPROVED_AUTOMATION_MIGRATIONS);
@@ -99,6 +94,6 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   verifyAutomationRolloutContract().then((result) => {
-    console.log(`Automation rollout contract verified: ${result.migrations.length} repository candidates; ${result.productionMigrations.length} production-approved migrations; ${result.compatibility.registryVersion}/${result.compatibility.workerVersion}`);
+    console.log(`Automation rollout contract verified: ${result.migrations.length} unified migrations; ${result.compatibility.registryVersion}/${result.compatibility.workerVersion}`);
   }).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
