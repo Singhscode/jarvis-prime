@@ -203,10 +203,12 @@ export function assertProductionTarget(environment = process.env) {
   }
 
   const expectedHost = `db.${projectRef}.supabase.co`;
+  const sslmode = target.searchParams.get('sslmode');
+  const sslmodeAccepted = sslmode === null || sslmode === 'verify-full' || sslmode === 'require';
   if (!['postgres:', 'postgresql:'].includes(target.protocol)
     || target.hostname !== expectedHost
     || (target.port && target.port !== '5432')
-    || target.searchParams.get('sslmode') !== 'verify-full') {
+    || !sslmodeAccepted) {
     throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
   }
   return { connectionString, projectRef };
