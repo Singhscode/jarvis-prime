@@ -2,7 +2,7 @@ import { AppError } from '../../middleware/error-handler.js';
 import * as workspace from '../owner-workspace/owner-workspace.service.js';
 import * as repository from './automation.execution.repository.js';
 import * as recipePolicy from './automation.recipe-policy.service.js';
-import { ACTION_CODES, assertObject, TERMINAL_STATES } from './automation.execution.validation.js';
+import { assertObject, TERMINAL_STATES } from './automation.execution.validation.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const IDEMPOTENCY = /^[A-Za-z0-9._:-]{16,200}$/;
@@ -62,10 +62,10 @@ export async function createManualRun(userId, values, rawIdempotency) {
   return recipePolicy.admitManualRun(userId, values, rawIdempotency);
 }
 export async function createDailySchedule(userId, values) {
-  const actor = await scope(userId, { ownerOnly: true }); const body = exact(values, ['recipeVersionId', 'configurationSha256', 'actionCode', 'input', 'timezone', 'localTime']);
-  if (!ACTION_CODES.includes(body.actionCode) || typeof body.configurationSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(body.configurationSha256)
+  const actor = await scope(userId, { ownerOnly: true }); const body = exact(values, ['recipeCode', 'input', 'timezone', 'localTime']);
+  if (typeof body.recipeCode !== 'string' || !/^RCP_[A-Z0-9_]{3,60}$/.test(body.recipeCode)
     || typeof body.timezone !== 'string' || body.timezone.length > 80 || typeof body.localTime !== 'string' || !/^\d{2}:\d{2}(:\d{2})?$/.test(body.localTime)) invalid();
-  try { return await repository.createDailySchedule({ ownerUserId: actor.ownerUserId, actorUserId: actor.actorUserId, recipeVersionId: uuid(body.recipeVersionId), configurationSha256: body.configurationSha256, actionCode: body.actionCode, input: assertObject(body.input, 'SCHEDULE_INPUT'), timezone: body.timezone, localTime: body.localTime }); }
+  try { return await repository.createDailySchedule({ ownerUserId: actor.ownerUserId, actorUserId: actor.actorUserId, recipeCode: body.recipeCode, input: assertObject(body.input, 'SCHEDULE_INPUT'), timezone: body.timezone, localTime: body.localTime }); }
   catch (error) { mapError(error); }
 }
 export async function listRuns(userId, query = {}) {

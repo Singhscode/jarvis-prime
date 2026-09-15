@@ -60,3 +60,39 @@ test('the policy registry is fixed and only static approval can admit or hold a 
   });
   assert.throws(() => evaluateAdmissionPolicies({ policies: ['POL_SCORE@V1'], requiresHumanReview: false }), /AUTOMATION_POLICY_INVALID/);
 });
+
+
+test('Recipe contracts accept only typed resource references and a bounded boolean successor condition', () => {
+  const resourceRef = {
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    campaignId: '22222222-2222-4222-8222-222222222222',
+    prospectId: '33333333-3333-4333-8333-333333333333',
+  };
+  const conditional = definition({
+    inputSchema: {
+      properties: { resourceRef: { type: 'resourceRef' }, mode: { type: 'string' } },
+      required: ['resourceRef', 'mode'],
+    },
+    steps: [
+      definition().steps[0],
+      {
+        stepCode: 'STEP_NOTIFY', sequence: 2, actionCode: 'ACT_NOTIFY', dependsOn: 'STEP_TASK',
+        input: { mode: 'SEND_MESSAGE', threadId: 'thread-1', body: 'Update' },
+        condition: { type: 'RESULT_BOOLEAN_EQUALS', field: 'shouldNotify', equals: true },
+        policies: ['POL_APPROVAL@V1'], requiresHumanReview: false,
+      },
+    ],
+  });
+  assert.equal(assertRecipeDefinition(conditional), conditional);
+  assert.deepEqual(assertRecipeInput(conditional, { resourceRef, mode: 'UPDATE' }), { resourceRef, mode: 'UPDATE' });
+  assert.throws(() => assertRecipeInput(conditional, { resourceRef: { ...resourceRef, extra: true }, mode: 'UPDATE' }), /AUTOMATION_RESOURCE_REFERENCE_INVALID/);
+  assert.throws(() => assertRecipeInput(conditional, { resourceRef: { campaignId: resourceRef.campaignId }, mode: 'UPDATE' }), /AUTOMATION_RESOURCE_REFERENCE_INVALID/);
+  assert.throws(() => assertRecipeDefinition(definition({ steps: [definition().steps[0], {
+    stepCode: 'STEP_NOTIFY', sequence: 2, actionCode: 'ACT_NOTIFY', dependsOn: 'STEP_TASK', input: {},
+    condition: { type: 'RESULT_BOOLEAN_EQUALS', field: 'shouldNotify', equals: 'true' }, policies: ['POL_APPROVAL@V1'], requiresHumanReview: false,
+  }] })), /AUTOMATION_RECIPE_CONDITION_INVALID/);
+  assert.throws(() => assertRecipeDefinition(definition({ steps: [definition().steps[0], {
+    stepCode: 'STEP_NOTIFY', sequence: 2, actionCode: 'ACT_NOTIFY', dependsOn: 'STEP_TASK', input: {},
+    condition: { type: 'javascript', expression: 'true' }, policies: ['POL_APPROVAL@V1'], requiresHumanReview: false,
+  }] })), /AUTOMATION_RECIPE_DYNAMIC_CONTENT/);
+});

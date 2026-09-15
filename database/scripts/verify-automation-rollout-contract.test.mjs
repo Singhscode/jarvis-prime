@@ -68,25 +68,20 @@ test('recognizes only the canonical Phase 11 automation naming family', () => {
   }
 });
 
-test('accepts the literal Phase 11 candidate chain and explicit production approval subset', async (t) => {
+test('accepts the unified automation chain without depending on the retained canary migration', async (t) => {
   const root = await createFixture(t);
 
   const result = await verifyAutomationRolloutContract(root);
 
-  assert.equal(result.migrations.length, 12);
-  assert.deepEqual(result.migrations.slice(-4), [
-    '20260810000031_add_automation_operational_health.sql',
-    '20260810000035_complete_phase11_local_candidate_controls.sql',
-    '20260810000036_harden_phase11_p0_controls.sql',
-    '20260810000037_add_phase11_internal_fake_canary.sql',
-  ]);
-  assert.deepEqual(result.productionMigrations.slice(-3), [
+  assert.equal(result.migrations.length, 11);
+  assert.deepEqual(result.migrations.slice(-3), [
     '20260810000031_add_automation_operational_health.sql',
     '20260810000035_complete_phase11_local_candidate_controls.sql',
     '20260810000036_harden_phase11_p0_controls.sql',
   ]);
-  assert.equal(result.migrations.at(-1), '20260810000037_add_phase11_internal_fake_canary.sql');
-  assert.equal(result.productionMigrations.includes('20260810000037_add_phase11_internal_fake_canary.sql'), false);
+  assert.deepEqual(result.productionMigrations, result.migrations);
+  assert.equal(isPhase11AutomationMigration('20260810000037_add_phase11_internal_fake_canary.sql'), false);
+  assert.equal(result.migrations.includes('20260810000037_add_phase11_internal_fake_canary.sql'), false);
 });
 
 test('fails when a required canonical Phase 11 migration is absent', async (t) => {
@@ -121,7 +116,7 @@ test('fails when canonical Phase 11 migration manifest order changes', async (t)
   [contract.migrations[0], contract.migrations[1]] = [contract.migrations[1], contract.migrations[0]];
   await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
 
-  await assert.rejects(verifyAutomationRolloutContract(root), /migration manifest must exactly match the literal approved candidate chain/);
+  await assert.rejects(verifyAutomationRolloutContract(root), /migration manifest must exactly match the unified automation chain/);
 });
 
 test('fails when a canonical Phase 11 migration is not transaction-bounded', async (t) => {

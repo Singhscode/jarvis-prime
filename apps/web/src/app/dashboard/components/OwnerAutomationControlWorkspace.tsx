@@ -120,7 +120,11 @@ export default function OwnerAutomationControlWorkspace() {
   async function mutate(path: string, init: RequestInit, success: string, after: 'run' | 'recipe' | 'reload') {
     setWorking(true); setDetailError(''); setNotice('');
     try {
-      await request<ApiBody<unknown>>(path, init);
+      try { await request<ApiBody<unknown>>(path, init); }
+      catch (caught) {
+        if (!new Headers(init.headers).has('Idempotency-Key')) throw caught;
+        await request<ApiBody<unknown>>(path, init);
+      }
       setNotice(success);
       if (after === 'run' && openRunId) await openRun(openRunId, true);
       if (after === 'recipe' && recipeDetail) await openRecipe(recipeDetail.recipe.id);
