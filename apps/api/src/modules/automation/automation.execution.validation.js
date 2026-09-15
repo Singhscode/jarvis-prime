@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 export const EXECUTION_STATES = Object.freeze(['RUNNING', 'WAITING', 'COMPLETED', 'RETRYABLE', 'FAILED', 'BLOCKED', 'CANCELLED', 'HUMAN_REVIEW']);
 export const ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
 export const AUTOMATION_REGISTRY_VERSION = 'AUTOMATION_REGISTRY_V1';
-export const AUTOMATION_WORKER_VERSION = 'AUTOMATION_WORKER_V2';
+export const AUTOMATION_WORKER_VERSION = 'AUTOMATION_WORKER_V1';
 export const TERMINAL_STATES = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
 export const MAX = Object.freeze({ claimBatch: 50, workerConcurrency: 20, actionConcurrency: 10, inputBytes: 65536, resultBytes: 16384, metadataBytes: 8192, pollMinMs: 1000, pollMaxMs: 60000 });
 
