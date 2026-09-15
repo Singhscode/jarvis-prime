@@ -1,5 +1,5 @@
 import * as repository from './automation.execution.repository.js';
-import { getAction } from './automation.execution.actions.js';
+import { getAction, normalizeActionMetadata, normalizeActionOutcome } from './automation.execution.actions.js';
 import { AUTOMATION_REGISTRY_VERSION, AUTOMATION_WORKER_VERSION, bounded, classifyError, MAX, redactedError, retryDelayMs, workerIdentity } from './automation.execution.validation.js';
 import { createAutomationObservability } from './automation.execution.observability.js';
 
@@ -21,7 +21,7 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
   const heartbeatInterval = bounded(heartbeatMs, 15000, 1000, Math.max(1000, lease * 500), 'HEARTBEAT_INTERVAL');
   const interval = bounded(pollMs, 5000, MAX.pollMinMs, MAX.pollMaxMs, 'POLL_INTERVAL');
   const actionActive = new Map(); const actionWaiters = new Map();
-  const metrics = { claims: 0, completed: 0, retryable: 0, failed: 0, blocked: 0, review: 0, heartbeats: 0, heartbeatFailures: 0, staleRecovered: 0 };
+  const metrics = { claims: 0, completed: 0, retryable: 0, failed: 0, blocked: 0, review: 0, heartbeats: 0, heartbeatFailures: 0, staleRecovered: 0, relinquished: 0, lateResults: 0 };
   let draining = false; let ready = false; let active = 0; let compatibility = null;
   async function acquireAction(actionCode) {
     while ((actionActive.get(actionCode) || 0) >= actionLimit) {
@@ -44,6 +44,40 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
     else if (state === 'HUMAN_REVIEW') metrics.review += 1;
     telemetry.transition(state, reasonCode);
   }
+  function transitionResult(work, transition, fallbackState, reasonCode, result) {
+    const state = transition?.state || fallbackState;
+    if (transition?.late) {
+      metrics.lateResults += 1;
+      telemetry.warn('late_result_observed', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'LATE_RESULT', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: 'LATE_RESULT' });
+      return { id: work.id, state, late: true };
+    }
+    recordState(state, reasonCode);
+    const event = { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: `RUNNING_TO_${state}`, actionCode: work.action_code, attempt: work.attempt_count, result };
+    if (reasonCode) event.reasonCode = reasonCode;
+    telemetry.log('transition', event);
+    return { id: work.id, state };
+  }
+  async function relinquishUnstartedClaim(work) {
+    let released;
+    try {
+      if (typeof repositoryApi.relinquishUnstartedClaim !== 'function') throw new Error('AUTOMATION_RELINQUISH_UNAVAILABLE');
+      released = await repositoryApi.relinquishUnstartedClaim(work.id, workerId, work.lease_token);
+    } catch (cause) {
+      const error = new Error(`AUTOMATION_CLAIM_RELEASE_FAILED: ${String(cause?.message || 'UNKNOWN').slice(0, 100)}`);
+      error.code = 'AUTOMATION_CLAIM_RELEASE_FAILED';
+      error.cause = cause;
+      throw error;
+    }
+    const state = released?.state || 'WAITING';
+    if (released?.late) {
+      metrics.lateResults += 1;
+      telemetry.warn('late_result_observed', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'LATE_RESULT', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: 'WORKER_DRAINING' });
+      return { id: work.id, state, late: true };
+    }
+    metrics.relinquished += 1;
+    telemetry.log('claim_released', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'RUNNING_TO_WAITING', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: 'WORKER_DRAINING' });
+    return { id: work.id, state, relinquished: true };
+  }
   function startHeartbeat(work) {
     if (typeof repositoryApi.heartbeat !== 'function') return { stop: () => {}, lost: () => false };
     let lost = false;
@@ -59,8 +93,10 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
     active += 1;
     let dispatched = false; let actionAcquired = false; let heartbeat = null;
     try {
+      if (draining) return await relinquishUnstartedClaim(work);
       const concurrencyKey = concurrencyKeyResolver(work);
       await acquireAction(concurrencyKey); actionAcquired = concurrencyKey;
+      if (draining) return await relinquishUnstartedClaim(work);
       const dispatchAdmission = await repositoryApi.markDispatching(work.id, workerId, work.lease_token);
       if (dispatchAdmission?.allowed === false) {
         recordState(dispatchAdmission.state || 'BLOCKED', dispatchAdmission.reason);
@@ -71,23 +107,30 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
       dispatched = true;
       heartbeat = startHeartbeat(work);
       const action = actionResolver(work.action_code, work.provider_code || 'INTERNAL');
-      const outcome = await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, runId: work.run_id, workItemId: work.id, correlationId: work.correlation_id, input: work.input });
+      const outcome = normalizeActionOutcome(await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, runId: work.run_id, workItemId: work.id, correlationId: work.correlation_id, input: work.input }));
       if (heartbeat.lost()) {
         const error = new Error('AUTOMATION_LEASE_LOST'); error.code = 'AUTOMATION_LEASE_LOST'; throw error;
       }
-      await repositoryApi.transition(work.id, workerId, work.lease_token, 'COMPLETED', 'ACTION_COMPLETED', outcome.safeMetadata || {});
-      recordState('COMPLETED');
-      telemetry.log('transition', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'RUNNING_TO_COMPLETED', actionCode: work.action_code, attempt: work.attempt_count, result: outcome.safeMetadata || {} });
-      return { id: work.id, state: 'COMPLETED' };
+      const persisted = await repositoryApi.transition(work.id, workerId, work.lease_token, 'COMPLETED', 'ACTION_COMPLETED', outcome.safeMetadata || {});
+      return transitionResult(work, persisted, 'COMPLETED', null, outcome.safeMetadata || {});
     } catch (error) {
+      if (error?.code === 'AUTOMATION_CLAIM_RELEASE_FAILED') {
+        telemetry.warn('claim_release_failed', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'CLAIM_RELEASE_FAILED', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: error.code });
+        throw error;
+      }
       const classified = classifyError(error, { afterDispatch: dispatched, knownOutcome: Boolean(error?.knownOutcome) });
-      const safeProviderResult = error?.safeMetadata && typeof error.safeMetadata === 'object' && !Array.isArray(error.safeMetadata)
-        ? error.safeMetadata : {};
+      let safeProviderResult = {};
+      if (error?.safeMetadata !== undefined) {
+        try { safeProviderResult = normalizeActionMetadata(error.safeMetadata); } catch { safeProviderResult = {}; }
+      }
       const dueAt = classified.state === 'RETRYABLE' ? new Date(Date.now() + retryDelayMs(work.attempt_count, work.id)).toISOString() : null;
-      try { await repositoryApi.transition(work.id, workerId, work.lease_token, classified.state, classified.reason, { ...redactedError(error), ...safeProviderResult }, dueAt); } catch (transitionError) { telemetry.warn('transition_failed', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'RUNNING_TO_ERROR', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: redactedError(transitionError).code }); }
-      recordState(classified.state, classified.reason);
-      telemetry.log('transition', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: `RUNNING_TO_${classified.state}`, actionCode: work.action_code, attempt: work.attempt_count, reasonCode: classified.reason, result: safeProviderResult });
-      return { id: work.id, state: classified.state };
+      try {
+        const persisted = await repositoryApi.transition(work.id, workerId, work.lease_token, classified.state, classified.reason, { ...redactedError(error), ...safeProviderResult }, dueAt);
+        return transitionResult(work, persisted, classified.state, classified.reason, safeProviderResult);
+      } catch (transitionError) {
+        telemetry.warn('transition_failed', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'worker', transition: 'RUNNING_TO_ERROR', actionCode: work.action_code, attempt: work.attempt_count, reasonCode: redactedError(transitionError).code });
+        throw transitionError;
+      }
     } finally {
       heartbeat?.stop();
       if (actionAcquired) releaseAction(actionAcquired);

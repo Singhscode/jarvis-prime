@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createActionRegistry } from '../src/modules/automation/automation.execution.actions.js';
+import { createActionRegistry, normalizeActionOutcome } from '../src/modules/automation/automation.execution.actions.js';
 import { ACTION_CODES, assertActionCode, assertTransition, classifyError, retryDelayMs } from '../src/modules/automation/automation.execution.validation.js';
 import { createDurableScheduleMaterializer, createEligibilityScheduler } from '../src/modules/automation/automation.execution.scheduler.js';
 import { createWorker } from '../src/modules/automation/automation.execution.worker.js';
@@ -10,7 +10,7 @@ import { getAutomationWorkerRuntimeConfig } from '../src/workers/automation-work
 import { createAutomationWorkerHealthServer, workerReadinessView } from '../src/workers/automation-worker.health.js';
 
 test('automation contracts allow only fixed actions, legal transitions, and deterministic safe retry classification', () => {
-  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_INTERNAL_FAKE', 'ACT_APOLLO_SEARCH']);
+  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
   assert.equal(assertActionCode('ACT_ASSIGN'), 'ACT_ASSIGN');
   assert.throws(() => assertActionCode('ACT_EMAIL'), /AUTOMATION_ACTION_DISABLED/);
   assert.equal(assertTransition('RUNNING', 'COMPLETED'), 'COMPLETED');
@@ -19,6 +19,34 @@ test('automation contracts allow only fixed actions, legal transitions, and dete
   assert.deepEqual(classifyError({ code: 'VALIDATION_ERROR' }), { state: 'FAILED', reason: 'TERMINAL_DOMAIN_FAILURE' });
   assert.deepEqual(classifyError(new Error('unknown'), { afterDispatch: true }), { state: 'HUMAN_REVIEW', reason: 'POST_DISPATCH_UNCERTAIN' });
   assert.equal(retryDelayMs(2, 'same'), retryDelayMs(2, 'same'));
+});
+
+test('action outcomes are bounded, redact credential-like values, and preserve boolean condition fields', () => {
+  assert.deepEqual(normalizeActionOutcome({ safeMetadata: { shouldNotify: true, nested: { token: 'provider-secret', returnedCount: 2 } } }), {
+    safeMetadata: { shouldNotify: true, nested: { token: '[REDACTED]', returnedCount: 2 } },
+  });
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: { shouldNotify: 'true' } , extra: true }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: ['not-an-object'] }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: { invalid: () => true } }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+});
+
+test('worker persists only normalized action results and fails closed on malformed outcomes', async () => {
+  const transitions = [];
+  const work = (id) => ({ id, owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: `lease-${id}`, attempt_count: 1, input: {} });
+  const repository = {
+    checkReady: async () => true, recoverStale: async () => [],
+    claim: async () => [work('normalized'), work('malformed')],
+    markDispatching: async () => ({ allowed: true }),
+    transition: async (...args) => { transitions.push(args); return { state: args[3] }; },
+  };
+  const worker = createWorker({ workerId: 'outcome-worker', concurrency: 1, repositoryApi: repository, actionResolver: () => async ({ workItemId }) => {
+    if (workItemId === 'normalized') return { safeMetadata: { shouldNotify: false, authorization: 'provider-credential', nested: { token: 'nested-credential' } } };
+    return { safeMetadata: 'malformed' };
+  } });
+  await worker.start();
+  assert.deepEqual(await worker.runOnce(), [{ id: 'normalized', state: 'COMPLETED' }, { id: 'malformed', state: 'HUMAN_REVIEW' }]);
+  assert.deepEqual(transitions[0].slice(3, 6), ['COMPLETED', 'ACTION_COMPLETED', { shouldNotify: false, authorization: '[REDACTED]', nested: { token: '[REDACTED]' } }]);
+  assert.deepEqual(transitions[1].slice(3, 6), ['HUMAN_REVIEW', 'AUTOMATION_ACTION_OUTCOME_INVALID', { code: 'AUTOMATION_ACTION_OUTCOME_INVALID' }]);
 });
 
 test('eligibility scheduler only wakes durable worker logic and never executes actions', async () => {
@@ -78,10 +106,6 @@ test('fixed action registry delegates only to the existing CRM and Communication
   await actions.ACT_TASK({ ...base, input: { mode: 'CREATE', projectId: 'project-1', name: 'Follow up' } });
   await actions.ACT_NOTIFY({ ...base, input: { mode: 'CREATE_THREAD', subject: 'Status', body: 'Update', participants: [{ kind: 'employee', employeeCode: 'JP-EMP-000001' }] } });
   await actions.ACT_NOTIFY({ ...base, actorUserId: 'employee-1', actorKind: 'employee', input: { mode: 'SEND_MESSAGE', threadId: 'thread-1', body: 'Update' } });
-  const beforeCanary = calls.length;
-  assert.deepEqual(await actions.ACT_INTERNAL_FAKE({ ...base, input: {} }), { safeMetadata: { mode: 'INTERNAL_FAKE_CANARY' } });
-  assert.equal(calls.length, beforeCanary);
-  await assert.rejects(actions.ACT_INTERNAL_FAKE({ ...base, input: { provider: 'APOLLO' } }), /AUTOMATION_INVALID_INTERNAL_FAKE_INPUT/);
   assert.deepEqual(calls, [
     ['updateTask', 'owner-1', 'project-1', 'task-1', { assigned_user_id: 'employee-1' }],
     ['updateTask', 'owner-1', 'project-1', 'task-1', { completed: true }],
@@ -188,7 +212,7 @@ test('worker blocks startup on an incompatible durable execution contract', asyn
   };
   const worker = createWorker({ workerId: 'worker-compatible', repositoryApi: compatible });
   await worker.start();
-  assert.deepEqual(calls[0], ['ready', 'AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V1']);
+  assert.deepEqual(calls[0], ['ready', 'AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V2']);
   assert.deepEqual(worker.status.compatibility, { ready: true, schema_version: 2 });
   await worker.shutdown({ graceMs: 1 });
 
@@ -199,6 +223,14 @@ test('worker blocks startup on an incompatible durable execution contract', asyn
   await assert.rejects(blocked.start(), /AUTOMATION_COMPATIBILITY_MISMATCH/);
   assert.equal(blocked.ready, false);
   assert.deepEqual(blockedCalls, []);
+
+  const unavailableCalls = [];
+  const unavailable = createWorker({
+    repositoryApi: { checkReady: async () => { throw new Error('AUTOMATION_RELINQUISH_UNAVAILABLE'); }, recoverStale: async () => { unavailableCalls.push('recover'); return []; }, claim: async () => { unavailableCalls.push('claim'); return []; } },
+  });
+  await assert.rejects(unavailable.start(), /AUTOMATION_RELINQUISH_UNAVAILABLE/);
+  assert.equal(unavailable.ready, false);
+  assert.deepEqual(unavailableCalls, []);
 });
 
 test('worker heartbeats only dispatched work and records lease loss as human review', async () => {
@@ -263,10 +295,10 @@ test('worker health probe reports local liveness and existing-worker readiness w
     assert.equal(live.status, 200); assert.deepEqual(await live.json(), { alive: true });
     let ready = await fetch(`http://127.0.0.1:${port}/ready`);
     assert.equal(ready.status, 503); assert.equal((await ready.json()).ready, false);
-    status = { ready: true, draining: false, active: 2, compatibility: { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V1', secret: 'must-not-appear' } };
+    status = { ready: true, draining: false, active: 2, compatibility: { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V2', secret: 'must-not-appear' } };
     ready = await fetch(`http://127.0.0.1:${port}/ready`);
     const body = await ready.json();
-    assert.equal(ready.status, 200); assert.deepEqual(body, { ready: true, draining: false, active: 2, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V1' }, observedAt: '2026-08-30T00:00:00.000Z' });
+    assert.equal(ready.status, 200); assert.deepEqual(body, { ready: true, draining: false, active: 2, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V2' }, observedAt: '2026-08-30T00:00:00.000Z' });
     assert.doesNotMatch(JSON.stringify(body), /secret|workerId|lease|input/i);
     const draining = workerReadinessView({ ready: true, draining: true, active: 0 });
     assert.equal(draining.ready, false); assert.equal(draining.draining, true); assert.equal(draining.active, 0); assert.equal(draining.compatibility, null);
@@ -327,4 +359,103 @@ test('telemetry failures never interrupt worker startup, claims, actions, heartb
   assert.deepEqual(worker.status.metrics.observability, {});
   await worker.shutdown({ graceMs: 1 });
   assert.equal(worker.ready, false);
+});
+
+
+test('worker reports the durable late outcome rather than an optimistic completed result', async () => {
+  const repository = {
+    checkReady: async () => true,
+    recoverStale: async () => [],
+    claim: async () => [{ id: 'late-work', owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: 'late-lease', attempt_count: 1, input: {} }],
+    markDispatching: async () => ({ allowed: true }),
+    transition: async () => ({ state: 'CANCELLED', late: true }),
+  };
+  const worker = createWorker({ workerId: 'late-worker', repositoryApi: repository, actionResolver: () => async () => ({ safeMetadata: { ok: true } }) });
+  await worker.start();
+  assert.deepEqual(await worker.runOnce(), [{ id: 'late-work', state: 'CANCELLED', late: true }]);
+  assert.equal(worker.status.metrics.completed, 0);
+  assert.equal(worker.status.metrics.lateResults, 1);
+});
+
+test('worker graceful drain relinquishes unstarted claims without invoking their actions', async () => {
+  let resolveFirst; let firstStarted;
+  const firstStartedPromise = new Promise((resolve) => { firstStarted = resolve; });
+  const firstFinished = new Promise((resolve) => { resolveFirst = resolve; });
+  const actions = []; const relinquished = [];
+  const work = ['drain-first', 'drain-second'].map((id) => ({ id, owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: `lease-${id}`, attempt_count: 1, input: {} }));
+  const repository = {
+    checkReady: async () => true,
+    recoverStale: async () => [],
+    claim: async () => work,
+    markDispatching: async () => ({ allowed: true }),
+    transition: async () => ({ state: 'COMPLETED' }),
+    relinquishUnstartedClaim: async (...args) => { relinquished.push(args); return { state: 'WAITING', relinquished: true }; },
+  };
+  const worker = createWorker({ workerId: 'drain-worker', claimBatch: 2, concurrency: 1, repositoryApi: repository, actionResolver: () => async ({ workItemId }) => {
+    actions.push(workItemId);
+    if (workItemId === 'drain-first') { firstStarted(); await firstFinished; }
+    return { safeMetadata: {} };
+  } });
+  await worker.start();
+  const running = worker.runOnce();
+  await firstStartedPromise;
+  const shutdown = worker.shutdown({ graceMs: 500 });
+  resolveFirst();
+  assert.deepEqual(await running, [
+    { id: 'drain-first', state: 'COMPLETED' },
+    { id: 'drain-second', state: 'WAITING', relinquished: true },
+  ]);
+  await shutdown;
+  assert.deepEqual(actions, ['drain-first']);
+  assert.deepEqual(relinquished, [['drain-second', 'drain-worker', 'lease-drain-second']]);
+  assert.equal(worker.status.metrics.relinquished, 1);
+  assert.equal(worker.ready, false);
+});
+
+test('worker surfaces a drain-release failure without transitioning unstarted work', async () => {
+  let resolveFirst; let firstStarted;
+  const firstStartedPromise = new Promise((resolve) => { firstStarted = resolve; });
+  const firstFinished = new Promise((resolve) => { resolveFirst = resolve; });
+  const actions = []; const transitions = [];
+  const work = ['release-first', 'release-second'].map((id) => ({ id, owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: `lease-${id}`, attempt_count: 1, input: {} }));
+  const repository = {
+    checkReady: async () => true,
+    recoverStale: async () => [],
+    claim: async () => work,
+    markDispatching: async () => ({ allowed: true }),
+    transition: async (...args) => { transitions.push(args); return { state: 'COMPLETED' }; },
+    relinquishUnstartedClaim: async () => { throw new Error('release failure'); },
+  };
+  const worker = createWorker({ workerId: 'release-worker', claimBatch: 2, concurrency: 1, repositoryApi: repository, actionResolver: () => async ({ workItemId }) => {
+    actions.push(workItemId);
+    if (workItemId === 'release-first') { firstStarted(); await firstFinished; }
+    return { safeMetadata: {} };
+  } });
+  await worker.start();
+  const running = worker.runOnce();
+  await firstStartedPromise;
+  const shutdown = worker.shutdown({ graceMs: 500 });
+  resolveFirst();
+  await assert.rejects(running, /AUTOMATION_CLAIM_RELEASE_FAILED: release failure/);
+  await shutdown;
+  assert.deepEqual(actions, ['release-first']);
+  assert.deepEqual(transitions.map(([workItemId]) => workItemId), ['release-first']);
+  assert.equal(worker.status.metrics.relinquished, 0);
+  assert.equal(worker.ready, false);
+});
+
+test('worker surfaces a durable transition persistence failure for lease recovery instead of reporting a false outcome', async () => {
+  const transitions = [];
+  const repository = {
+    checkReady: async () => true,
+    recoverStale: async () => [],
+    claim: async () => [{ id: 'persist-failure', owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: 'persist-lease', attempt_count: 1, input: {} }],
+    markDispatching: async () => ({ allowed: true }),
+    transition: async (...args) => { transitions.push(args); throw new Error('database temporarily unavailable'); },
+  };
+  const worker = createWorker({ workerId: 'persistence-worker', repositoryApi: repository, actionResolver: () => async () => ({ safeMetadata: { ok: true } }) });
+  await worker.start();
+  await assert.rejects(worker.runOnce(), /database temporarily unavailable/);
+  assert.equal(transitions.length, 2);
+  assert.equal(worker.status.metrics.completed, 0);
 });
