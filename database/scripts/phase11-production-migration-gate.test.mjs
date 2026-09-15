@@ -79,9 +79,12 @@ test('clean contiguous predecessor state allows 35 and preserves a read-only ins
   const { result, client, output } = await runWithLedger();
   assert.equal(result.stopped, false);
   assert.deepEqual(result.report.pending.map(({ version }) => version), ['20260810000035', '20260810000036']);
-  assert.deepEqual(output.slice(-3), [
+  assert.deepEqual(output.slice(-6), [
     'PHASE11_LEDGER 20260810000035 pending',
     'PHASE11_LEDGER 20260810000036 pending',
+    'PHASE11_LEDGER 20260810000038 pending',
+    'PHASE11_LEDGER 20260810000039 pending',
+    'PHASE11_LEDGER 20260810000040 pending',
     'PHASE11_LEDGER 20260810000037 absent',
   ]);
   assert.ok(client.queries.includes('BEGIN READ ONLY'));
