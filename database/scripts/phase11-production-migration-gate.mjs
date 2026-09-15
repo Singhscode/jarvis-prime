@@ -32,6 +32,21 @@ export const PHASE11_PRODUCTION_MIGRATIONS = Object.freeze([
     file: '20260810000036_harden_phase11_p0_controls.sql',
     sha256: 'b35bb3aed105ddfd9cdd053877b0f95d228ba262bd2f5a1bd71a58d092e0812b',
   }),
+  Object.freeze({
+    version: '20260810000038',
+    file: '20260810000038_add_automation_resource_trigger_contract.sql',
+    sha256: '9efb3ba4b524ed67f45ded904aa8355687adbef7ee6a131829a456931e16fa24',
+  }),
+  Object.freeze({
+    version: '20260810000039',
+    file: '20260810000039_complete_core_automation_engine.sql',
+    sha256: '7d8d4fa1faae05622e56d861e4577797ae18b9f08f4cd9bfc7d5c7165672dccb',
+  }),
+  Object.freeze({
+    version: '20260810000040',
+    file: '20260810000040_harden_automation_worker_claim_drain.sql',
+    sha256: '3ab75d24d26fd2923b277b641c16bc86ff5a3f7c2199a336e8de6f84ba6d7914',
+  }),
 ]);
 
 export const PHASE11_STAGING_ONLY_MIGRATION = Object.freeze({

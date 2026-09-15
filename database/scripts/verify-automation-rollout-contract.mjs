@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
-const AUTOMATION_MIGRATION_CANDIDATE = /^202608100000(?:2[3-9]|3[01]|3[5-6])_.+\.sql$/;
+const AUTOMATION_MIGRATION_CANDIDATE = /^202608100000(?:2[3-9]|3[01]|3[5-6]|38|39|40)_.+\.sql$/;
 
 export const APPROVED_AUTOMATION_MIGRATIONS = Object.freeze([
   '20260810000023_add_automation_control_plane.sql',
@@ -19,6 +19,9 @@ export const APPROVED_AUTOMATION_MIGRATIONS = Object.freeze([
   '20260810000031_add_automation_operational_health.sql',
   '20260810000035_complete_phase11_local_candidate_controls.sql',
   '20260810000036_harden_phase11_p0_controls.sql',
+  '20260810000038_add_automation_resource_trigger_contract.sql',
+  '20260810000039_complete_core_automation_engine.sql',
+  '20260810000040_harden_automation_worker_claim_drain.sql',
 ]);
 export const PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS = APPROVED_AUTOMATION_MIGRATIONS;
 
@@ -50,10 +53,10 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   }
   const manifestFiles = Array.isArray(contract.migrations) ? contract.migrations.map(({ file }) => file) : [];
   if (!sameOrderedList(manifestFiles, APPROVED_AUTOMATION_MIGRATIONS)) {
-    fail(errors, 'migration manifest must exactly match the unified automation chain (20260810000023–31, 35, and 36)');
+    fail(errors, 'migration manifest must exactly match the unified automation chain (20260810000023–31, 35, 36, 38, 39, 40)');
   }
   if (!sameOrderedList(contract.productionApprovedMigrations, PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS)) {
-    fail(errors, 'unified automation migration approval must exactly end with 20260810000031 → 20260810000035 → 20260810000036');
+    fail(errors, 'unified automation migration approval must exactly end with 20260810000031 → 20260810000035 → 20260810000036 → 20260810000038 → 20260810000039 → 20260810000040');
   }
 
   const expected = new Set(APPROVED_AUTOMATION_MIGRATIONS);
