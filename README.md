@@ -152,6 +152,14 @@ apps/api/src/
 - **Backend:** Deploy `apps/api/` to any Node.js 18+ host
 - **Database:** Supabase (PostgreSQL) — SQL source of truth at [`database/`](./database/); apply schemas in the documented order
 
+### Phase 11 production worker first-image bootstrap
+
+The first approved production worker image is a one-time, manually dispatched, ACR-push-only bootstrap. Its authoritative production repository name is `phase11-automation-worker`; the protected `jarvis-prime-api / production` Environment variable `PRODUCTION_WORKER_IMAGE_REPOSITORY` must equal that exact value. A successful production API deployment through workflow `04-deploy-azure-api.yml` must exist for the same reviewed 40-character lowercase SHA before the bootstrap can authenticate to Azure.
+
+The bootstrap builds the root `Dockerfile` and pushes only `<production-acr>/phase11-automation-worker:sha-<reviewed-sha>`. The reviewed `infrastructure/aca/production.bicep` then consumes that immutable reference as its mandatory `workerImage` parameter to create the ACA environment and worker. Once the worker has a ready ACA baseline, workflow `08-deploy-aca-production.yml` remains the normal image-only deployment mechanism.
+
+The bootstrap never uses `latest`, staging, public, placeholder, or `INTERNAL_FAKE` images, and never provisions ACA, applies Bicep, or changes identities, RBAC, secrets, databases, migrations, or automation. It documents no secret values; the required production OIDC identity, ACR push role, and protected Environment secrets remain separate platform prerequisites.
+
 ---
 
 ## License

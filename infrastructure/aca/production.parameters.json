@@ -1,0 +1,20 @@
+{
+  "contentVersion": "1.0.0.0",
+  "_comment": "NON-SECRET production placeholders only. Replace <...> only through an approved human-operated production provisioning change. logAnalyticsSharedKey and all Supabase secret VALUES remain out-of-band; the two Supabase URI fields are Key Vault references, not secret values.",
+  "parameters": {
+    "location": { "value": "<PRODUCTION_AZURE_REGION>" },
+    "managedEnvironmentName": { "value": "<PRODUCTION_ACA_ENVIRONMENT_NAME>" },
+    "workerAppName": { "value": "<PRODUCTION_WORKER_CONTAINER_APP_NAME>" },
+    "logAnalyticsCustomerId": { "value": "<PRODUCTION_LOG_ANALYTICS_CUSTOMER_ID_GUID>" },
+    "acrLoginServer": { "value": "<PRODUCTION_ACR_LOGIN_SERVER>" },
+    "workerImage": { "value": "<PRODUCTION_ACR_LOGIN_SERVER>/<WORKER_IMAGE_REPOSITORY>:sha-<40_LOWERCASE_REVIEWED_SHA>" },
+    "userAssignedIdentityResourceId": { "value": "<PRODUCTION_USER_ASSIGNED_IDENTITY_RESOURCE_ID>" },
+    "supabaseUrlSecretUri": { "value": "https://<PRODUCTION_KEY_VAULT_NAME>.vault.azure.net/secrets/supabase-url" },
+    "supabaseServiceRoleKeySecretUri": { "value": "https://<PRODUCTION_KEY_VAULT_NAME>.vault.azure.net/secrets/supabase-service-role-key" },
+    "automationWorkerId": { "value": "phase11-worker-production-1" },
+    "automationWorkerHealthPort": { "value": 8080 },
+    "automationWorkerDrainGraceMs": { "value": 30000 },
+    "workerCpu": { "value": "0.25" },
+    "workerMemory": { "value": "0.5Gi" }
+  }
+}

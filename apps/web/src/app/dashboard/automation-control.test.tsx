@@ -158,11 +158,25 @@ describe('Owner automation control plane', () => {
     await user.click(screen.getByRole('button', { name: 'Emergency Stop' }));
     const confirm = (await screen.findAllByRole('button', { name: 'Emergency Stop' })).at(-1) as HTMLElement;
     await user.click(confirm);
-    const control = bodyOf(fetch, '/api/automation/controls', 'PUT');
-    expect(control.body).toEqual({
+    expect(bodyOf(fetch, '/api/automation/controls', 'PUT').body).toEqual({
       scopeType: 'OWNER', scopeId: 'OWNER', paused: false, emergencyStop: true, reasonCode: 'OWNER_EMERGENCY_STOP',
     });
-    expect(control.init?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) });
+    expect(bodyOf(fetch, '/api/automation/controls', 'PUT').init?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) });
+  });
+
+  it('includes idempotency keys for Owner pause and clear controls', async () => {
+    const user = userEvent.setup();
+    const fetch = mockApi();
+    render(<DashboardLayout><OwnerAutomationControlWorkspace /></DashboardLayout>);
+    await user.click(await screen.findByRole('tab', { name: 'Controls' }));
+    await user.click(screen.getByRole('button', { name: 'Pause new work' }));
+    await screen.findByText('Owner scope paused.');
+    await user.click(screen.getByRole('button', { name: 'Clear owner controls' }));
+    await screen.findByText('Owner scope controls cleared.');
+    const controls = (fetch.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit?]>)
+      .filter(([url, init]) => url.toString().endsWith('/api/automation/controls') && init?.method === 'PUT');
+    expect(controls).toHaveLength(2);
+    for (const [, init] of controls) expect(init?.headers).toMatchObject({ 'Idempotency-Key': expect.any(String) });
   });
 
   it('surfaces the safe backend error without leaking internals', async () => {

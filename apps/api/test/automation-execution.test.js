@@ -10,7 +10,7 @@ import { getAutomationWorkerRuntimeConfig } from '../src/workers/automation-work
 import { createAutomationWorkerHealthServer, workerReadinessView } from '../src/workers/automation-worker.health.js';
 
 test('automation contracts allow only fixed actions, legal transitions, and deterministic safe retry classification', () => {
-  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
+  assert.deepEqual(ACTION_CODES, ['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_INTERNAL_FAKE', 'ACT_APOLLO_SEARCH']);
   assert.equal(assertActionCode('ACT_ASSIGN'), 'ACT_ASSIGN');
   assert.throws(() => assertActionCode('ACT_EMAIL'), /AUTOMATION_ACTION_DISABLED/);
   assert.equal(assertTransition('RUNNING', 'COMPLETED'), 'COMPLETED');
@@ -78,6 +78,10 @@ test('fixed action registry delegates only to the existing CRM and Communication
   await actions.ACT_TASK({ ...base, input: { mode: 'CREATE', projectId: 'project-1', name: 'Follow up' } });
   await actions.ACT_NOTIFY({ ...base, input: { mode: 'CREATE_THREAD', subject: 'Status', body: 'Update', participants: [{ kind: 'employee', employeeCode: 'JP-EMP-000001' }] } });
   await actions.ACT_NOTIFY({ ...base, actorUserId: 'employee-1', actorKind: 'employee', input: { mode: 'SEND_MESSAGE', threadId: 'thread-1', body: 'Update' } });
+  const beforeCanary = calls.length;
+  assert.deepEqual(await actions.ACT_INTERNAL_FAKE({ ...base, input: {} }), { safeMetadata: { mode: 'INTERNAL_FAKE_CANARY' } });
+  assert.equal(calls.length, beforeCanary);
+  await assert.rejects(actions.ACT_INTERNAL_FAKE({ ...base, input: { provider: 'APOLLO' } }), /AUTOMATION_INVALID_INTERNAL_FAKE_INPUT/);
   assert.deepEqual(calls, [
     ['updateTask', 'owner-1', 'project-1', 'task-1', { assigned_user_id: 'employee-1' }],
     ['updateTask', 'owner-1', 'project-1', 'task-1', { completed: true }],
@@ -148,6 +152,32 @@ test('durable schedule materializer serializes database scheduling and stops saf
   assert.equal(scheduler.running, false);
   assert.throws(() => createDurableScheduleMaterializer(), /AUTOMATION_INVALID_SCHEDULE_REPOSITORY/);
   assert.throws(() => createDurableScheduleMaterializer({ repositoryApi: { materializeSchedules: async () => {} }, batch: 26 }), /AUTOMATION_INVALID_SCHEDULE_BATCH/);
+  assert.throws(() => createDurableScheduleMaterializer({ repositoryApi: { materializeSchedules: async () => {} }, onError: 'not-a-function' }), /AUTOMATION_INVALID_SCHEDULE_ERROR_HANDLER/);
+});
+
+test('durable schedule materializer reports a rejected tick, re-arms once, recovers, and stops', async () => {
+  const scheduled = []; const failures = []; let calls = 0;
+  const scheduler = createDurableScheduleMaterializer({
+    repositoryApi: { materializeSchedules: async () => { calls += 1; if (calls === 1) throw new Error('transient materialization failure'); } },
+    intervalMs: 1000,
+    sleep: (callback) => { scheduled.push(callback); return scheduled.length; },
+    onError: (error) => failures.push(error.message),
+  });
+
+  scheduler.start();
+  await scheduled.shift()();
+  assert.equal(calls, 1);
+  assert.deepEqual(failures, ['transient materialization failure']);
+  assert.equal(scheduled.length, 1);
+
+  await scheduled.shift()();
+  assert.equal(calls, 2);
+  assert.equal(scheduled.length, 1);
+
+  scheduler.stop();
+  await scheduled.shift()();
+  assert.equal(calls, 2);
+  assert.equal(scheduler.running, false);
 });
 
 test('worker blocks startup on an incompatible durable execution contract', async () => {

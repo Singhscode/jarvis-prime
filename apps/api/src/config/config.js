@@ -13,61 +13,42 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Minimal .env loader with environment-specific support (avoids adding a dependency).
-// Loads in order: .env.{NODE_ENV} → .env (allows overrides per environment)
-function loadEnvFile() {
-  const nodeEnv = process.env.NODE_ENV || 'development';
-  const baseDir = path.join(__dirname, '..', '..');
-  
-  // Files to try in order (later ones override earlier ones)
-  const filesToLoad = [
-    path.join(baseDir, '.env'),                    // base defaults (committed)
-    path.join(baseDir, `.env.${nodeEnv}`),         // environment-specific (committed for dev/test)
-  ];
-
-  // Helper to parse and load a single .env file
-  function parseEnvFile(filePath) {
-    if (!fs.existsSync(filePath)) return 0;
-    
-    const raw = fs.readFileSync(filePath, 'utf8');
-    let count = 0;
-    
-    for (const line of raw.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      
-      const eq = trimmed.indexOf('=');
-      if (eq === -1) continue;
-      
-      const key = trimmed.slice(0, eq).trim();
-      let val = trimmed.slice(eq + 1).trim();
-      
-      // Strip surrounding quotes
-      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-        val = val.slice(1, -1);
-      }
-      
-      // Only set if not already set (env vars take precedence over files)
-      if (process.env[key] === undefined) {
-        process.env[key] = val;
-        count++;
-      }
+// Minimal deterministic environment loader (avoids adding a dependency).
+// Precedence: explicit process/runtime injection > .env.{NODE_ENV} > .env > defaults.
+// File-derived values may override earlier file-derived values, but never an
+// explicit value that was present before loading began.
+function parseEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return {};
+  const values = {};
+  for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let value = trimmed.slice(eq + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
     }
-    
-    return count;
+    values[key] = value;
   }
-
-  // Load all files in order
-  for (const filePath of filesToLoad) {
-    const count = parseEnvFile(filePath);
-    if (count > 0) {
-      const filename = path.basename(filePath);
-      // Silently load (production is usually noisy already)
-    }
-  }
+  return values;
 }
 
-loadEnvFile();
+export function loadRuntimeEnvironment({ target = process.env, baseDir = path.join(__dirname, '..', '..') } = {}) {
+  const explicitKeys = new Set(Object.keys(target));
+  const nodeEnv = target.NODE_ENV || 'development';
+  const fileValues = {
+    ...parseEnvFile(path.join(baseDir, '.env')),
+    ...parseEnvFile(path.join(baseDir, `.env.${nodeEnv}`)),
+  };
+  for (const [key, value] of Object.entries(fileValues)) {
+    if (!explicitKeys.has(key)) target[key] = value;
+  }
+  return target;
+}
+
+loadRuntimeEnvironment();
 
 const env = { ...process.env };
 
@@ -99,6 +80,7 @@ export const config = {
   // Phase 11 external reads stay fail-closed until an explicit server-side activation.
   // The durable Apollo owner configuration is independently disabled by default.
   phase11ApolloReadEnabled: bool(env.PHASE11_APOLLO_READ_ENABLED, false),
+  phase11RuntimeTarget: env.PHASE11_RUNTIME_TARGET || '',
 
   // Authentication (JWT — user-facing auth layer)
   jwtSecret: env.JWT_SECRET || '',

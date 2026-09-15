@@ -1,0 +1,212 @@
+name: Deploy — Phase 11 Worker (ACA Production)
+
+# Manual, image-only production worker release. This workflow never runs a
+# migration, provisions ACA resources, changes identity/secrets/probes/scale, or
+# enables any provider. Bicep owns configuration; platform approval owns its use.
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: Exact reviewed implementation SHA to build (40 lowercase hex characters).
+        required: true
+        type: string
+      api_release_sha:
+        description: Exact SHA recorded by the successful paired production API release.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aca-worker-production
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build paired worker image and update production worker
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # This protected Environment owns production OIDC credentials and resource
+    # identifiers; none are committed in this workflow.
+    environment: jarvis-prime-api / production
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_PRODUCTION_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_PRODUCTION_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_PRODUCTION_SUBSCRIPTION_ID }}
+      ACR_LOGIN_SERVER: ${{ vars.PRODUCTION_ACR_LOGIN_SERVER }}
+      ACR_NAME: ${{ vars.PRODUCTION_ACR_NAME }}
+      RESOURCE_GROUP: ${{ vars.PRODUCTION_RESOURCE_GROUP }}
+      CONTAINER_APP_NAME: ${{ vars.PRODUCTION_WORKER_CONTAINER_APP }}
+      IMAGE_REPOSITORY: ${{ vars.PRODUCTION_WORKER_IMAGE_REPOSITORY }}
+
+    steps:
+      - name: Validate protected production configuration and SHA pairing
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID ACR_LOGIN_SERVER ACR_NAME RESOURCE_GROUP CONTAINER_APP_NAME IMAGE_REPOSITORY; do
+            if [[ -z "${!key:-}" ]]; then missing+=("$key"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required protected production configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+          for sha in "${{ inputs.git_sha }}" "${{ inputs.api_release_sha }}"; do
+            if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Both SHA inputs must be full 40-character lowercase commit SHAs." >&2
+              exit 1
+            fi
+          done
+          if [[ "${{ inputs.git_sha }}" != "${{ inputs.api_release_sha }}" ]]; then
+            echo "Refusing worker release: git_sha must equal the paired production API release SHA." >&2
+            exit 1
+          fi
+          for value in "$ACR_LOGIN_SERVER" "$ACR_NAME" "$RESOURCE_GROUP" "$CONTAINER_APP_NAME"; do
+            if [[ "$(tr '[:upper:]' '[:lower:]' <<< "$value")" == *"staging"* ]]; then
+              echo "Refusing to run: a production worker identifier references staging." >&2
+              exit 1
+            fi
+          done
+
+      - name: Check out the exact reviewed SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require trusted main source and paired API deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Production worker deployment is permitted only from refs/heads/main; got ${GITHUB_REF}." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main; then
+            echo "Production worker SHA ${{ inputs.git_sha }} is not reachable from origin/main." >&2
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "${{ inputs.git_sha }}" ]]; then
+            echo "Checked-out SHA ($actual) does not match requested SHA (${{ inputs.git_sha }})." >&2
+            exit 1
+          fi
+          api_runs="repos/${GITHUB_REPOSITORY}/actions/workflows/04-deploy-azure-api.yml/runs?head_sha=${{ inputs.api_release_sha }}&status=completed&per_page=100"
+          successful_api_runs="$(gh api "$api_runs" --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+          if (( successful_api_runs < 1 )); then
+            echo "No successful production API deployment workflow was found for ${{ inputs.api_release_sha }}." >&2
+            exit 1
+          fi
+          {
+            echo "## Phase 11 production artifact pairing"
+            echo "- API release SHA: \`${{ inputs.api_release_sha }}\`"
+            echo "- Worker image source SHA: \`$actual\`"
+            echo "- Successful API deployment workflow evidence: verified"
+            echo "- Pairing result: exact match"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      # Read-only evidence only. A known-ready baseline is required before an
+      # image mutation so a failed future release has an auditable, human-reviewed
+      # recovery reference. This workflow never rolls back automatically.
+      - name: Capture ready worker baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          show_app() {
+            az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP"
+          }
+          baseline_revision="$(show_app --query 'properties.latestRevisionName' -o tsv)"
+          baseline_ready_revision="$(show_app --query 'properties.latestReadyRevisionName' -o tsv)"
+          baseline_image="$(show_app --query 'properties.template.containers[?name==`automation-worker`].image | [0]' -o tsv)"
+          if [[ -z "$baseline_revision" || -z "$baseline_ready_revision" || -z "$baseline_image" || "$baseline_revision" != "$baseline_ready_revision" ]]; then
+            echo 'Refusing worker release: no unambiguous currently-ready worker baseline.' >&2
+            exit 1
+          fi
+          {
+            echo "BASELINE_REVISION=$baseline_revision"
+            echo "BASELINE_IMAGE=$baseline_image"
+          } >> "$GITHUB_ENV"
+          {
+            echo "- Worker baseline ready revision: \`$baseline_ready_revision\`"
+            echo "- Worker baseline image: \`$baseline_image\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Authenticate to the production Azure Container Registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name "$ACR_NAME"
+
+      - name: Build and push immutable paired worker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:sha-${{ inputs.git_sha }}"
+          echo "IMAGE_REF=$image" >> "$GITHUB_ENV"
+          docker build --file Dockerfile --tag "$image" --label "org.opencontainers.image.revision=${{ inputs.git_sha }}" .
+          docker push "$image"
+
+      - name: Update only the production worker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          az containerapp update --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --image "$IMAGE_REF"
+
+      # ACA readiness is authoritative here: the ingress-disabled worker's local
+      # /ready probe passes only after compatibility and stale-lease recovery.
+      - name: Verify desired worker revision is ACA-ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 600))
+          latest_revision=''
+          ready_revision=''
+          observed_image=''
+          while (( SECONDS < deadline )); do
+            latest_revision="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.latestRevisionName' -o tsv)"
+            ready_revision="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.latestReadyRevisionName' -o tsv)"
+            observed_image="$(az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" --query 'properties.template.containers[?name==`automation-worker`].image | [0]' -o tsv)"
+            if [[ -n "$latest_revision" && "$latest_revision" == "$ready_revision" && "$observed_image" == "$IMAGE_REF" ]]; then
+              {
+                echo "- Worker desired image: \`$IMAGE_REF\`"
+                echo "- Worker ACA-ready revision: \`$ready_revision\`"
+                echo "- Worker readiness result: exact desired image is ACA-ready"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          {
+            echo "- Worker desired image: \`$IMAGE_REF\`"
+            echo "- Worker observed latest revision: \`${latest_revision:-none}\`"
+            echo "- Worker observed ready revision: \`${ready_revision:-none}\`"
+            echo "- Worker observed image: \`${observed_image:-none}\`"
+            echo "- Worker readiness result: timed out; no automatic rollback was attempted"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo 'Worker update did not become ACA-ready with the desired image within ten minutes.' >&2
+          exit 1
+
+      - name: Report constrained release boundary
+        shell: bash
+        run: |
+          echo "Production worker image updated and ACA-readiness verified: $IMAGE_REF"
+          echo "Baseline evidence was recorded for an authorized manual recovery decision; no rollback was attempted."
+          echo "No migrations, secret changes, configuration changes, provider activation, or resource provisioning were performed."

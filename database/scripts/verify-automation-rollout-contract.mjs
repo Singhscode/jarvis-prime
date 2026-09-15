@@ -5,10 +5,32 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
-const AUTOMATION_MIGRATION = /^202608100000(2[3-9]|3[0-6])_.+\.sql$/;
+const AUTOMATION_MIGRATION_CANDIDATE = /^202608100000(?:2[3-9]|3[01]|3[5-6])_.+\.sql$/;
+
+export const APPROVED_AUTOMATION_MIGRATIONS = Object.freeze([
+  '20260810000023_add_automation_control_plane.sql',
+  '20260810000024_add_automation_execution_gap_controls.sql',
+  '20260810000025_fix_automation_daily_quota_window.sql',
+  '20260810000026_add_automation_recipe_policy_governance.sql',
+  '20260810000027_add_employee_run_pause_control.sql',
+  '20260810000028_add_automation_icp_score_policy.sql',
+  '20260810000029_add_automation_apollo_readonly_action.sql',
+  '20260810000030_add_automation_apollo_operational_readiness.sql',
+  '20260810000031_add_automation_operational_health.sql',
+  '20260810000035_complete_phase11_local_candidate_controls.sql',
+  '20260810000036_harden_phase11_p0_controls.sql',
+]);
+export const PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS = APPROVED_AUTOMATION_MIGRATIONS;
+
+export function isPhase11AutomationMigration(filename) {
+  return APPROVED_AUTOMATION_MIGRATIONS.includes(filename);
+}
 
 function fail(errors, message) { errors.push(message); }
 function sha256(value) { return createHash('sha256').update(value).digest('hex'); }
+function sameOrderedList(actual, expected) {
+  return Array.isArray(actual) && actual.length === expected.length && actual.every((entry, index) => entry === expected[index]);
+}
 
 /**
  * Static repository-only release gate. It intentionally runs no child processes,
@@ -26,16 +48,19 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   if (contract.compatibility?.registryVersion !== 'AUTOMATION_REGISTRY_V1' || contract.compatibility?.workerVersion !== 'AUTOMATION_WORKER_V1') {
     fail(errors, 'compatibility versions do not match the durable worker contract');
   }
-  if (!Array.isArray(contract.migrations) || contract.migrations.length !== 11) fail(errors, 'exactly the eleven approved local candidate migrations (20260810000023–31, 35, and 36) are required');
+  const manifestFiles = Array.isArray(contract.migrations) ? contract.migrations.map(({ file }) => file) : [];
+  if (!sameOrderedList(manifestFiles, APPROVED_AUTOMATION_MIGRATIONS)) {
+    fail(errors, 'migration manifest must exactly match the unified automation chain (20260810000023–31, 35, and 36)');
+  }
+  if (!sameOrderedList(contract.productionApprovedMigrations, PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS)) {
+    fail(errors, 'unified automation migration approval must exactly end with 20260810000031 → 20260810000035 → 20260810000036');
+  }
 
-  const expected = new Set(); let previous = '';
-  for (const entry of contract.migrations || []) {
-    if (!entry || typeof entry.file !== 'string' || !AUTOMATION_MIGRATION.test(entry.file) || !/^[a-f0-9]{64}$/.test(entry.sha256 || '')) {
+  const expected = new Set(APPROVED_AUTOMATION_MIGRATIONS);
+  for (const [index, entry] of (contract.migrations || []).entries()) {
+    if (!entry || entry.file !== APPROVED_AUTOMATION_MIGRATIONS[index] || !/^[a-f0-9]{64}$/.test(entry.sha256 || '')) {
       fail(errors, 'migration manifest contains an invalid entry'); continue;
     }
-    const version = entry.file.slice(0, 14);
-    if (expected.has(entry.file) || version <= previous) fail(errors, `migration manifest is duplicated or out of order: ${entry.file}`);
-    expected.add(entry.file); previous = version;
     try {
       const source = await read(path.join('database', 'supabase', 'migrations', entry.file));
       if (sha256(source) !== entry.sha256) fail(errors, `migration hash mismatch: ${entry.file}`);
@@ -44,7 +69,7 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   }
 
   const migrationDir = path.join(root, 'database', 'supabase', 'migrations');
-  const discovered = (await readdir(migrationDir)).filter((name) => AUTOMATION_MIGRATION.test(name));
+  const discovered = (await readdir(migrationDir)).filter((name) => AUTOMATION_MIGRATION_CANDIDATE.test(name));
   for (const file of discovered) if (!expected.has(file)) fail(errors, `undeclared automation migration: ${file}`);
   for (const file of expected) if (!discovered.includes(file)) fail(errors, `declared automation migration is absent: ${file}`);
 
@@ -64,11 +89,11 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
   } catch (error) { fail(errors, `required deployment artifact is unavailable: ${error.message}`); }
 
   if (errors.length) throw new Error(`AUTOMATION_ROLLOUT_CONTRACT_INVALID:\n- ${errors.join('\n- ')}`);
-  return { migrations: [...expected], compatibility: contract.compatibility };
+  return { migrations: [...APPROVED_AUTOMATION_MIGRATIONS], productionMigrations: [...PRODUCTION_APPROVED_AUTOMATION_MIGRATIONS], compatibility: contract.compatibility };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   verifyAutomationRolloutContract().then((result) => {
-    console.log(`Automation rollout contract verified: ${result.migrations.length} migrations, ${result.compatibility.registryVersion}/${result.compatibility.workerVersion}`);
+    console.log(`Automation rollout contract verified: ${result.migrations.length} unified migrations; ${result.compatibility.registryVersion}/${result.compatibility.workerVersion}`);
   }).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }

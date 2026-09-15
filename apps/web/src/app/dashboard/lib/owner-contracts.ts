@@ -65,3 +65,31 @@ export type OwnerSettingsStatus = { asOf: string; api: OwnerSettingStatus; envir
 export type OwnerSearchResult = { id: string; label: string; detail?: string; href: string };
 export type OwnerSearchGroup = { type: string; status: 'available' | 'unavailable'; items: OwnerSearchResult[]; reason?: string };
 export type OwnerSearch = { asOf: string; groups: OwnerSearchGroup[] };
+
+export type SalesApprovalStatus = 'pending_review' | 'changes_required' | 'approved' | 'rejected' | 'stopped' | 'released_dry_run' | 'blocked';
+export type SalesApprovalCheck = { code: string; passed: boolean; message: string };
+export type SalesApproval = {
+  id: string;
+  clientId: string;
+  campaignId: string | null;
+  prospectId: string;
+  channel: 'email';
+  step: number;
+  revision: number;
+  recipient: { name: string; email: string };
+  clientName: string;
+  subject: string;
+  body: string;
+  contentHash: string;
+  evaluation: { passed: boolean; rulesVersion: string; checkedAt: string; checks: SalesApprovalCheck[] };
+  evidence: { source: 'apollo' | 'hunter' | 'manual'; reference: string; collectedAt: string; consentStatus: 'legitimate_interest' | 'opted_in'; consentBasis: string };
+  status: SalesApprovalStatus;
+  decisionAt: string | null;
+  decisionReason: string | null;
+  provider: { status: 'dry_run' | 'failed' | null; id: string | null; errorCode: string | null };
+  releasedAt: string | null;
+  stoppedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+export type SalesApprovalList = { mode: 'dry_run_only'; items: SalesApproval[] };

@@ -5,33 +5,48 @@ import { config } from '../../config/config.js';
 import { writeEmail } from '../../ai/prompts/personalizer.js';
 import { sendEmail as resendEmail } from '../../integrations/email-sender.js';
 import { alertEvent } from '../../integrations/notifications.js';
-import { insertMessage, insertEvent } from '../../database/db.js';
+import {
+  getProspectWithActiveClient,
+  insertMessage,
+  insertEvent,
+} from '../../database/db.js';
+
+function outreachError(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+async function resolveOutreachScope(reference) {
+  const scope = await getProspectWithActiveClient(reference?.id);
+  if (!scope) {
+    throw outreachError('OUTREACH_SCOPE_NOT_FOUND', 'Prospect is not available for outreach.');
+  }
+  return scope;
+}
 
 /**
- * Send a personalized cold email to a prospect.
+ * Send a personalized cold email using server-resolved prospect and client scope.
  */
-export async function sendEmail(prospect, step = 1, options = {}) {
+export async function sendEmail(prospectReference, step = 1, options = {}) {
   const { dryRun = config.dryRun } = options;
+  const { prospect, client } = await resolveOutreachScope(prospectReference);
 
-  if (!prospect?.email) {
-    throw new Error('Prospect email is required');
+  if (!prospect.email) {
+    throw outreachError('OUTREACH_EMAIL_MISSING', 'Prospect email is required.');
   }
 
-  // Generate personalized email via AI
-  const client = options.client || { name: config.fromName, icp_industries: ['B2B'] };
-  const emailContent = await writeEmail(step, prospect, client);
-
-  // Send via Resend
+  const emailContent = await writeEmail(step, prospect, client, { dryRun });
   const result = await resendEmail({
     to: prospect.email,
     subject: emailContent.subject,
     body: emailContent.body,
+    dryRun,
   });
 
-  // Log the message
   await insertMessage({
-    prospect_id: prospect.id || null,
-    client_id: client.id || null,
+    prospect_id: prospect.id,
+    client_id: client.id,
     channel: 'email',
     step,
     subject: emailContent.subject,
@@ -43,7 +58,7 @@ export async function sendEmail(prospect, step = 1, options = {}) {
   });
 
   if (result.status !== 'failed') {
-    await insertEvent({ prospect_id: prospect.id || null, type: 'sent', meta: { step, channel: 'email' } });
+    await insertEvent({ prospect_id: prospect.id, type: 'sent', meta: { step, channel: 'email' } });
   }
 
   return {
@@ -56,34 +71,26 @@ export async function sendEmail(prospect, step = 1, options = {}) {
   };
 }
 
-/**
- * Send a follow-up email.
- */
-export async function sendFollowup(prospect, step = 2, options = {}) {
-  // Follow-ups use the same pipeline, just with a higher step number
-  return sendEmail(prospect, step, options);
+export async function sendFollowup(prospectReference, step = 2, options = {}) {
+  return sendEmail(prospectReference, step, options);
 }
 
-/**
- * Send an alert via the notification hub.
- */
-export async function sendAlert(prospect, options = {}) {
-  const { dryRun = config.dryRun } = options;
-
+export async function sendAlert(prospectReference) {
+  const { prospect, client } = await resolveOutreachScope(prospectReference);
   const alertData = {
-    name: prospect?.full_name || prospect?.name || 'Unknown',
-    title: prospect?.title || '',
-    company: prospect?.company || '',
-    email: prospect?.email || '',
-    score: prospect?.icp_score || 0,
-    client: options.client?.name || '',
+    name: prospect.full_name || prospect.name || 'Unknown',
+    title: prospect.title || '',
+    company: prospect.company || '',
+    email: prospect.email || '',
+    score: prospect.icp_score || 0,
+    client: client.name || '',
   };
 
-  const type = prospect?.hot ? 'hot_lead' : 'positive_reply';
+  const type = prospect.hot ? 'hot_lead' : 'positive_reply';
   const result = await alertEvent(type, alertData);
 
   return {
-    prospect: prospect?.full_name || prospect?.name,
+    prospect: prospect.full_name || prospect.name,
     alertType: type,
     channels: result,
     sentAt: new Date().toISOString(),

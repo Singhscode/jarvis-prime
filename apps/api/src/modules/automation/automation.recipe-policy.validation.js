@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export const RECIPE_ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_APOLLO_SEARCH']);
+export const RECIPE_ACTION_CODES = Object.freeze(['ACT_ASSIGN', 'ACT_TASK', 'ACT_NOTIFY', 'ACT_INTERNAL_FAKE', 'ACT_APOLLO_SEARCH']);
 export const FIXED_POLICY_KEYS = Object.freeze(['POL_APPROVAL@V1', 'POL_LIMIT@V1']);
 export const DISABLED_POLICY_CODES = Object.freeze(['POL_REPLY']);
 export const RECIPE_LIFECYCLE_TRANSITIONS = Object.freeze(['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE', 'PAUSE', 'ARCHIVE']);

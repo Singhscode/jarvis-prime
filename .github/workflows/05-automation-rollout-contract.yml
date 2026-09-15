@@ -5,27 +5,47 @@ on:
     paths:
       - 'database/automation-rollout-contract.json'
       - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/scripts/verify-automation-rollout-contract.test.mjs'
+      - 'database/scripts/phase11-production-migration-gate.mjs'
+      - 'database/scripts/phase11-production-migration-gate.test.mjs'
       - 'database/supabase/migrations/**'
+      - 'documentation/operations/phase11-automation-rollout.md'
       - 'documentation/operations/phase11-worker-deployment-contract.md'
+      - 'infrastructure/aca/**'
+      - 'Dockerfile'
+      - '.dockerignore'
       - 'apps/api/src/workers/**'
       - 'apps/api/src/modules/automation/**'
       - 'apps/api/package.json'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/04-deploy-azure-api.yml'
       - '.github/workflows/05-automation-rollout-contract.yml'
+      - '.github/workflows/08-deploy-aca-production.yml'
+      - '.github/workflows/09-phase11-production-migration-gate.yml'
   push:
     branches: [main, develop]
     paths:
       - 'database/automation-rollout-contract.json'
       - 'database/scripts/verify-automation-rollout-contract.mjs'
+      - 'database/scripts/verify-automation-rollout-contract.test.mjs'
+      - 'database/scripts/phase11-production-migration-gate.mjs'
+      - 'database/scripts/phase11-production-migration-gate.test.mjs'
       - 'database/supabase/migrations/**'
+      - 'documentation/operations/phase11-automation-rollout.md'
       - 'documentation/operations/phase11-worker-deployment-contract.md'
+      - 'infrastructure/aca/**'
+      - 'Dockerfile'
+      - '.dockerignore'
       - 'apps/api/src/workers/**'
       - 'apps/api/src/modules/automation/**'
       - 'apps/api/package.json'
       - 'package.json'
       - 'package-lock.json'
+      - '.github/workflows/04-deploy-azure-api.yml'
       - '.github/workflows/05-automation-rollout-contract.yml'
+      - '.github/workflows/08-deploy-aca-production.yml'
+      - '.github/workflows/09-phase11-production-migration-gate.yml'
 
 permissions:
   contents: read
@@ -41,6 +61,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run verify:automation:rollout-contract
+      - run: npm run test:automation:rollout-contract
+      - run: npm run test:phase11:migration-gate
       - uses: supabase/setup-cli@v1
         with:
           version: 2.109.1

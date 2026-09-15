@@ -9,7 +9,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function run() {
   const runtime = getAutomationWorkerRuntimeConfig();
   const worker = createWorker({ workerId: runtime.workerId, ...runtime.workerOptions });
-  const materializer = createDurableScheduleMaterializer({ repositoryApi: repository, ...runtime.scheduleOptions });
+  const materializer = createDurableScheduleMaterializer({
+    repositoryApi: repository,
+    ...runtime.scheduleOptions,
+    onError: (error) => { console.error('Automation schedule materialization failed', { code: error?.code || 'AUTOMATION_SCHEDULE_MATERIALIZATION_FAILED' }); },
+  });
   const controller = new AbortController();
   const healthServer = runtime.healthPort === null
     ? null

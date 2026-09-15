@@ -1,0 +1,141 @@
+name: Bootstrap — Phase 11 First Production Worker Image
+
+# One-time, ACR-push-only bootstrap for the first approved production worker
+# image. It intentionally cannot provision or inspect ACA, apply Bicep, change
+# identities/RBAC/secrets, run migrations, or execute automation.
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: Exact reviewed implementation SHA to build (40 lowercase hex characters).
+        required: true
+        type: string
+      api_release_sha:
+        description: Exact SHA recorded by the successful paired production API release.
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: aca-worker-production-first-image-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  build-first-production-image:
+    name: Build and push the first paired production worker image
+    # This job-level gate prevents checkout, protected Environment access, and
+    # Azure OIDC login for any dispatch that is not on the canonical main ref.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_PRODUCTION_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_PRODUCTION_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_PRODUCTION_SUBSCRIPTION_ID }}
+      ACR_LOGIN_SERVER: ${{ vars.PRODUCTION_ACR_LOGIN_SERVER }}
+      ACR_NAME: ${{ vars.PRODUCTION_ACR_NAME }}
+      IMAGE_REPOSITORY: ${{ vars.PRODUCTION_WORKER_IMAGE_REPOSITORY }}
+
+    steps:
+      - name: Validate protected production configuration and SHA pairing
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for key in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID ACR_LOGIN_SERVER ACR_NAME IMAGE_REPOSITORY; do
+            if [[ -z "${!key:-}" ]]; then missing+=("$key"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            echo "Missing required protected production configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+          for sha in "${{ inputs.git_sha }}" "${{ inputs.api_release_sha }}"; do
+            if [[ ! "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Both SHA inputs must be full 40-character lowercase commit SHAs." >&2
+              exit 1
+            fi
+          done
+          if [[ "${{ inputs.git_sha }}" != "${{ inputs.api_release_sha }}" ]]; then
+            echo "Refusing bootstrap: git_sha must equal the paired production API release SHA." >&2
+            exit 1
+          fi
+          if [[ "$IMAGE_REPOSITORY" != "phase11-automation-worker" ]]; then
+            echo "Refusing bootstrap: PRODUCTION_WORKER_IMAGE_REPOSITORY must be phase11-automation-worker." >&2
+            exit 1
+          fi
+          for value in "$ACR_LOGIN_SERVER" "$ACR_NAME" "$IMAGE_REPOSITORY"; do
+            if [[ "$(tr '[:upper:]' '[:lower:]' <<< "$value")" == *"staging"* ]]; then
+              echo "Refusing to run: a production image identifier references staging." >&2
+              exit 1
+            fi
+          done
+
+      - name: Check out the exact reviewed SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require trusted main source and paired API deployment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "First production worker image bootstrap is permitted only from refs/heads/main; got ${GITHUB_REF}." >&2
+            exit 1
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main; then
+            echo "Production worker SHA ${{ inputs.git_sha }} is not reachable from origin/main." >&2
+            exit 1
+          fi
+
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "${{ inputs.git_sha }}" ]]; then
+            echo "Checked-out SHA ($actual) does not match requested SHA (${{ inputs.git_sha }})." >&2
+            exit 1
+          fi
+          api_runs="repos/${GITHUB_REPOSITORY}/actions/workflows/04-deploy-azure-api.yml/runs?head_sha=${{ inputs.api_release_sha }}&status=completed&per_page=100"
+          successful_api_runs="$(gh api "$api_runs" --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+          if (( successful_api_runs < 1 )); then
+            echo "No successful production API deployment workflow was found for ${{ inputs.api_release_sha }}." >&2
+            exit 1
+          fi
+          {
+            echo "## Phase 11 first production worker image bootstrap"
+            echo "- API release SHA: \`${{ inputs.api_release_sha }}\`"
+            echo "- Worker image source SHA: \`$actual\`"
+            echo "- Successful API deployment workflow evidence: verified"
+            echo "- Image target: \`${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:sha-$actual\`"
+            echo "- Bootstrap scope: ACR push only"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Authenticate to the production Azure Container Registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          az acr login --name "$ACR_NAME"
+
+      - name: Build and push the first immutable paired worker image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${ACR_LOGIN_SERVER}/${IMAGE_REPOSITORY}:sha-${{ inputs.git_sha }}"
+          docker build --file Dockerfile --tag "$image" --label "org.opencontainers.image.revision=${{ inputs.git_sha }}" .
+          docker push "$image"

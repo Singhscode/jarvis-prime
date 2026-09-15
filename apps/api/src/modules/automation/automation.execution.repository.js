@@ -19,9 +19,8 @@ export async function createTriggerRun(values) {
 }
 export async function createDailySchedule(values) {
   return result(await client().rpc('automation_create_daily_schedule', {
-    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_recipe_version: values.recipeVersionId,
-    p_configuration_hash: values.configurationSha256, p_action: values.actionCode, p_input: values.input,
-    p_timezone: values.timezone, p_local_time: values.localTime,
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_recipe_code: values.recipeCode,
+    p_input: values.input, p_timezone: values.timezone, p_local_time: values.localTime,
   }));
 }
 export async function materializeSchedules(limit = 25) { return result(await client().rpc('automation_materialize_schedules', { p_limit: limit })) || []; }
@@ -30,6 +29,9 @@ export async function heartbeat(workItemId, workerId, leaseToken, leaseSeconds) 
 export async function markDispatching(workItemId, workerId, leaseToken) { return result(await client().rpc('automation_mark_dispatching', { p_work: workItemId, p_worker: workerId, p_token: leaseToken })); }
 export async function transition(workItemId, workerId, leaseToken, nextState, reasonCode, metadata = {}, dueAt = null) {
   return result(await client().rpc('automation_transition_work', { p_work: workItemId, p_worker: workerId, p_token: leaseToken, p_expected: 'RUNNING', p_next: nextState, p_reason: reasonCode, p_result: metadata, p_due: dueAt }));
+}
+export async function relinquishUnstartedClaim(workItemId, workerId, leaseToken) {
+  return result(await client().rpc('automation_relinquish_unstarted_claim', { p_work: workItemId, p_worker: workerId, p_token: leaseToken }));
 }
 export async function createDependentWork(ownerUserId, parentWorkItemId, sequence, input, dueAt = null) {
   return result(await client().rpc('automation_create_dependent_work', { p_owner: ownerUserId, p_parent: parentWorkItemId, p_sequence: sequence, p_input: input, p_due: dueAt }));
@@ -45,6 +47,15 @@ export async function resolveFutureTrigger(values) {
     p_source_event: values.sourceEventId, p_recipe_code: values.recipeCode, p_input: values.input,
     p_due_at: values.dueAt, p_decision: values.decision, p_reason: values.reasonCode,
     p_payload_hash: values.payloadSha256,
+  }));
+}
+// Service-role-only internal integration boundary. It delegates to governed recipe
+// admission and therefore never supplies a version, action, provider, or policy result.
+export async function admitInternalResourceTrigger(values) {
+  return result(await client().rpc('automation_admit_internal_resource_trigger', {
+    p_owner: values.ownerUserId, p_actor: values.actorUserId, p_source_event: values.sourceEventId,
+    p_recipe_code: values.recipeCode, p_resource_reference: values.resourceReference,
+    p_input: values.input, p_due_at: values.dueAt,
   }));
 }
 export async function cancelRun(ownerUserId, runId, actorUserId, reasonCode = 'OWNER_CANCELLED') { return result(await client().rpc('automation_cancel_run', { p_owner: ownerUserId, p_run: runId, p_actor: actorUserId, p_reason: reasonCode })); }
