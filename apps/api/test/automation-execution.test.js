@@ -212,7 +212,7 @@ test('worker blocks startup on an incompatible durable execution contract', asyn
   };
   const worker = createWorker({ workerId: 'worker-compatible', repositoryApi: compatible });
   await worker.start();
-  assert.deepEqual(calls[0], ['ready', 'AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V2']);
+  assert.deepEqual(calls[0], ['ready', 'AUTOMATION_REGISTRY_V1', 'AUTOMATION_WORKER_V1']);
   assert.deepEqual(worker.status.compatibility, { ready: true, schema_version: 2 });
   await worker.shutdown({ graceMs: 1 });
 
@@ -295,10 +295,10 @@ test('worker health probe reports local liveness and existing-worker readiness w
     assert.equal(live.status, 200); assert.deepEqual(await live.json(), { alive: true });
     let ready = await fetch(`http://127.0.0.1:${port}/ready`);
     assert.equal(ready.status, 503); assert.equal((await ready.json()).ready, false);
-    status = { ready: true, draining: false, active: 2, compatibility: { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V2', secret: 'must-not-appear' } };
+    status = { ready: true, draining: false, active: 2, compatibility: { ready: true, schema_version: 2, registry_version: 'AUTOMATION_REGISTRY_V1', worker_version: 'AUTOMATION_WORKER_V1', secret: 'must-not-appear' } };
     ready = await fetch(`http://127.0.0.1:${port}/ready`);
     const body = await ready.json();
-    assert.equal(ready.status, 200); assert.deepEqual(body, { ready: true, draining: false, active: 2, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V2' }, observedAt: '2026-08-30T00:00:00.000Z' });
+    assert.equal(ready.status, 200); assert.deepEqual(body, { ready: true, draining: false, active: 2, compatibility: { ready: true, schemaVersion: 2, registryVersion: 'AUTOMATION_REGISTRY_V1', workerVersion: 'AUTOMATION_WORKER_V1' }, observedAt: '2026-08-30T00:00:00.000Z' });
     assert.doesNotMatch(JSON.stringify(body), /secret|workerId|lease|input/i);
     const draining = workerReadinessView({ ready: true, draining: true, active: 0 });
     assert.equal(draining.ready, false); assert.equal(draining.draining, true); assert.equal(draining.active, 0); assert.equal(draining.compatibility, null);

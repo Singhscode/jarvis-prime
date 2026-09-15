@@ -73,11 +73,11 @@ test('accepts the unified automation chain without depending on the retained can
 
   const result = await verifyAutomationRolloutContract(root);
 
-  assert.equal(result.migrations.length, 11);
+  assert.equal(result.migrations.length, 14);
   assert.deepEqual(result.migrations.slice(-3), [
-    '20260810000031_add_automation_operational_health.sql',
-    '20260810000035_complete_phase11_local_candidate_controls.sql',
-    '20260810000036_harden_phase11_p0_controls.sql',
+    '20260810000038_add_automation_resource_trigger_contract.sql',
+    '20260810000039_complete_core_automation_engine.sql',
+    '20260810000040_harden_automation_worker_claim_drain.sql',
   ]);
   assert.deepEqual(result.productionMigrations, result.migrations);
   assert.equal(isPhase11AutomationMigration('20260810000037_add_phase11_internal_fake_canary.sql'), false);
