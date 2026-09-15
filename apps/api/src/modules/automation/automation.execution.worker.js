@@ -1,5 +1,5 @@
 import * as repository from './automation.execution.repository.js';
-import { getAction } from './automation.execution.actions.js';
+import { getAction, normalizeActionMetadata, normalizeActionOutcome } from './automation.execution.actions.js';
 import { AUTOMATION_REGISTRY_VERSION, AUTOMATION_WORKER_VERSION, bounded, classifyError, MAX, redactedError, retryDelayMs, workerIdentity } from './automation.execution.validation.js';
 import { createAutomationObservability } from './automation.execution.observability.js';
 
@@ -107,7 +107,7 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
       dispatched = true;
       heartbeat = startHeartbeat(work);
       const action = actionResolver(work.action_code, work.provider_code || 'INTERNAL');
-      const outcome = await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, runId: work.run_id, workItemId: work.id, correlationId: work.correlation_id, input: work.input });
+      const outcome = normalizeActionOutcome(await action({ ownerUserId: work.owner_user_id, actorUserId: work.requested_by_user_id, actorKind: work.requested_by_kind, runId: work.run_id, workItemId: work.id, correlationId: work.correlation_id, input: work.input }));
       if (heartbeat.lost()) {
         const error = new Error('AUTOMATION_LEASE_LOST'); error.code = 'AUTOMATION_LEASE_LOST'; throw error;
       }
@@ -119,8 +119,10 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
         throw error;
       }
       const classified = classifyError(error, { afterDispatch: dispatched, knownOutcome: Boolean(error?.knownOutcome) });
-      const safeProviderResult = error?.safeMetadata && typeof error.safeMetadata === 'object' && !Array.isArray(error.safeMetadata)
-        ? error.safeMetadata : {};
+      let safeProviderResult = {};
+      if (error?.safeMetadata !== undefined) {
+        try { safeProviderResult = normalizeActionMetadata(error.safeMetadata); } catch { safeProviderResult = {}; }
+      }
       const dueAt = classified.state === 'RETRYABLE' ? new Date(Date.now() + retryDelayMs(work.attempt_count, work.id)).toISOString() : null;
       try {
         const persisted = await repositoryApi.transition(work.id, workerId, work.lease_token, classified.state, classified.reason, { ...redactedError(error), ...safeProviderResult }, dueAt);

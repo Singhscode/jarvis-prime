@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createActionRegistry } from '../src/modules/automation/automation.execution.actions.js';
+import { createActionRegistry, normalizeActionOutcome } from '../src/modules/automation/automation.execution.actions.js';
 import { ACTION_CODES, assertActionCode, assertTransition, classifyError, retryDelayMs } from '../src/modules/automation/automation.execution.validation.js';
 import { createDurableScheduleMaterializer, createEligibilityScheduler } from '../src/modules/automation/automation.execution.scheduler.js';
 import { createWorker } from '../src/modules/automation/automation.execution.worker.js';
@@ -19,6 +19,34 @@ test('automation contracts allow only fixed actions, legal transitions, and dete
   assert.deepEqual(classifyError({ code: 'VALIDATION_ERROR' }), { state: 'FAILED', reason: 'TERMINAL_DOMAIN_FAILURE' });
   assert.deepEqual(classifyError(new Error('unknown'), { afterDispatch: true }), { state: 'HUMAN_REVIEW', reason: 'POST_DISPATCH_UNCERTAIN' });
   assert.equal(retryDelayMs(2, 'same'), retryDelayMs(2, 'same'));
+});
+
+test('action outcomes are bounded, redact credential-like values, and preserve boolean condition fields', () => {
+  assert.deepEqual(normalizeActionOutcome({ safeMetadata: { shouldNotify: true, nested: { token: 'provider-secret', returnedCount: 2 } } }), {
+    safeMetadata: { shouldNotify: true, nested: { token: '[REDACTED]', returnedCount: 2 } },
+  });
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: { shouldNotify: 'true' } , extra: true }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: ['not-an-object'] }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+  assert.throws(() => normalizeActionOutcome({ safeMetadata: { invalid: () => true } }), /AUTOMATION_ACTION_OUTCOME_INVALID/);
+});
+
+test('worker persists only normalized action results and fails closed on malformed outcomes', async () => {
+  const transitions = [];
+  const work = (id) => ({ id, owner_user_id: 'owner-1', requested_by_user_id: 'owner-1', requested_by_kind: 'owner', action_code: 'ACT_TASK', lease_token: `lease-${id}`, attempt_count: 1, input: {} });
+  const repository = {
+    checkReady: async () => true, recoverStale: async () => [],
+    claim: async () => [work('normalized'), work('malformed')],
+    markDispatching: async () => ({ allowed: true }),
+    transition: async (...args) => { transitions.push(args); return { state: args[3] }; },
+  };
+  const worker = createWorker({ workerId: 'outcome-worker', concurrency: 1, repositoryApi: repository, actionResolver: () => async ({ workItemId }) => {
+    if (workItemId === 'normalized') return { safeMetadata: { shouldNotify: false, authorization: 'provider-credential', nested: { token: 'nested-credential' } } };
+    return { safeMetadata: 'malformed' };
+  } });
+  await worker.start();
+  assert.deepEqual(await worker.runOnce(), [{ id: 'normalized', state: 'COMPLETED' }, { id: 'malformed', state: 'HUMAN_REVIEW' }]);
+  assert.deepEqual(transitions[0].slice(3, 6), ['COMPLETED', 'ACTION_COMPLETED', { shouldNotify: false, authorization: '[REDACTED]', nested: { token: '[REDACTED]' } }]);
+  assert.deepEqual(transitions[1].slice(3, 6), ['HUMAN_REVIEW', 'AUTOMATION_ACTION_OUTCOME_INVALID', { code: 'AUTOMATION_ACTION_OUTCOME_INVALID' }]);
 });
 
 test('eligibility scheduler only wakes durable worker logic and never executes actions', async () => {

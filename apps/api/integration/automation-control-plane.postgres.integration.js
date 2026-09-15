@@ -673,6 +673,29 @@ describe('Phase 11 durable automation PostgreSQL control plane', { concurrency: 
     await cancel(employee.run_id); await cancel(admitted.run_id);
   });
 
+  test('compiles RESULT_BOOLEAN_EQUALS successors only from normalized boolean result metadata', async () => {
+    const code = recipeCode('BOOLEAN_RESULT');
+    const definition = governedDefinition(code);
+    definition.steps[1].condition = { type: 'RESULT_BOOLEAN_EQUALS', field: 'shouldNotify', equals: true };
+    const created = await call(db, 'automation_create_recipe', [ids.ownerA, ids.ownerA, code, JSON.stringify(definition), hash(jsonb(definition))]);
+    for (const transition of ['SUBMIT_REVIEW', 'APPROVE', 'ACTIVATE']) await call(db, 'automation_transition_recipe_lifecycle', [ids.ownerA, ids.ownerA, created.recipe_id, created.recipe_version_id, transition]);
+
+    const accepted = await admitGovernedRecipe({ recipe: { ...created, code, definition }, idempotency: key('boolean-result-accepted') });
+    const acceptedRoot = await claimFor(accepted.run_id, 'worker-boolean-accepted');
+    await call(db, 'automation_transition_work', [acceptedRoot.id, acceptedRoot.worker, acceptedRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: true, token: '[REDACTED]' }), null]);
+    const { rows: acceptedSuccessors } = await db.query(`select state from public.automation_work_items where run_id=$1 and sequence=2`, [accepted.run_id]);
+    assert.deepEqual(acceptedSuccessors, [{ state: 'WAITING' }]);
+
+    const declined = await admitGovernedRecipe({ recipe: { ...created, code, definition }, idempotency: key('boolean-result-declined') });
+    const declinedRoot = await claimFor(declined.run_id, 'worker-boolean-declined');
+    await call(db, 'automation_transition_work', [declinedRoot.id, declinedRoot.worker, declinedRoot.lease_token, 'RUNNING', 'COMPLETED', 'ACTION_COMPLETED', JSON.stringify({ shouldNotify: false }), null]);
+    const { rows: declinedSuccessors } = await db.query(`select state from public.automation_work_items where run_id=$1 and sequence=2`, [declined.run_id]);
+    assert.deepEqual(declinedSuccessors, []);
+    const { rows: events } = await db.query(`select event_code,reason_code from public.automation_run_events where run_id=$1 and event_code='RECIPE_CONDITION_NOT_MET'`, [declined.run_id]);
+    assert.deepEqual(events, [{ event_code: 'RECIPE_CONDITION_NOT_MET', reason_code: 'RESULT_BOOLEAN_EQUALS' }]);
+    await cancel(accepted.run_id); await cancel(declined.run_id);
+  });
+
   test('holds a Recipe requiring human review before any Step 2 dispatch without enabling external delivery', async () => {
     const recipe = await createGovernedRecipe({ humanReview: true });
     const admitted = await admitGovernedRecipe({ recipe, idempotency: key('governed-review') });

@@ -1,9 +1,64 @@
 import * as crm from '../crm/crm.service.js';
 import * as communications from '../communications/communications.service.js';
 import { communicationEmailDeliveryEnabled } from '../communications/communications.delivery.js';
-import { assertActionCode, assertObject } from './automation.execution.validation.js';
+import { assertActionCode, assertObject, byteLength, MAX } from './automation.execution.validation.js';
 import { config } from '../../config/config.js';
 import { APOLLO_ACTION_CODE, APOLLO_PROVIDER_CODE, createApolloReadOnlyAdapterRegistry } from './automation.apollo-read.adapter.js';
+
+const OUTCOME_FIELDS = Object.freeze(['safeMetadata']);
+const RESULT_KEY = /^[A-Za-z][A-Za-z0-9_]{0,60}$/;
+const SENSITIVE_RESULT_KEY = /pass(word)?|token|secret|authorization|cookie|header|credential|api_?key|payload|input|email|name/i;
+
+function outcomeInvalid() {
+  const error = new Error('AUTOMATION_ACTION_OUTCOME_INVALID');
+  error.code = 'AUTOMATION_ACTION_OUTCOME_INVALID';
+  error.automationOutcome = 'HUMAN_REVIEW';
+  error.knownOutcome = true;
+  return error;
+}
+function plainObject(value) {
+  if (!value || Array.isArray(value) || typeof value !== 'object') throw outcomeInvalid();
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) throw outcomeInvalid();
+  return value;
+}
+function normalizeMetadataValue(value, depth = 0) {
+  if (depth > 4) throw outcomeInvalid();
+  if (value === null || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw outcomeInvalid();
+    return value;
+  }
+  if (typeof value === 'string') return value.length <= 256 ? value : '[REDACTED]';
+  if (Array.isArray(value)) {
+    if (value.length > 20) throw outcomeInvalid();
+    return value.map((entry) => normalizeMetadataValue(entry, depth + 1));
+  }
+  const object = plainObject(value);
+  const entries = Object.entries(object);
+  if (entries.length > 100) throw outcomeInvalid();
+  return Object.fromEntries(entries.map(([key, entry]) => {
+    if (!RESULT_KEY.test(key)) throw outcomeInvalid();
+    return [key, SENSITIVE_RESULT_KEY.test(key) ? '[REDACTED]' : normalizeMetadataValue(entry, depth + 1)];
+  }));
+}
+
+/** Normalizes the only result shape that can enter durable work history. */
+export function normalizeActionMetadata(value) {
+  const metadata = normalizeMetadataValue(plainObject(value));
+  try {
+    if (byteLength(metadata) > MAX.metadataBytes) throw outcomeInvalid();
+  } catch (error) {
+    if (error?.code === 'AUTOMATION_ACTION_OUTCOME_INVALID') throw error;
+    throw outcomeInvalid();
+  }
+  return Object.freeze(metadata);
+}
+export function normalizeActionOutcome(value) {
+  const outcome = plainObject(value);
+  if (Object.keys(outcome).some((key) => !OUTCOME_FIELDS.includes(key)) || !Object.hasOwn(outcome, 'safeMetadata')) throw outcomeInvalid();
+  return Object.freeze({ safeMetadata: normalizeActionMetadata(outcome.safeMetadata) });
+}
 
 function context(value) {
   if (!value?.ownerUserId || !value?.actorUserId || !value?.workItemId) throw new Error('AUTOMATION_INVALID_ACTION_CONTEXT');
