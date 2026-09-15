@@ -9,6 +9,7 @@ import {
   PHASE11_PRODUCTION_MIGRATIONS,
   PHASE11_STAGING_ONLY_MIGRATION,
   Phase11MigrationGateError,
+  assertProductionTarget,
   evaluateProductionLedger,
   loadApprovedMigrations,
   runPhase11ProductionMigrationGate,
@@ -135,6 +136,19 @@ test('rejects an incorrect production host before connecting', async () => {
     clientFactory: async () => { factoryCalls += 1; return createFakeClient([]); },
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
   assert.equal(factoryCalls, 0);
+});
+
+test('accepts require sslmode and rejects insecure sslmodes', () => {
+  const accepted = assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: secretConnectionString.replace('sslmode=verify-full', 'sslmode=require'),
+  });
+  assert.equal(accepted.projectRef, projectRef);
+
+  assert.throws(() => assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: secretConnectionString.replace('sslmode=verify-full', 'sslmode=disable'),
+  }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
 });
 
 test('enforces 35 before 36 and does not reapply completed migrations', async () => {
