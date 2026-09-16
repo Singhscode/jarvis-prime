@@ -15,7 +15,7 @@ type ThreadList = { items: Thread[]; pageInfo: { nextCursor: string | null; hasN
 type NotificationList = { items: Notification[]; pageInfo: { nextCursor: string | null; hasNextPage: boolean } };
 
 type Props = { request: CommunicationRequest; role: 'owner' | 'employee' | 'client'; heading: string; description: string };
-const POLL_INTERVAL_MS = 15_000;
+const POLL_INTERVAL_MS = 60_000;
 
 async function api<T>(request: CommunicationRequest, path: string, init?: RequestInit) {
   return (await request<ApiBody<T>>(path, init)).data;
@@ -41,6 +41,7 @@ export default function CommunicationWorkspace({ request, role, heading, descrip
   const [creating, setCreating] = useState(false); const [subject, setSubject] = useState(''); const [employeeCode, setEmployeeCode] = useState(''); const [clientCode, setClientCode] = useState('');
   const selectedRef = useRef<string | null>(null);
   const summaryViewRef = useRef<'inbox' | 'sent' | null>(null);
+  const refreshInFlightRef = useRef(false);
 
   const loadDetail = useCallback(async (threadId: string, beforeSequence?: number, mode: 'replace' | 'appendOlder' | 'mergeLatest' = 'replace') => {
     const suffix = beforeSequence ? `?beforeSequence=${beforeSequence}&limit=50` : '?limit=50';
@@ -58,38 +59,44 @@ export default function CommunicationWorkspace({ request, role, heading, descrip
     return incoming;
   }, [request]);
 
-  const loadSummary = useCallback(async (cursor: string | null = null, append = false) => {
+  const loadSummary = useCallback(async (cursor: string | null = null, append = false, includePreferences = false) => {
     const suffix = new URLSearchParams({ view, limit: '20', ...(cursor ? { cursor } : {}) }).toString();
     const [threadData, notificationData, preferenceData] = await Promise.all([
       api<ThreadList>(request, `/api/communications/threads?${suffix}`),
       api<NotificationList>(request, '/api/communications/notifications?limit=20'),
-      api<Preferences>(request, '/api/communications/preferences'),
+      includePreferences ? api<Preferences>(request, '/api/communications/preferences') : Promise.resolve(null),
     ]);
     const sameView = summaryViewRef.current === view;
     setThreads((current) => sameView || append ? mergeById(current, threadData.items) : threadData.items);
     setThreadPage((current) => append || !sameView ? threadData.pageInfo : current);
     summaryViewRef.current = view;
-    setNotifications((current) => mergeById(current, notificationData.items)); setPreferences(preferenceData);
+    setNotifications((current) => mergeById(current, notificationData.items));
+    if (preferenceData) setPreferences(preferenceData);
     return threadData;
   }, [request, view]);
 
-  const refresh = useCallback(async (showLoading = true) => {
+  const refresh = useCallback(async (showLoading = true, includePreferences = false) => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     if (showLoading) setLoading(true);
     setError('');
     try {
-      await loadSummary();
+      await loadSummary(undefined, false, includePreferences);
       if (selectedRef.current) await loadDetail(selectedRef.current, undefined, 'mergeLatest');
       setStatus('Communication Hub is up to date.');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to load Communication Hub.');
-    } finally { if (showLoading) setLoading(false); }
+    } finally {
+      refreshInFlightRef.current = false;
+      if (showLoading) setLoading(false);
+    }
   }, [loadDetail, loadSummary]);
 
   useEffect(() => {
     summaryViewRef.current = null; selectedRef.current = null;
     setThreads([]); setThreadPage({ nextCursor: null, hasNextPage: false }); setSelectedId(null); setDetail(null);
   }, [view]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void refresh(true, true); }, [refresh]);
   useEffect(() => {
     const refreshIfVisible = () => { if (!document.hidden) void refresh(false); };
     const interval = window.setInterval(refreshIfVisible, POLL_INTERVAL_MS);
@@ -155,7 +162,7 @@ export default function CommunicationWorkspace({ request, role, heading, descrip
   async function updatePreferences(next: Preferences) {
     setPreferences(next); setError('');
     try { await api(request, '/api/communications/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) }); setStatus('Notification preferences saved.'); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to save preferences.'); await refresh(false); }
+    catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to save preferences.'); await refresh(false, true); }
   }
 
   async function openNotification(notification: Notification) {
