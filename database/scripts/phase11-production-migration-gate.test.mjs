@@ -77,10 +77,10 @@ async function runWithLedger({ operation = 'inspect', ledger = predecessorLedger
   return { client, output, result };
 }
 
-test('clean contiguous predecessor state allows 35 and preserves a read-only inspection', async () => {
+test('clean contiguous predecessor state allows 35, 36, 38, 39, 40 and preserves a read-only inspection', async () => {
   const { result, client, output } = await runWithLedger();
   assert.equal(result.stopped, false);
-  assert.deepEqual(result.report.pending.map(({ version }) => version), ['20260810000035', '20260810000036']);
+  assert.deepEqual(result.report.pending.map(({ version }) => version), ['20260810000035', '20260810000036', '20260810000038', '20260810000039', '20260810000040']);
   assert.deepEqual(output.slice(-6), [
     'PHASE11_LEDGER 20260810000035 pending',
     'PHASE11_LEDGER 20260810000036 pending',
@@ -94,15 +94,21 @@ test('clean contiguous predecessor state allows 35 and preserves a read-only ins
   assert.equal(client.queries.some((query) => query.includes('automation_control_audit_events')), false);
 });
 
-test('correctly recorded 35 allows only 36 and never reapplies 35', async () => {
+test('correctly recorded 35 and 36 allows 38, 39, 40 and never reapplies earlier migrations', async () => {
   const migrations = await loadedMigrations();
-  const { result, client } = await runWithLedger({ operation: 'apply', ledger: [...predecessorLedger(), approvedLedgerRow(migrations[0])] });
+  const { result, client } = await runWithLedger({
+    operation: 'apply',
+    ledger: [...predecessorLedger(), approvedLedgerRow(migrations[0]), approvedLedgerRow(migrations[1])],
+  });
   assert.equal(result.stopped, false);
-  assert.deepEqual(result.applied, ['20260810000036']);
+  assert.deepEqual(result.applied, ['20260810000038', '20260810000039', '20260810000040']);
   const inserts = client.queries.filter((query) => query.startsWith('insert into supabase_migrations'));
-  assert.equal(inserts.length, 1);
+  assert.equal(inserts.length, 3);  // only 38, 39, 40 should be inserted
   assert.equal(client.ledger.some((row) => row.version === '20260810000035'), true);
   assert.equal(client.ledger.some((row) => row.version === '20260810000036'), true);
+  assert.equal(client.ledger.some((row) => row.version === '20260810000038'), true);
+  assert.equal(client.ledger.some((row) => row.version === '20260810000039'), true);
+  assert.equal(client.ledger.some((row) => row.version === '20260810000040'), true);
 });
 
 test('stops when already-recorded 35 or 36 does not exactly match the approved ledger statements', async () => {
@@ -324,6 +330,89 @@ test('a failed 35 transaction prevents 36 and never invokes generic db push', as
 test('output never contains a connection string or secret value', async () => {
   const { output } = await runWithLedger();
   assert.equal(output.some((line) => line.includes(secretConnectionString) || line.includes('secret-value')), false);
+});
+
+test('enforces 35 before 36 and 36 before 38 and 38 before 39 and 39 before 40', async () => {
+  const migrations = await loadedMigrations();
+
+  // Test: 36 without 35 applied is invalid
+  const without35 = evaluateProductionLedger([...predecessorLedger(), approvedLedgerRow(migrations[1])], migrations);
+  assert.ok(without35.violations.includes('PHASE11_GATE_ORDERING_INVALID'));
+
+  // Test: 38 without 36 applied is invalid
+  const without36 = evaluateProductionLedger(
+    [...predecessorLedger(), approvedLedgerRow(migrations[0]), approvedLedgerRow(migrations[2])],
+    migrations
+  );
+  assert.ok(without36.violations.includes('PHASE11_GATE_ORDERING_INVALID'));
+
+  // Test: 39 without 38 applied is invalid
+  const without38 = evaluateProductionLedger(
+    [...predecessorLedger(), approvedLedgerRow(migrations[0]), approvedLedgerRow(migrations[1]), approvedLedgerRow(migrations[3])],
+    migrations
+  );
+  assert.ok(without38.violations.includes('PHASE11_GATE_ORDERING_INVALID'));
+
+  // Test: 40 without 39 applied is invalid
+  const without39 = evaluateProductionLedger(
+    [...predecessorLedger(), approvedLedgerRow(migrations[0]), approvedLedgerRow(migrations[1]), approvedLedgerRow(migrations[2]), approvedLedgerRow(migrations[4])],
+    migrations
+  );
+  assert.ok(without39.violations.includes('PHASE11_GATE_ORDERING_INVALID'));
+});
+
+test('applies full sequential 35→36→38→39→40 in correct order', async () => {
+  const migrations = await loadedMigrations();
+  const { result, client } = await runWithLedger({ operation: 'apply' });
+  assert.equal(result.stopped, false);
+  assert.deepEqual(result.applied, ['20260810000035', '20260810000036', '20260810000038', '20260810000039', '20260810000040']);
+  const inserts = client.queries.filter((query) => query.startsWith('insert into supabase_migrations'));
+  assert.equal(inserts.length, 5);  // all 5 migrations should be inserted
+  // Verify all are recorded
+  for (const migration of migrations) {
+    assert.equal(client.ledger.some((row) => row.version === migration.version), true);
+  }
+});
+
+test('rejects migration 37 (staging-only) and stops if it appears in ledger', async () => {
+  const migrations = await loadedMigrations();
+  const report = evaluateProductionLedger(
+    [...predecessorLedger(), { version: PHASE11_STAGING_ONLY_MIGRATION.version, name: '', statements: null }],
+    migrations
+  );
+  assert.ok(report.violations.includes('PHASE11_GATE_STAGING_ONLY_37_PRESENT'));
+  assert.equal(report.states.at(-1).status, 'present-stop');
+});
+
+test('skips already-applied migrations and applies only pending ones', async () => {
+  const migrations = await loadedMigrations();
+  // Scenario: 35 and 36 already applied, 38-40 pending
+  const { result, client } = await runWithLedger({
+    operation: 'apply',
+    ledger: [...predecessorLedger(), approvedLedgerRow(migrations[0]), approvedLedgerRow(migrations[1])],
+  });
+  assert.equal(result.stopped, false);
+  assert.deepEqual(result.applied, ['20260810000038', '20260810000039', '20260810000040']);
+  const inserts = client.queries.filter((query) => query.startsWith('insert into supabase_migrations'));
+  assert.equal(inserts.length, 3);  // only 38, 39, 40 should be newly inserted
+});
+
+test('enforces hash verification for all 5 migrations', async () => {
+  const migrations = await loadedMigrations();
+  for (const migration of migrations) {
+    const mutated = approvedLedgerRow(migration);
+    mutated.statements.push('select 1');
+    const prerequisite = [];
+    if (migration.version !== '20260810000035') {
+      // Add all previous migrations as already applied
+      for (let i = 0; i < migrations.indexOf(migration); i++) {
+        prerequisite.push(approvedLedgerRow(migrations[i]));
+      }
+    }
+    const report = evaluateProductionLedger([...predecessorLedger(), ...prerequisite, mutated], migrations);
+    assert.ok(report.violations.includes('PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH'));
+    assert.equal(report.states.find((state) => state.version === migration.version).status, 'checksum-mismatch');
+  }
 });
 
 test('classifies database failures with safe stage and code metadata only', async () => {

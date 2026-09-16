@@ -326,7 +326,21 @@ export function evaluateProductionLedger(rows, migrations) {
 
   const migration35 = states[0];
   const migration36 = states[1];
+  const migration38 = states[2];
+  const migration39 = states[3];
+  const migration40 = states[4];
+
+  // Enforce sequential ordering: 36 requires 35, 38 requires 36, 39 requires 38, 40 requires 39
   if (migration36.status === 'applied' && migration35.status !== 'applied') {
+    violations.push('PHASE11_GATE_ORDERING_INVALID');
+  }
+  if (migration38.status === 'applied' && migration36.status !== 'applied') {
+    violations.push('PHASE11_GATE_ORDERING_INVALID');
+  }
+  if (migration39.status === 'applied' && migration38.status !== 'applied') {
+    violations.push('PHASE11_GATE_ORDERING_INVALID');
+  }
+  if (migration40.status === 'applied' && migration39.status !== 'applied') {
     violations.push('PHASE11_GATE_ORDERING_INVALID');
   }
 
@@ -337,6 +351,24 @@ export function evaluateProductionLedger(rows, migrations) {
       violations.push('PHASE11_GATE_ORDERING_INVALID');
     }
     pending.push(approvedMigrations[1]);
+  }
+  if (migration38.status === 'pending') {
+    if (migration36.status !== 'applied' && migration36.status !== 'pending') {
+      violations.push('PHASE11_GATE_ORDERING_INVALID');
+    }
+    pending.push(approvedMigrations[2]);
+  }
+  if (migration39.status === 'pending') {
+    if (migration38.status !== 'applied' && migration38.status !== 'pending') {
+      violations.push('PHASE11_GATE_ORDERING_INVALID');
+    }
+    pending.push(approvedMigrations[3]);
+  }
+  if (migration40.status === 'pending') {
+    if (migration39.status !== 'applied' && migration39.status !== 'pending') {
+      violations.push('PHASE11_GATE_ORDERING_INVALID');
+    }
+    pending.push(approvedMigrations[4]);
   }
 
   return Object.freeze({
