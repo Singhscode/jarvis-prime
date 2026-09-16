@@ -357,3 +357,9 @@ test('reports certificate-verifying TLS regardless of the connection mode', asyn
   assert.match(formatted, /mode=session-pooler/);
   assert.match(formatted, /tls=REJECT_UNAUTHORIZED/);
 });
+
+test('diagnostic skips gracefully when environment is incomplete', async () => {
+  const { diagnosticNodeTlsCapability } = await import('./phase11-production-migration-gate.mjs');
+  const result = await diagnosticNodeTlsCapability({});
+  assert.equal(result.status, 'skipped');
+});
