@@ -151,8 +151,26 @@ test('accepts require sslmode and rejects insecure sslmodes', () => {
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
 });
 
-test('accepts session-pooler mode with valid Supavisor endpoint', () => {
-  const poolerConnectionString = `postgresql://postgres:secret-value@${projectRef}.us-east-1.pooler.supabase.com:5432/postgres?sslmode=verify-full`;
+// Supabase's documented Shared Session Pooler hostname is a region/index-scoped
+// Supavisor endpoint that does NOT embed the project ref; the ref is carried in
+// the connection username instead, as postgres.<project-ref> (or, for a custom
+// database role, <role>.<project-ref>).
+// https://supabase.com/docs/guides/database/connecting-to-postgres
+const poolerHost = 'aws-0-us-east-1.pooler.supabase.com';
+
+test('accepts session-pooler mode with the documented postgres.<project-ref> username', () => {
+  const poolerConnectionString = `postgresql://postgres.${projectRef}:secret-value@${poolerHost}:5432/postgres?sslmode=verify-full`;
+  const accepted = assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+  });
+  assert.equal(accepted.projectRef, projectRef);
+  assert.equal(accepted.dbMode, 'session-pooler');
+});
+
+test('accepts session-pooler mode with a custom role in the <role>.<project-ref> username', () => {
+  const poolerConnectionString = `postgresql://customrole.${projectRef}:secret-value@${poolerHost}:5432/postgres?sslmode=verify-full`;
   const accepted = assertProductionTarget({
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
@@ -161,8 +179,8 @@ test('accepts session-pooler mode with valid Supavisor endpoint', () => {
   assert.equal(accepted.projectRef, projectRef);
 });
 
-test('rejects session-pooler with wrong project ref', () => {
-  const poolerConnectionString = `postgresql://postgres:secret-value@otherproject.us-east-1.pooler.supabase.com:5432/postgres?sslmode=verify-full`;
+test('rejects session-pooler when the username has no .<project-ref> suffix', () => {
+  const poolerConnectionString = `postgresql://postgres:secret-value@${poolerHost}:5432/postgres?sslmode=verify-full`;
   assert.throws(() => assertProductionTarget({
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
@@ -170,8 +188,26 @@ test('rejects session-pooler with wrong project ref', () => {
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
 });
 
+test('rejects session-pooler with wrong project ref in the username', () => {
+  const poolerConnectionString = `postgresql://postgres.otherref:secret-value@${poolerHost}:5432/postgres?sslmode=verify-full`;
+  assert.throws(() => assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+  }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+});
+
+test('rejects session-pooler mode pointed at the direct-mode host', () => {
+  const directHostWithPoolerUsername = `postgresql://postgres.${projectRef}:secret-value@db.${projectRef}.supabase.co:5432/postgres?sslmode=verify-full`;
+  assert.throws(() => assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: directHostWithPoolerUsername,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+  }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+});
+
 test('rejects session-pooler with non-Supabase pooler hostname', () => {
-  const invalidConnectionString = `postgresql://postgres:secret-value@pooler.example.com:5432/postgres?sslmode=verify-full`;
+  const invalidConnectionString = `postgresql://postgres.${projectRef}:secret-value@pooler.example.com:5432/postgres?sslmode=verify-full`;
   assert.throws(() => assertProductionTarget({
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: invalidConnectionString,
@@ -179,8 +215,17 @@ test('rejects session-pooler with non-Supabase pooler hostname', () => {
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
 });
 
+test('rejects an arbitrary pooler.supabase.com host paired with the wrong project identity', () => {
+  const poolerConnectionString = `postgresql://postgres.otherref:secret-value@some-other-region.pooler.supabase.com:5432/postgres?sslmode=verify-full`;
+  assert.throws(() => assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+  }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+});
+
 test('rejects session-pooler with port 6543 (transaction mode)', () => {
-  const poolerConnectionString = `postgresql://postgres:secret-value@${projectRef}.us-east-1.pooler.supabase.com:6543/postgres?sslmode=verify-full`;
+  const poolerConnectionString = `postgresql://postgres.${projectRef}:secret-value@${poolerHost}:6543/postgres?sslmode=verify-full`;
   assert.throws(() => assertProductionTarget({
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
@@ -189,10 +234,19 @@ test('rejects session-pooler with port 6543 (transaction mode)', () => {
 });
 
 test('rejects session-pooler with malformed host', () => {
-  const malformedConnectionString = `postgresql://postgres:secret-value@.pooler.supabase.com:5432/postgres?sslmode=verify-full`;
+  const malformedConnectionString = `postgresql://postgres.${projectRef}:secret-value@.pooler.supabase.com:5432/postgres?sslmode=verify-full`;
   assert.throws(() => assertProductionTarget({
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: malformedConnectionString,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+  }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+});
+
+test('rejects session-pooler with invalid sslmode', () => {
+  const poolerConnectionString = `postgresql://postgres.${projectRef}:secret-value@${poolerHost}:5432/postgres?sslmode=disable`;
+  assert.throws(() => assertProductionTarget({
+    ...environment,
+    PHASE11_PRODUCTION_DATABASE_URL: poolerConnectionString,
     PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
 });
