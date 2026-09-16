@@ -139,7 +139,7 @@ jobs:
             exit 1
           fi
           case "${PAYLOAD_OPERATION}:${PAYLOAD_CONFIRMATION}" in
-            inspect:INSPECT_ONLY|apply:APPLY_35_THEN_36) ;;
+            inspect:INSPECT_ONLY|apply:APPLY_FULL_35_THROUGH_40) ;;
             *) echo "Operation and confirmation do not match." >&2; exit 1 ;;
           esac
           if [[ "${PAYLOAD_DB_MODE}" != "session-pooler" ]]; then
