@@ -230,16 +230,39 @@ export function assertProductionTarget(environment = process.env) {
       throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
     }
   } else if (dbMode === 'session-pooler') {
-    // Session pooler: *.pooler.supabase.com with matching project ref
-    // The pooler hostname follows: <project-ref>.<region>.pooler.supabase.com
-    if (!target.hostname.endsWith('.pooler.supabase.com')) {
+    // Supabase's documented Shared Session Pooler carries the project ref in
+    // the connection *username* (e.g. postgres.<project-ref>), not the
+    // hostname. The shared pooler hostname is a region/index-scoped Supavisor
+    // endpoint such as aws-0-us-east-1.pooler.supabase.com and does not embed
+    // the project ref at all, so the ref must never be matched from the host.
+    // https://supabase.com/docs/guides/database/connecting-to-postgres
+    const poolerSuffix = '.pooler.supabase.com';
+    const poolerLabel = target.hostname.endsWith(poolerSuffix)
+      ? target.hostname.slice(0, -poolerSuffix.length)
+      : null;
+    if (!poolerLabel) {
+      // Also rejects a hostname equal to the bare suffix (no region/index
+      // label), which is malformed rather than a real Supavisor endpoint.
       throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
     }
-    // Extract project ref from pooler hostname to verify it matches
-    const poolerPrefix = target.hostname.replace(/\.pooler\.supabase\.com$/, '');
-    // Pooler format is typically: <project-ref>.<region> or just <project-ref>
-    // We verify the project ref appears at the start of the pooler prefix
-    if (!poolerPrefix.startsWith(`${projectRef}.`) && poolerPrefix !== projectRef) {
+
+    let username;
+    try {
+      // target.username is percent-encoded per the URL spec; decode it to
+      // compare the literal role/ref segments. The password is never read.
+      username = decodeURIComponent(target.username);
+    } catch {
+      throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+    }
+
+    // Documented shared-pooler identity: <role>.<project-ref>, where <role> is
+    // usually "postgres" but MAY be a custom Postgres role. The project ref
+    // must be the exact suffix after the final '.', matching PROJECT_REF
+    // exactly (no additional dots, no partial/prefix match).
+    const lastDot = username.lastIndexOf('.');
+    const usernameProjectRef = lastDot === -1 ? '' : username.slice(lastDot + 1);
+    const usernameRole = lastDot === -1 ? username : username.slice(0, lastDot);
+    if (!usernameRole || usernameProjectRef !== projectRef) {
       throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
     }
   }
