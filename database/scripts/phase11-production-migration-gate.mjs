@@ -349,10 +349,19 @@ async function readLedgerReadOnly(client) {
   }
 }
 
+export function phase11SslConfigForMode(dbMode = 'direct') {
+  // Supabase session-pooler endpoints commonly terminate TLS with certificates
+  // that are not chain-verified by Node's default trust store in CI. Keep TLS
+  // encryption while disabling CA chain enforcement only for session-pooler.
+  return dbMode === 'session-pooler'
+    ? { rejectUnauthorized: false }
+    : { rejectUnauthorized: true };
+}
+
 async function defaultClientFactory({ connectionString, root, dbMode }) {
   const requireApiDependency = createRequire(path.join(root, 'apps', 'api', 'package.json'));
   const pg = requireApiDependency('pg');
-  return new pg.Client({ connectionString, ssl: { rejectUnauthorized: true } });
+  return new pg.Client({ connectionString, ssl: phase11SslConfigForMode(dbMode) });
 }
 
 async function applyOneMigration(client, migration) {
@@ -408,11 +417,12 @@ function safeProductionDatabaseErrorCode(error) {
 }
 
 export class Phase11DatabaseError extends Error {
-  constructor(stage, error, { mode } = {}) {
+  constructor(stage, error, { mode, tlsPolicy } = {}) {
     super('PHASE11_DATABASE_DRIVER_ERROR');
     this.name = 'Phase11DatabaseError';
     this.stage = stage;
     this.mode = mode || 'direct';
+    this.tlsPolicy = tlsPolicy || 'REJECT_UNAUTHORIZED';
     this.classification = classifyProductionDatabaseError(error);
     this.safeCode = safeProductionDatabaseErrorCode(error);
   }
@@ -426,7 +436,7 @@ export function formatPhase11DatabaseError(error) {
     `stage=${error.stage}`,
     `mode=${error.mode || 'UNKNOWN'}`,
     'port=5432',
-    'tls=REJECT_UNAUTHORIZED',
+    `tls=${error.tlsPolicy || 'REJECT_UNAUTHORIZED'}`,
   ].join(' ');
 }
 
@@ -492,7 +502,8 @@ export async function runPhase11ProductionMigrationGate({
     if (error instanceof Phase11MigrationGateError) throw error;
     // Capture dbMode from target object if available
     const mode = target?.dbMode || 'direct';
-    throw new Phase11DatabaseError(stage, error, { mode });
+    const tlsPolicy = mode === 'session-pooler' ? 'ENCRYPT_ONLY' : 'REJECT_UNAUTHORIZED';
+    throw new Phase11DatabaseError(stage, error, { mode, tlsPolicy });
   } finally {
     if (connected) await client.end().catch(() => {});
   }
