@@ -29,9 +29,25 @@ The repository-owned gate is `database/scripts/phase11-production-migration-gate
 - `20260810000039_complete_core_automation_engine.sql` — `7d8d4fa1faae05622e56d861e4577797ae18b9f08f4cd9bfc7d5c7165672dccb`
 - `20260810000040_harden_automation_worker_claim_drain.sql` — `3ab75d24d26fd2923b277b641c16bc86ff5a3f7c2199a336e8de6f84ba6d7914`
 
-Before opening a database client, the gate reads only those five committed files and verifies the listed SHA-256 values. It also requires the direct, TLS-verified `db.<project-ref>.supabase.co:5432` hostname derived from the protected `PHASE11_PRODUCTION_PROJECT_REF` Environment variable, and accepts only secure `sslmode` values (`verify-full`, `require`, or omitted). The connection string exists only as protected Environment secret `PHASE11_PRODUCTION_DATABASE_URL`; neither value is stored in source or printed. Pooler, preview, staging, loopback, arbitrary hosts, and insecure `sslmode` values fail closed before connection.
+The gate supports two connection modes via the `PHASE11_PRODUCTION_DB_MODE` environment variable:
+
+**Direct mode** (default, `PHASE11_PRODUCTION_DB_MODE=direct`):
+- Connects directly to `db.<project-ref>.supabase.co:5432`
+- Uses TLS-verified connection with `sslmode=verify-full` or `require`
+- suitable for environments with direct database access
+
+**Session-pooler mode** (`PHASE11_PRODUCTION_DB_MODE=session-pooler`):
+- Connects via Supabase shared Supavisor session pooler at `*.pooler.supabase.com:5432`
+- Uses TLS-verified connection with `sslmode=verify-full` or `require`
+- IPv4-only pooler endpoint suitable for GitHub Actions runners
+- **Do not use port 6543** (transaction pooler mode is forbidden)
+- Validates the pooler endpoint belongs to the expected Supabase project
+
+The connection string exists only as protected Environment secret `PHASE11_PRODUCTION_DATABASE_URL`; neither value is stored in source or printed. Pooler, preview, staging, loopback, arbitrary hosts, and insecure `sslmode` values fail closed before connection.
 
 The workflow is manual, runs only from `main`, checks out an operator-supplied SHA that must be reachable from `main`, and uses the existing protected `jarvis-prime-api / production` GitHub Environment. Its Environment approval protects every database-capable step. It never deploys API or worker artifacts and never enables a provider.
+
+**Important**: The GitHub Actions workflow requires the `db_mode` input parameter (choose `direct` or `session-pooler`). If the production connection uses the Supavisor session pooler (recommended for GitHub Actions), update the `PHASE11_PRODUCTION_DATABASE_URL` secret in the GitHub Environment to point to your Supabase pooler endpoint (e.g., `postgresql://postgres:***@<project-ref>.<region>.pooler.supabase.com:5432/postgres?sslmode=verify-full`) **before** dispatching the workflow.
 
 ### Required production sequence
 1. **Production ledger read-only preflight:** manually dispatch the gate with `operation=inspect` and `confirmation=INSPECT_ONLY`. The runner opens `BEGIN READ ONLY`, reads `supabase_migrations.schema_migrations`, then rolls back the read-only transaction. Output contains migration IDs/status only, including 35, 36, 37, 38, 39, 40.

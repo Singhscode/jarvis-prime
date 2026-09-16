@@ -21,6 +21,13 @@ on:
         options:
           - INSPECT_ONLY
           - APPLY_35_THEN_36
+      db_mode:
+        description: Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).
+        required: true
+        type: choice
+        options:
+          - direct
+          - session-pooler
       git_sha:
         description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
         required: true
@@ -89,6 +96,7 @@ jobs:
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
 
       - name: Selectively apply only 35 then 36
@@ -96,6 +104,7 @@ jobs:
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --apply
 
       - name: Read-only post-delivery ledger verification
@@ -103,6 +112,7 @@ jobs:
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
 
       - name: Report constrained boundary

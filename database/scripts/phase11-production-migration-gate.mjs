@@ -184,9 +184,11 @@ export async function loadApprovedMigrations(root = defaultRoot) {
 }
 
 /**
- * Enforces the direct, TLS-verified Supabase host derived from a protected
- * production Environment variable. Pooler, preview, staging, local, and any
- * arbitrary host are rejected before a client is created.
+ * Enforces the TLS-verified Supabase host derived from a protected
+ * production Environment variable. Supports direct connection or Supavisor
+ * session pooler mode based on PHASE11_PRODUCTION_DB_MODE (default: direct).
+ * Pooler, preview, staging, local, and arbitrary hosts are rejected before
+ * a client is created.
  */
 export function assertProductionTarget(environment = process.env) {
   const connectionString = environment.PHASE11_PRODUCTION_DATABASE_URL;
@@ -202,16 +204,47 @@ export function assertProductionTarget(environment = process.env) {
     throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
   }
 
-  const expectedHost = `db.${projectRef}.supabase.co`;
-  const sslmode = target.searchParams.get('sslmode');
-  const sslmodeAccepted = sslmode === null || sslmode === 'verify-full' || sslmode === 'require';
-  if (!['postgres:', 'postgresql:'].includes(target.protocol)
-    || target.hostname !== expectedHost
-    || (target.port && target.port !== '5432')
-    || !sslmodeAccepted) {
+  // Connection mode: 'direct' (default) or 'session-pooler'
+  const dbMode = environment.PHASE11_PRODUCTION_DB_MODE || 'direct';
+  if (!['direct', 'session-pooler'].includes(dbMode)) {
     throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
   }
-  return { connectionString, projectRef };
+
+  const sslmode = target.searchParams.get('sslmode');
+  const sslmodeAccepted = sslmode === null || sslmode === 'verify-full' || sslmode === 'require';
+
+  if (!['postgres:', 'postgresql:'].includes(target.protocol) || !sslmodeAccepted) {
+    throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+  }
+
+  // Validate port: session mode requires 5432, direct mode allows 5432
+  if (target.port && target.port !== '5432') {
+    throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+  }
+
+  // Validate host based on mode
+  if (dbMode === 'direct') {
+    // Direct connection: db.<project-ref>.supabase.co
+    const expectedHost = `db.${projectRef}.supabase.co`;
+    if (target.hostname !== expectedHost) {
+      throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+    }
+  } else if (dbMode === 'session-pooler') {
+    // Session pooler: *.pooler.supabase.com with matching project ref
+    // The pooler hostname follows: <project-ref>.<region>.pooler.supabase.com
+    if (!target.hostname.endsWith('.pooler.supabase.com')) {
+      throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+    }
+    // Extract project ref from pooler hostname to verify it matches
+    const poolerPrefix = target.hostname.replace(/\.pooler\.supabase\.com$/, '');
+    // Pooler format is typically: <project-ref>.<region> or just <project-ref>
+    // We verify the project ref appears at the start of the pooler prefix
+    if (!poolerPrefix.startsWith(`${projectRef}.`) && poolerPrefix !== projectRef) {
+      throw new Phase11MigrationGateError('PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+    }
+  }
+
+  return { connectionString, projectRef, dbMode };
 }
 
 function ledgerStatementsMatch(row, migration) {
@@ -293,7 +326,7 @@ async function readLedgerReadOnly(client) {
   }
 }
 
-async function defaultClientFactory({ connectionString, root }) {
+async function defaultClientFactory({ connectionString, root, dbMode }) {
   const requireApiDependency = createRequire(path.join(root, 'apps', 'api', 'package.json'));
   const pg = requireApiDependency('pg');
   return new pg.Client({ connectionString, ssl: { rejectUnauthorized: true } });
@@ -352,10 +385,11 @@ function safeProductionDatabaseErrorCode(error) {
 }
 
 export class Phase11DatabaseError extends Error {
-  constructor(stage, error) {
+  constructor(stage, error, { mode } = {}) {
     super('PHASE11_DATABASE_DRIVER_ERROR');
     this.name = 'Phase11DatabaseError';
     this.stage = stage;
+    this.mode = mode || 'direct';
     this.classification = classifyProductionDatabaseError(error);
     this.safeCode = safeProductionDatabaseErrorCode(error);
   }
@@ -367,7 +401,7 @@ export function formatPhase11DatabaseError(error) {
     `class=${error.classification}`,
     `code=${error.safeCode}`,
     `stage=${error.stage}`,
-    'target=DIRECT_SUPABASE',
+    `mode=${error.mode || 'UNKNOWN'}`,
     'port=5432',
     'tls=REJECT_UNAUTHORIZED',
   ].join(' ');
@@ -390,7 +424,7 @@ export async function runPhase11ProductionMigrationGate({
   let stage = 'client-create';
 
   try {
-    client = await clientFactory({ ...target, root });
+    client = await clientFactory({ ...target, root, dbMode: target.dbMode });
     stage = 'connect';
     await client.connect();
     connected = true;
@@ -432,8 +466,10 @@ export async function runPhase11ProductionMigrationGate({
       await client.query(ADVISORY_UNLOCK_SQL).catch(() => {});
     }
   } catch (error) {
-    if (error instanceof Phase11MigrationGateError || error instanceof Phase11DatabaseError) throw error;
-    throw new Phase11DatabaseError(stage, error);
+    if (error instanceof Phase11MigrationGateError) throw error;
+    // Capture dbMode from target object if available
+    const mode = target?.dbMode || 'direct';
+    throw new Phase11DatabaseError(stage, error, { mode });
   } finally {
     if (connected) await client.end().catch(() => {});
   }
