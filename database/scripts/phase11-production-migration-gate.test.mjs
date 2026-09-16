@@ -182,7 +182,13 @@ test('a failed 35 transaction prevents 36 and never invokes generic db push', as
   const fake = createFakeClient(predecessorLedger(), { fail: (query) => query.includes('CREATE TABLE public.automation_control_audit_events') });
   await assert.rejects(runPhase11ProductionMigrationGate({
     operation: 'apply', environment, root: repositoryRoot, clientFactory: async () => fake,
-  }), /simulated database failure/);
+  }), (error) => {
+    assert.equal(error.name, 'Phase11DatabaseError');
+    assert.equal(error.classification, 'DATABASE_DRIVER');
+    assert.equal(error.safeCode, 'UNCLASSIFIED');
+    assert.equal(error.stage, 'migration-apply');
+    return true;
+  });
   assert.equal(fake.queries.some((query) => query.includes('automation_control_idempotency_receipts')), false);
   assert.equal(fake.queries.some((query) => query.includes('db:push')), false);
 });
@@ -190,4 +196,29 @@ test('a failed 35 transaction prevents 36 and never invokes generic db push', as
 test('output never contains a connection string or secret value', async () => {
   const { output } = await runWithLedger();
   assert.equal(output.some((line) => line.includes(secretConnectionString) || line.includes('secret-value')), false);
+});
+
+test('classifies database failures with safe stage and code metadata only', async () => {
+  const {
+    Phase11DatabaseError,
+    classifyProductionDatabaseError,
+    formatPhase11DatabaseError,
+  } = await import('./phase11-production-migration-gate.mjs');
+  assert.equal(classifyProductionDatabaseError({ code: 'ECONNREFUSED' }), 'NETWORK');
+  assert.equal(classifyProductionDatabaseError({ code: '28P01' }), 'AUTH');
+
+  const fake = createFakeClient(predecessorLedger(), { fail: (query) => query === 'BEGIN READ ONLY' });
+  await assert.rejects(runPhase11ProductionMigrationGate({
+    operation: 'inspect',
+    environment,
+    root: repositoryRoot,
+    clientFactory: async () => fake,
+  }), (error) => error instanceof Phase11DatabaseError
+    && error.classification === 'DATABASE_DRIVER'
+    && error.safeCode === 'UNCLASSIFIED'
+    && error.stage === 'ledger-read');
+
+  const formatted = formatPhase11DatabaseError(new Phase11DatabaseError('connect', { code: 'ECONNREFUSED' }));
+  assert.match(formatted, /class=NETWORK code=ECONNREFUSED stage=connect/);
+  assert.doesNotMatch(formatted, /postgresql|secret-value|password/i);
 });
