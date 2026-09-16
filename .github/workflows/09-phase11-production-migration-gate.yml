@@ -115,6 +115,19 @@ jobs:
 
       # The gate itself opens BEGIN READ ONLY before reading the ledger. This
       # preflight is mandatory even for apply and emits IDs/status only.
+      - name: Diagnostic - verify Environment context
+        shell: bash
+        env:
+          DATABASE_URL_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}
+          PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
+        run: |
+          echo "=== Environment Context Diagnostic ==="
+          echo "Job Environment: jarvis-prime-api / production"
+          echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${DATABASE_URL_PROVIDED}"
+          echo "Variable PHASE11_PRODUCTION_PROJECT_REF provided: ${PROJECT_REF_PROVIDED} (value: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }})"
+          echo "Input db_mode: ${{ inputs.db_mode }}"
+          echo "=== End Diagnostic ==="
+
       - name: Read-only production ledger preflight
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
