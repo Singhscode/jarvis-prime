@@ -5,10 +5,9 @@ name: Phase 11 Production Migration Gate Dispatch
 # The GitHub workflow-dispatch API refuses to dispatch this repository's Phase 11
 # workflows (HTTP 422 "Workflow does not have 'workflow_dispatch' trigger") even
 # though the YAML declares the trigger, so the documented `repository_dispatch`
-# event is used as the manual trigger instead. This workflow carries no
-# credentials and duplicates no migration logic: it authorizes the operator,
-# validates the payload, and then calls the existing production gate through
-# `workflow_call`.
+# event is used as the manual trigger instead. This workflow authorizes the
+# operator, validates the payload, and then performs the same reviewed gate
+# checks inside the protected production Environment.
 #
 # APPROVED OPERATOR ALLOWLIST
 # ---------------------------
@@ -111,46 +110,91 @@ jobs:
           fi
           echo "Validated read-only inspection payload for ${PAYLOAD_GIT_SHA}."
 
-  # Intermediate job to retrieve the production secret and pass it to the gate.
-  # GitHub Actions does not auto-inject Environment-scoped secrets into reusable
-  # workflow jobs called via workflow_call, even when the job declares the
-  # environment. This job bridges that gap by explicitly passing the secret as a
-  # workflow_call input (base64-encoded to handle any URL characters).
-  #
-  # This job must run in the protected production Environment to access the
-  # secret. The gate then retrieves it from the input, decodes it, and uses it.
-  provide-production-secret:
+  # Run the gate checks directly in the protected Environment. Reusable workflow
+  # job outputs are secret-redacted by Actions, so Environment secrets cannot be
+  # relayed safely through workflow_call inputs from an intermediate job.
+  call-migration-gate:
+    name: call-migration-gate / phase11-migration-gate
     needs:
       - authorize-operator
       - validate-inspect-payload
     runs-on: ubuntu-latest
     environment: jarvis-prime-api / production
-    outputs:
-      database_url_b64: ${{ steps.encode-secret.outputs.database_url_b64 }}
     steps:
-      - name: Encode production secret for workflow_call input
-        id: encode-secret
+      - name: Validate dispatch payload and reviewed SHA
+        shell: bash
         env:
-          RAW_SECRET: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PAYLOAD_OPERATION: ${{ github.event.client_payload.operation }}
+          PAYLOAD_CONFIRMATION: ${{ github.event.client_payload.confirmation }}
+          PAYLOAD_DB_MODE: ${{ github.event.client_payload.db_mode }}
+          PAYLOAD_GIT_SHA: ${{ github.event.client_payload.git_sha }}
         run: |
           set -euo pipefail
-          # Base64-encode the secret for safe transmission via workflow_call input
-          b64_secret=$(printf '%s' "${RAW_SECRET}" | base64 -w 0)
-          echo "database_url_b64=${b64_secret}" >> "${GITHUB_OUTPUT}"
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Refusing to run outside main." >&2
+            exit 1
+          fi
+          if [[ ! "${PAYLOAD_GIT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase SHA." >&2
+            exit 1
+          fi
+          case "${PAYLOAD_OPERATION}:${PAYLOAD_CONFIRMATION}" in
+            inspect:INSPECT_ONLY|apply:APPLY_35_THEN_36) ;;
+            *) echo "Operation and confirmation do not match." >&2; exit 1 ;;
+          esac
+          if [[ "${PAYLOAD_DB_MODE}" != "session-pooler" ]]; then
+            echo "db_mode must be exactly 'session-pooler' for repository_dispatch." >&2
+            exit 1
+          fi
 
-  # The called gate owns the protected Environment, the production database
-  # secret and project ref, SHA/ancestry validation, the rollout contract, the
-  # immutable migration allowlist, the read-only ledger preflight, session-pooler
-  # target validation, the migration 37 hard-stop, and all apply restrictions.
-  call-migration-gate:
-    needs:
-      - authorize-operator
-      - validate-inspect-payload
-      - provide-production-secret
-    uses: Singhscode/jarvis-prime/.github/workflows/09-phase11-production-migration-gate.yml@main
-    with:
-      operation: ${{ github.event.client_payload.operation }}
-      confirmation: ${{ github.event.client_payload.confirmation }}
-      db_mode: ${{ github.event.client_payload.db_mode }}
-      git_sha: ${{ github.event.client_payload.git_sha }}
-      database_url_b64: ${{ needs.provide-production-secret.outputs.database_url_b64 }}
+      - name: Check out the exact reviewed main-branch SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.git_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm requested SHA is reachable from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${{ github.event.client_payload.git_sha }}" origin/main
+          [[ "$(git rev-parse HEAD)" == "${{ github.event.client_payload.git_sha }}" ]]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run verify:automation:rollout-contract
+
+      - name: Print immutable migration boundary
+        run: node database/scripts/phase11-production-migration-gate.mjs --describe
+
+      - name: Diagnostic - verify Environment context
+        shell: bash
+        env:
+          PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
+        run: |
+          echo "=== Environment Context Diagnostic ==="
+          echo "Job Environment: jarvis-prime-api / production"
+          echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}"
+          echo "Variable PHASE11_PRODUCTION_PROJECT_REF provided: ${PROJECT_REF_PROVIDED} (value: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }})"
+          echo "Input db_mode: ${{ github.event.client_payload.db_mode }}"
+          echo "=== End Diagnostic ==="
+
+      - name: Read-only production ledger preflight
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ github.event.client_payload.db_mode }}
+        run: node database/scripts/phase11-production-migration-gate.mjs --inspect
+
+      - name: Report constrained boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Phase 11 migration gate completed."
+          echo "No API/worker deployment, provider activation, or generic db push was performed."
