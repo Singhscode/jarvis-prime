@@ -1,0 +1,46 @@
+name: Phase 11 Production Migration Gate Dispatch
+
+# Minimal caller workflow to manually dispatch the Phase 11 migration gate.
+# The actual migration logic, production Environment, secrets, and all safety
+# controls remain in the called workflow: 09-phase11-production-migration-gate.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only inspection, or the explicit 35-then-36 delivery path.
+        required: true
+        type: choice
+        options:
+          - inspect
+          - apply
+      confirmation:
+        description: Select the confirmation matching the requested operation.
+        required: true
+        type: choice
+        options:
+          - INSPECT_ONLY
+          - APPLY_35_THEN_36
+      db_mode:
+        description: Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).
+        required: true
+        type: choice
+        options:
+          - direct
+          - session-pooler
+      git_sha:
+        description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  call-migration-gate:
+    uses: Singhscode/jarvis-prime/.github/workflows/09-phase11-production-migration-gate.yml@main
+    with:
+      operation: ${{ inputs.operation }}
+      confirmation: ${{ inputs.confirmation }}
+      db_mode: ${{ inputs.db_mode }}
+      git_sha: ${{ inputs.git_sha }}
