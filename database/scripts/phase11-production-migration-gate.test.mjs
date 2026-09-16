@@ -12,6 +12,7 @@ import {
   assertProductionTarget,
   evaluateProductionLedger,
   loadApprovedMigrations,
+  phase11SslConfigForMode,
   runPhase11ProductionMigrationGate,
 } from './phase11-production-migration-gate.mjs';
 
@@ -328,4 +329,9 @@ test('classifies database failures with safe stage and code metadata only', asyn
   const formatted = formatPhase11DatabaseError(new Phase11DatabaseError('connect', { code: 'ECONNREFUSED' }));
   assert.match(formatted, /class=NETWORK code=ECONNREFUSED stage=connect/);
   assert.doesNotMatch(formatted, /postgresql|secret-value|password/i);
+});
+
+test('uses encrypted-only TLS policy for session-pooler mode', () => {
+  assert.deepEqual(phase11SslConfigForMode('session-pooler'), { rejectUnauthorized: false });
+  assert.deepEqual(phase11SslConfigForMode('direct'), { rejectUnauthorized: true });
 });
