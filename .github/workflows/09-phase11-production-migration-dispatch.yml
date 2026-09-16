@@ -6,10 +6,28 @@ name: Phase 11 Production Migration Gate Dispatch
 # workflows (HTTP 422 "Workflow does not have 'workflow_dispatch' trigger") even
 # though the YAML declares the trigger, so the documented `repository_dispatch`
 # event is used as the manual trigger instead. This workflow carries no
-# credentials and duplicates no migration logic: it validates the operator
-# payload and then calls the existing production gate through `workflow_call`.
+# credentials and duplicates no migration logic: it authorizes the operator,
+# validates the payload, and then calls the existing production gate through
+# `workflow_call`.
 #
-# Dispatch (operator, from an authorized client):
+# APPROVED OPERATOR ALLOWLIST
+# ---------------------------
+# Authorization is driven by the REPOSITORY-level GitHub Actions variable
+# `PHASE11_APPROVED_OPERATORS` (Settings -> Secrets and variables -> Actions ->
+# Variables -> Repository variables). It holds a comma-, semicolon-, or
+# newline-separated list of approved GitHub logins, compared case-insensitively
+# against `github.actor`.
+#
+# The list is deliberately NOT environment-scoped: an environment-scoped
+# variable is only readable from a job that declares that environment, which
+# would consume a production reviewer approval before authorization could run.
+# The list is deliberately NOT committed here so that rotating an operator does
+# not require a code change.
+#
+# If `PHASE11_APPROVED_OPERATORS` is unset or empty, EVERY dispatch fails
+# closed. Populate it before the first dispatch.
+#
+# Dispatch (approved operator, from an authorized client):
 #   POST /repos/Singhscode/jarvis-prime/dispatches
 #   { "event_type": "phase11-production-inspect",
 #     "client_payload": { "operation": "inspect",
@@ -30,9 +48,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Fail closed before any database-capable job is reachable. This job has no
+  # Gate 1: only an explicitly approved operator may proceed. This job has no
   # environment, no secrets, and no production access of any kind.
+  authorize-operator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require github.actor to be an approved Phase 11 operator
+        shell: bash
+        env:
+          DISPATCH_ACTOR: ${{ github.actor }}
+          APPROVED_OPERATORS: ${{ vars.PHASE11_APPROVED_OPERATORS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPROVED_OPERATORS//[[:space:]]/}" ]]; then
+            echo "Repository variable PHASE11_APPROVED_OPERATORS is unset or empty; failing closed." >&2
+            exit 1
+          fi
+          actor_lower="$(printf '%s' "${DISPATCH_ACTOR}" | tr '[:upper:]' '[:lower:]')"
+          authorized=false
+          while IFS= read -r entry; do
+            entry="$(printf '%s' "${entry}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+            if [[ -n "${entry}" && "${entry}" == "${actor_lower}" ]]; then
+              authorized=true
+            fi
+          done < <(printf '%s\n' "${APPROVED_OPERATORS}" | tr ',;' '\n')
+          if [[ "${authorized}" != "true" ]]; then
+            echo "Actor is not an approved Phase 11 production operator; failing closed." >&2
+            exit 1
+          fi
+          echo "Dispatch actor is an approved Phase 11 production operator."
+
+  # Gate 2: fail closed on anything other than a read-only session-pooler
+  # inspection. Also credential-free and environment-free.
   validate-inspect-payload:
+    needs: authorize-operator
     runs-on: ubuntu-latest
     steps:
       - name: Require a read-only session-pooler inspection payload
@@ -67,7 +116,9 @@ jobs:
   # immutable migration allowlist, the read-only ledger preflight, session-pooler
   # target validation, the migration 37 hard-stop, and all apply restrictions.
   call-migration-gate:
-    needs: validate-inspect-payload
+    needs:
+      - authorize-operator
+      - validate-inspect-payload
     uses: Singhscode/jarvis-prime/.github/workflows/09-phase11-production-migration-gate.yml@main
     with:
       operation: ${{ github.event.client_payload.operation }}
