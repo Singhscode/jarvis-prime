@@ -50,6 +50,12 @@ The workflow is manual, runs only from `main`, checks out an operator-supplied S
 14. **Verify 37 is absent:** a final read-only workflow inspection must show 37 as `absent`. Migration 32, 33, 34, 37, any other post-31/unrelated version, duplicate ledger version, out-of-order 36/38/39/40, or a hash/content mismatch is a stop condition.
 15. **Only after the gate succeeds:** record the maintenance/backup approval, durable queue state, provider-disabled state (`PHASE11_APOLLO_READ_ENABLED=false`), and successful final ledger report. Only then may the separately authorized production API deployment proceed. The paired worker image may follow only under its independent worker deployment contract. No production canary or provider call is authorized by this gate.
 
+### Separate production API release prerequisite and readiness
+
+A successful `09-phase11-production-migration-gate.yml` run and the operator evidence above are prerequisites for manually dispatching `04-deploy-azure-api.yml`; workflow 04 does not run, infer, or replace the migration gate. A manual API release supplies an exact reviewed `git_sha`, verifies that SHA is reachable from `main`, checks it out explicitly, and deploys only the API-only artifact built from that checkout.
+
+After Azure App Service deployment, workflow 04 resolves the existing App Service default hostname read-only and requires the API's existing public `GET /ready` route to return HTTP 200 with `ready=true` using bounded exponential-backoff retries. `/ready` is an API database-readiness probe; it is distinct from the separately supervised worker's local `/ready` probe. A readiness timeout fails the workflow and records non-secret outcome evidence; it does not trigger automatic rollback, migration activity, worker/ACA activity, provider activation, or infrastructure changes.
+
 **Never use** unqualified `npm run db:push` for this release: CLI filesystem discovery could include staging-only migration 37. Do not repair a mismatch by editing migration history or ledger rows; stop and use the incident/forward-fix process.
 
 ## Operational response
