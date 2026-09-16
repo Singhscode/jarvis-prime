@@ -1,46 +1,76 @@
 name: Phase 11 Production Migration Gate Dispatch
 
-# Minimal caller workflow to manually dispatch the Phase 11 migration gate.
-# The actual migration logic, production Environment, secrets, and all safety
-# controls remain in the called workflow: 09-phase11-production-migration-gate.yml
+# Manual control-plane entrypoint for the Phase 11 production migration gate.
+#
+# The GitHub workflow-dispatch API refuses to dispatch this repository's Phase 11
+# workflows (HTTP 422 "Workflow does not have 'workflow_dispatch' trigger") even
+# though the YAML declares the trigger, so the documented `repository_dispatch`
+# event is used as the manual trigger instead. This workflow carries no
+# credentials and duplicates no migration logic: it validates the operator
+# payload and then calls the existing production gate through `workflow_call`.
+#
+# Dispatch (operator, from an authorized client):
+#   POST /repos/Singhscode/jarvis-prime/dispatches
+#   { "event_type": "phase11-production-inspect",
+#     "client_payload": { "operation": "inspect",
+#                         "confirmation": "INSPECT_ONLY",
+#                         "db_mode": "session-pooler",
+#                         "git_sha": "<40 lowercase hex main SHA>" } }
 
 on:
-  workflow_dispatch:
-    inputs:
-      operation:
-        description: Read-only inspection, or the explicit 35-then-36 delivery path.
-        required: true
-        type: choice
-        options:
-          - inspect
-          - apply
-      confirmation:
-        description: Select the confirmation matching the requested operation.
-        required: true
-        type: choice
-        options:
-          - INSPECT_ONLY
-          - APPLY_35_THEN_36
-      db_mode:
-        description: Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).
-        required: true
-        type: choice
-        options:
-          - direct
-          - session-pooler
-      git_sha:
-        description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
-        required: true
-        type: string
+  repository_dispatch:
+    types:
+      - phase11-production-inspect
 
 permissions:
   contents: read
 
+concurrency:
+  group: phase11-production-migration-dispatch
+  cancel-in-progress: false
+
 jobs:
+  # Fail closed before any database-capable job is reachable. This job has no
+  # environment, no secrets, and no production access of any kind.
+  validate-inspect-payload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a read-only session-pooler inspection payload
+        shell: bash
+        env:
+          PAYLOAD_OPERATION: ${{ github.event.client_payload.operation }}
+          PAYLOAD_CONFIRMATION: ${{ github.event.client_payload.confirmation }}
+          PAYLOAD_DB_MODE: ${{ github.event.client_payload.db_mode }}
+          PAYLOAD_GIT_SHA: ${{ github.event.client_payload.git_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${PAYLOAD_OPERATION}" != "inspect" ]]; then
+            echo "operation must be exactly 'inspect' for repository_dispatch." >&2
+            exit 1
+          fi
+          if [[ "${PAYLOAD_CONFIRMATION}" != "INSPECT_ONLY" ]]; then
+            echo "confirmation must be exactly 'INSPECT_ONLY' for repository_dispatch." >&2
+            exit 1
+          fi
+          if [[ "${PAYLOAD_DB_MODE}" != "session-pooler" ]]; then
+            echo "db_mode must be exactly 'session-pooler' for repository_dispatch." >&2
+            exit 1
+          fi
+          if [[ ! "${PAYLOAD_GIT_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase SHA." >&2
+            exit 1
+          fi
+          echo "Validated read-only inspection payload for ${PAYLOAD_GIT_SHA}."
+
+  # The called gate owns the protected Environment, the production database
+  # secret and project ref, SHA/ancestry validation, the rollout contract, the
+  # immutable migration allowlist, the read-only ledger preflight, session-pooler
+  # target validation, the migration 37 hard-stop, and all apply restrictions.
   call-migration-gate:
+    needs: validate-inspect-payload
     uses: Singhscode/jarvis-prime/.github/workflows/09-phase11-production-migration-gate.yml@main
     with:
-      operation: ${{ inputs.operation }}
-      confirmation: ${{ inputs.confirmation }}
-      db_mode: ${{ inputs.db_mode }}
-      git_sha: ${{ inputs.git_sha }}
+      operation: ${{ github.event.client_payload.operation }}
+      confirmation: ${{ github.event.client_payload.confirmation }}
+      db_mode: ${{ github.event.client_payload.db_mode }}
+      git_sha: ${{ github.event.client_payload.git_sha }}
