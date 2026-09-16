@@ -22,7 +22,7 @@ on:
           - INSPECT_ONLY
           - APPLY_35_THEN_36
       db_mode:
-        description: Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).
+        description: 'Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).'
         required: true
         type: choice
         options:
@@ -32,29 +32,25 @@ on:
         description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
         required: true
         type: string
+  # workflow_call inputs support only string, number, and boolean. `choice` is a
+  # workflow_dispatch-only type; using it here made the reusable workflow fail
+  # validation at planning time, before any job or runner started. The allowed
+  # values are enforced at runtime by the "Validate manual operation and reviewed
+  # SHA" step below and by assertProductionTarget in the gate script.
   workflow_call:
     inputs:
       operation:
-        description: Read-only inspection, or the explicit 35-then-36 delivery path.
+        description: Read-only inspection, or the explicit 35-then-36 delivery path. Must be inspect or apply.
         required: true
-        type: choice
-        options:
-          - inspect
-          - apply
+        type: string
       confirmation:
-        description: Select the confirmation matching the requested operation.
+        description: Select the confirmation matching the requested operation. Must be INSPECT_ONLY or APPLY_35_THEN_36.
         required: true
-        type: choice
-        options:
-          - INSPECT_ONLY
-          - APPLY_35_THEN_36
+        type: string
       db_mode:
-        description: Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).
+        description: 'Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).'
         required: true
-        type: choice
-        options:
-          - direct
-          - session-pooler
+        type: string
       git_sha:
         description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
         required: true
