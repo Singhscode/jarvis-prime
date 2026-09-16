@@ -177,10 +177,12 @@ jobs:
         shell: bash
         env:
           PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
+          DATABASE_CA_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM != '' && 'yes' || 'no' }}
         run: |
           echo "=== Environment Context Diagnostic ==="
           echo "Job Environment: jarvis-prime-api / production"
           echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}"
+          echo "Secret PHASE11_PRODUCTION_DATABASE_CA_PEM provided: ${DATABASE_CA_PROVIDED}"
           echo "Variable PHASE11_PRODUCTION_PROJECT_REF provided: ${PROJECT_REF_PROVIDED} (value: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }})"
           echo "Input db_mode: ${{ github.event.client_payload.db_mode }}"
           echo "=== End Diagnostic ==="
@@ -188,6 +190,7 @@ jobs:
       - name: Read-only production ledger preflight
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ github.event.client_payload.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect

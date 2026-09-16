@@ -140,11 +140,13 @@ jobs:
         shell: bash
         env:
           DATABASE_URL_PROVIDED: ${{ (secrets.PHASE11_PRODUCTION_DATABASE_URL != '' || steps.decode-db-url.outputs.database_url != '') && 'yes' || 'no' }}
+          DATABASE_CA_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM != '' && 'yes' || 'no' }}
           PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
         run: |
           echo "=== Environment Context Diagnostic ==="
           echo "Job Environment: jarvis-prime-api / production"
           echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}"
+          echo "Secret PHASE11_PRODUCTION_DATABASE_CA_PEM provided: ${DATABASE_CA_PROVIDED}"
           echo "Decoded URL from workflow_call: ${{ steps.decode-db-url.outputs.database_url != '' && 'yes' || 'no' }}"
           echo "Variable PHASE11_PRODUCTION_PROJECT_REF provided: ${PROJECT_REF_PROVIDED} (value: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }})"
           echo "Input db_mode: ${{ inputs.db_mode }}"
@@ -153,6 +155,7 @@ jobs:
       - name: Read-only production ledger preflight
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
@@ -161,6 +164,7 @@ jobs:
         if: ${{ inputs.operation == 'apply' }}
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --apply
@@ -169,6 +173,7 @@ jobs:
         if: ${{ inputs.operation == 'apply' }}
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
