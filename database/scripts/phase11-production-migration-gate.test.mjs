@@ -10,9 +10,9 @@ import {
   PHASE11_STAGING_ONLY_MIGRATION,
   Phase11MigrationGateError,
   assertProductionTarget,
+  createVerifiedPgClientConfig,
   evaluateProductionLedger,
   loadApprovedMigrations,
-  phase11SslConfigForMode,
   runPhase11ProductionMigrationGate,
 } from './phase11-production-migration-gate.mjs';
 
@@ -150,6 +150,26 @@ test('accepts require sslmode and rejects insecure sslmodes', () => {
     ...environment,
     PHASE11_PRODUCTION_DATABASE_URL: secretConnectionString.replace('sslmode=verify-full', 'sslmode=disable'),
   }), (error) => error instanceof Phase11MigrationGateError && error.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED');
+});
+
+test('pins the protected CA and prevents URL TLS parameters from overriding verification', () => {
+  const certificateAuthority = '-----BEGIN CERTIFICATE-----\nphase11-test-ca\n-----END CERTIFICATE-----';
+  const config = createVerifiedPgClientConfig({
+    connectionString: `${secretConnectionString}&sslrootcert=/unsafe/path&ssl=no-verify&sslnegotiation=direct`,
+    certificateAuthority,
+  });
+  const sanitized = new URL(config.connectionString);
+
+  assert.equal(sanitized.searchParams.has('sslmode'), false);
+  assert.equal(sanitized.searchParams.has('sslrootcert'), false);
+  assert.equal(sanitized.searchParams.has('ssl'), false);
+  assert.equal(sanitized.searchParams.has('sslnegotiation'), false);
+  assert.deepEqual(config.ssl, { rejectUnauthorized: true, ca: certificateAuthority });
+});
+
+test('uses the platform trust store with verification when no protected CA is configured', () => {
+  const config = createVerifiedPgClientConfig({ connectionString: secretConnectionString });
+  assert.deepEqual(config.ssl, { rejectUnauthorized: true });
 });
 
 // Supabase's documented Shared Session Pooler hostname is a region/index-scoped
@@ -331,7 +351,9 @@ test('classifies database failures with safe stage and code metadata only', asyn
   assert.doesNotMatch(formatted, /postgresql|secret-value|password/i);
 });
 
-test('uses encrypted-only TLS policy for session-pooler mode', () => {
-  assert.deepEqual(phase11SslConfigForMode('session-pooler'), { rejectUnauthorized: false });
-  assert.deepEqual(phase11SslConfigForMode('direct'), { rejectUnauthorized: true });
+test('reports certificate-verifying TLS regardless of the connection mode', async () => {
+  const { Phase11DatabaseError, formatPhase11DatabaseError } = await import('./phase11-production-migration-gate.mjs');
+  const formatted = formatPhase11DatabaseError(new Phase11DatabaseError('connect', { code: 'SELF_SIGNED_CERT_IN_CHAIN' }, { mode: 'session-pooler' }));
+  assert.match(formatted, /mode=session-pooler/);
+  assert.match(formatted, /tls=REJECT_UNAUTHORIZED/);
 });

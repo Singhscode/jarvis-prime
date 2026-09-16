@@ -267,7 +267,12 @@ export function assertProductionTarget(environment = process.env) {
     }
   }
 
-  return { connectionString, projectRef, dbMode };
+  return {
+    connectionString,
+    projectRef,
+    dbMode,
+    certificateAuthority: environment.PHASE11_PRODUCTION_DATABASE_CA_PEM || undefined,
+  };
 }
 
 function ledgerStatementsMatch(row, migration) {
@@ -349,19 +354,39 @@ async function readLedgerReadOnly(client) {
   }
 }
 
-export function phase11SslConfigForMode(dbMode = 'direct') {
-  // Supabase session-pooler endpoints commonly terminate TLS with certificates
-  // that are not chain-verified by Node's default trust store in CI. Keep TLS
-  // encryption while disabling CA chain enforcement only for session-pooler.
-  return dbMode === 'session-pooler'
-    ? { rejectUnauthorized: false }
-    : { rejectUnauthorized: true };
+const TLS_CONNECTION_QUERY_PARAMETERS = Object.freeze([
+  'ssl',
+  'sslmode',
+  'sslrootcert',
+  'sslcert',
+  'sslkey',
+  'sslnegotiation',
+  'uselibpqcompat',
+]);
+
+/**
+ * Build a pg configuration whose TLS policy cannot be overridden by a URL query
+ * parameter. When the protected Environment provides the project CA, it is the
+ * sole additional trust anchor; hostname and chain verification remain enabled.
+ */
+export function createVerifiedPgClientConfig({ connectionString, certificateAuthority }) {
+  const sanitizedConnectionUrl = new URL(connectionString);
+  for (const parameter of TLS_CONNECTION_QUERY_PARAMETERS) {
+    sanitizedConnectionUrl.searchParams.delete(parameter);
+  }
+
+  const ssl = { rejectUnauthorized: true };
+  if (typeof certificateAuthority === 'string' && certificateAuthority.trim()) {
+    ssl.ca = certificateAuthority;
+  }
+
+  return { connectionString: sanitizedConnectionUrl.toString(), ssl };
 }
 
-async function defaultClientFactory({ connectionString, root, dbMode }) {
+async function defaultClientFactory({ connectionString, certificateAuthority, root }) {
   const requireApiDependency = createRequire(path.join(root, 'apps', 'api', 'package.json'));
   const pg = requireApiDependency('pg');
-  return new pg.Client({ connectionString, ssl: phase11SslConfigForMode(dbMode) });
+  return new pg.Client(createVerifiedPgClientConfig({ connectionString, certificateAuthority }));
 }
 
 async function applyOneMigration(client, migration) {
@@ -417,12 +442,11 @@ function safeProductionDatabaseErrorCode(error) {
 }
 
 export class Phase11DatabaseError extends Error {
-  constructor(stage, error, { mode, tlsPolicy } = {}) {
+  constructor(stage, error, { mode } = {}) {
     super('PHASE11_DATABASE_DRIVER_ERROR');
     this.name = 'Phase11DatabaseError';
     this.stage = stage;
     this.mode = mode || 'direct';
-    this.tlsPolicy = tlsPolicy || 'REJECT_UNAUTHORIZED';
     this.classification = classifyProductionDatabaseError(error);
     this.safeCode = safeProductionDatabaseErrorCode(error);
   }
@@ -436,7 +460,7 @@ export function formatPhase11DatabaseError(error) {
     `stage=${error.stage}`,
     `mode=${error.mode || 'UNKNOWN'}`,
     'port=5432',
-    `tls=${error.tlsPolicy || 'REJECT_UNAUTHORIZED'}`,
+    'tls=REJECT_UNAUTHORIZED',
   ].join(' ');
 }
 
@@ -502,8 +526,7 @@ export async function runPhase11ProductionMigrationGate({
     if (error instanceof Phase11MigrationGateError) throw error;
     // Capture dbMode from target object if available
     const mode = target?.dbMode || 'direct';
-    const tlsPolicy = mode === 'session-pooler' ? 'ENCRYPT_ONLY' : 'REJECT_UNAUTHORIZED';
-    throw new Phase11DatabaseError(stage, error, { mode, tlsPolicy });
+    throw new Phase11DatabaseError(stage, error, { mode });
   } finally {
     if (connected) await client.end().catch(() => {});
   }
