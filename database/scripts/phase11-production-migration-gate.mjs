@@ -444,6 +444,103 @@ function safeProductionDatabaseErrorCode(error) {
 }
 
 /**
+ * Forensic diagnostic: Analyze CA PEM from runtime environment without exposing content.
+ * Reports only sanitized metadata: presence, length, byte patterns, hashes, encoding issues.
+ * Identifies: literal escaped newlines, BOM, CRLF, encoding corruption, whitespace issues.
+ * Does NOT print the CA or any secret data.
+ */
+export function diagnosticCaPemForensics(environment = process.env) {
+  const caPem = environment.PHASE11_PRODUCTION_DATABASE_CA_PEM;
+
+  const report = { phase: 'ca-forensics' };
+
+  if (!caPem) {
+    report.ca_env_present = false;
+    return report;
+  }
+
+  report.ca_env_present = true;
+  report.ca_length = caPem.length;
+
+  // Byte-level analysis
+  const caBytes = Buffer.from(caPem, 'utf8');
+  if (caBytes.length >= 1) report.ca_first_byte_hex = caBytes.readUInt8(0).toString(16).padStart(2, '0');
+  if (caBytes.length >= 1) report.ca_last_byte_hex = caBytes.readUInt8(caBytes.length - 1).toString(16).padStart(2, '0');
+
+  // BOM detection
+  report.ca_has_bom_utf8 = caBytes.length >= 3 && caBytes[0] === 0xEF && caBytes[1] === 0xBB && caBytes[2] === 0xBF;
+
+  // Newline pattern analysis (without printing content)
+  const crlf = (caPem.match(/\r\n/g) || []).length;
+  const lf = (caPem.match(/(?<!\r)\n/g) || []).length;
+  const crAlone = (caPem.match(/\r(?!\n)/g) || []).length;
+
+  report.ca_contains_crlf = crlf > 0;
+  report.ca_contains_lf = lf > 0;
+  report.ca_contains_cr = crAlone > 0;
+  report.crlf_count = crlf;
+  report.lf_count = lf;
+
+  // Literal escaped newline detection: looking for the two-character sequence \ followed by n
+  const literalBackslashN = (caPem.match(/\\n/g) || []).length;
+  report.ca_contains_literal_backslash_n = literalBackslashN > 0;
+  report.literal_backslash_n_count = literalBackslashN;
+
+  // BEGIN/END marker count
+  const beginCount = (caPem.match(/-----BEGIN\s+CERTIFICATE-----/g) || []).length;
+  const endCount = (caPem.match(/-----END\s+CERTIFICATE-----/g) || []).length;
+  report.ca_begin_marker_count = beginCount;
+  report.ca_end_marker_count = endCount;
+
+  // Whitespace analysis
+  const leadingWhitespace = caPem.match(/^\s+/);
+  const trailingWhitespace = caPem.match(/\s+$/);
+  report.ca_has_leading_whitespace = !!leadingWhitespace;
+  report.ca_has_trailing_whitespace = !!trailingWhitespace;
+
+  // Hash the raw bytes as-is
+  report.ca_sha256_raw = createHash('sha256').update(caBytes).digest('hex');
+
+  // Hash after trimming whitespace
+  const trimmed = caPem.trim();
+  const trimmedBytes = Buffer.from(trimmed, 'utf8');
+  report.ca_sha256_trimmed = createHash('sha256').update(trimmedBytes).digest('hex');
+
+  // Try to extract DER and hash that
+  try {
+    const base64 = caPem
+      .split('\n')
+      .filter(line => !line.includes('-----') && line.trim())
+      .join('');
+    if (base64) {
+      const der = Buffer.from(base64, 'base64');
+      report.ca_sha256_der = createHash('sha256').update(der).digest('hex');
+      report.ca_der_extracted = true;
+    }
+  } catch (e) {
+    report.ca_der_extract_error = e.message;
+  }
+
+  // Expected known fingerprint
+  report.expected_ca_sha256 = '807025ad50d4ed219d2c9c7d299c004f824eb00cf7f65afef607d07b72e6cafa';
+  report.ca_sha256_matches_expected = report.ca_sha256_der === report.expected_ca_sha256;
+
+  // Try to parse with X509Certificate
+  try {
+    const cert = new X509Certificate(caPem);
+    report.x509_parse_status = 'ok';
+    report.x509_subject = cert.subject;
+    report.x509_issuer = cert.issuer;
+    report.x509_is_ca = cert.checkCAConstraint ? true : false;
+  } catch (e) {
+    report.x509_parse_status = 'failed';
+    report.x509_parse_error = e.message;
+  }
+
+  return report;
+}
+
+/**
  * Temporary diagnostic: Test Node.js TLS capability against the production
  * PostgreSQL endpoint using PostgreSQL SSLRequest + TLS handshake with the
  * supplied CA. Reports only sanitized metadata; no secrets, no credentials,
@@ -597,6 +694,8 @@ export async function runPhase11ProductionMigrationGate({
 
   // TEMPORARY DIAGNOSTIC: Test Node TLS capability with production CA
   if (environment.PHASE11_PRODUCTION_DATABASE_URL && environment.PHASE11_PRODUCTION_DATABASE_CA_PEM) {
+    const forensics = diagnosticCaPemForensics(environment);
+    write(`PHASE11_DIAGNOSTICS_CA_FORENSICS ${JSON.stringify(forensics)}`);
     const tlsDiag = await diagnosticNodeTlsCapability(environment);
     write(`PHASE11_DIAGNOSTICS_NODE_TLS ${JSON.stringify(tlsDiag)}`);
   }
