@@ -1,14 +1,7 @@
 name: Deploy — Azure Production API
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'apps/api/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/04-deploy-azure-api.yml'
+  # Production API release is manual only and follows the Phase 11 migration gate.
   workflow_dispatch:
 
 permissions:

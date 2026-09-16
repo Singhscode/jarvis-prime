@@ -327,6 +327,52 @@ function describeMigrations(write) {
  * under an advisory lock, then executes 35 and 36 in order; each migration's
  * ledger record is inserted before its committed source transaction commits.
  */
+const SAFE_DATABASE_ERROR_CODES = new Set([
+  '28P01', '28000', '3D000',
+  'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID',
+  'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'EAI_AGAIN', 'EAI_FAIL', 'EAI_NODATA', 'ENETUNREACH', 'ENETDOWN',
+  'ENOTFOUND', 'EHOSTUNREACH', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT',
+]);
+
+export function classifyProductionDatabaseError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  if (['EAI_AGAIN', 'EAI_FAIL', 'EAI_NODATA', 'ENOTFOUND'].includes(code)) return 'DNS';
+  if (['ENETUNREACH', 'ENETDOWN', 'EHOSTUNREACH', 'ECONNREFUSED', 'ECONNRESET'].includes(code)) return 'NETWORK';
+  if (code === 'ETIMEDOUT') return 'TIMEOUT';
+  if (['CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'ERR_TLS_CERT_ALTNAME_INVALID', 'SELF_SIGNED_CERT_IN_CHAIN', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'].includes(code)) return 'TLS';
+  if (['28P01', '28000'].includes(code)) return 'AUTH';
+  if (code === '3D000') return 'DATABASE';
+  return 'DATABASE_DRIVER';
+}
+
+function safeProductionDatabaseErrorCode(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  return SAFE_DATABASE_ERROR_CODES.has(code) ? code : 'UNCLASSIFIED';
+}
+
+export class Phase11DatabaseError extends Error {
+  constructor(stage, error) {
+    super('PHASE11_DATABASE_DRIVER_ERROR');
+    this.name = 'Phase11DatabaseError';
+    this.stage = stage;
+    this.classification = classifyProductionDatabaseError(error);
+    this.safeCode = safeProductionDatabaseErrorCode(error);
+  }
+}
+
+export function formatPhase11DatabaseError(error) {
+  return [
+    'PHASE11_GATE_DATABASE_FAILED',
+    `class=${error.classification}`,
+    `code=${error.safeCode}`,
+    `stage=${error.stage}`,
+    'target=DIRECT_SUPABASE',
+    'port=5432',
+    'tls=REJECT_UNAUTHORIZED',
+  ].join(' ');
+}
+
 export async function runPhase11ProductionMigrationGate({
   operation,
   environment = process.env,
@@ -339,21 +385,29 @@ export async function runPhase11ProductionMigrationGate({
   }
   const migrations = await loadApprovedMigrations(root);
   const target = assertProductionTarget(environment);
-  const client = await clientFactory({ ...target, root });
+  let client;
   let connected = false;
+  let stage = 'client-create';
 
   try {
+    client = await clientFactory({ ...target, root });
+    stage = 'connect';
     await client.connect();
     connected = true;
+    stage = 'ledger-read';
     let report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+    stage = 'ledger-evaluate';
     writeLedgerReport(write, report);
     if (report.violations.length || operation === 'inspect') {
       return Object.freeze({ report, applied: Object.freeze([]), stopped: report.violations.length > 0 });
     }
 
+    stage = 'advisory-lock';
     await client.query(ADVISORY_LOCK_SQL);
     try {
+      stage = 'ledger-read';
       report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+      stage = 'ledger-evaluate';
       writeLedgerReport(write, report);
       if (report.violations.length) {
         return Object.freeze({ report, applied: Object.freeze([]), stopped: true });
@@ -361,8 +415,11 @@ export async function runPhase11ProductionMigrationGate({
 
       const applied = [];
       for (const migration of report.pending) {
+        stage = 'migration-apply';
         await applyOneMigration(client, migration);
+        stage = 'ledger-read';
         const verified = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+        stage = 'ledger-evaluate';
         writeLedgerReport(write, verified);
         if (verified.violations.length || !verified.states.some((state) => state.version === migration.version && state.status === 'applied')) {
           return Object.freeze({ report: verified, applied: Object.freeze(applied), stopped: true });
@@ -374,6 +431,9 @@ export async function runPhase11ProductionMigrationGate({
     } finally {
       await client.query(ADVISORY_UNLOCK_SQL).catch(() => {});
     }
+  } catch (error) {
+    if (error instanceof Phase11MigrationGateError || error instanceof Phase11DatabaseError) throw error;
+    throw new Phase11DatabaseError(stage, error);
   } finally {
     if (connected) await client.end().catch(() => {});
   }
@@ -393,8 +453,13 @@ async function main() {
       process.exitCode = 1;
     }
   } catch (error) {
-    // Do not print driver errors: they can include target details and must never expose a connection string.
-    console.error(error instanceof Phase11MigrationGateError ? error.code : 'PHASE11_GATE_FAILED');
+    if (error instanceof Phase11MigrationGateError) {
+      console.error(error.code);
+    } else if (error instanceof Phase11DatabaseError) {
+      console.error(formatPhase11DatabaseError(error));
+    } else {
+      console.error('PHASE11_GATE_FAILED');
+    }
     process.exitCode = 1;
   }
 }

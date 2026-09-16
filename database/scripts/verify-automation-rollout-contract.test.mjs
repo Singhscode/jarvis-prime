@@ -247,3 +247,16 @@ test('first production worker image bootstrap is manual, provenance-gated, and A
   const azureCliCommands = [...bootstrapWorkflow.matchAll(/^\s*(az\s+.+)$/gm)].map(([, command]) => command);
   assert.deepEqual(azureCliCommands, [acrLogin]);
 });
+
+test('production API deployment is manual and cannot race the migration gate on main pushes', async () => {
+  const productionApiWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '04-deploy-azure-api.yml'),
+    'utf8',
+  );
+
+  assert.match(productionApiWorkflow, /^  workflow_dispatch:$/m);
+  assert.doesNotMatch(productionApiWorkflow, /^  push:/m);
+  assert.match(productionApiWorkflow, /environment: "jarvis-prime-api \/ production"/);
+  assert.match(productionApiWorkflow, /uses: azure\/login@v2/);
+  assert.match(productionApiWorkflow, /uses: azure\/webapps-deploy@v3/);
+});
