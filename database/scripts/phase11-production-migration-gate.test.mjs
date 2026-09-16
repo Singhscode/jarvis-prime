@@ -452,3 +452,64 @@ test('diagnostic skips gracefully when environment is incomplete', async () => {
   const result = await diagnosticNodeTlsCapability({});
   assert.equal(result.status, 'skipped');
 });
+
+test('preflight with no violations in apply mode does not return stopped=true', async () => {
+  // This test verifies the fix: clean preflight should allow apply to proceed
+  const migrations = await loadedMigrations();
+  const cleanLedger = predecessorLedger();  // Only predecessor migrations, no violations
+  const report = evaluateProductionLedger(cleanLedger, migrations);
+  assert.equal(report.violations.length, 0);  // No violations
+  assert.equal(report.pending.length, 5);  // All 5 migrations pending
+  assert.deepEqual(report.pending.map(m => m.version), ['20260810000035', '20260810000036', '20260810000038', '20260810000039', '20260810000040']);
+});
+
+test('preflight detects and stops on genuine violations (ordering)', async () => {
+  const migrations = await loadedMigrations();
+  // Simulate violation: 38 applied but 36 not applied
+  const violatingLedger = [
+    ...predecessorLedger(),
+    approvedLedgerRow(migrations[0]),  // 35 applied
+    // 36 missing
+    approvedLedgerRow(migrations[2]),  // 38 applied (violation: 36 not present)
+  ];
+  const report = evaluateProductionLedger(violatingLedger, migrations);
+  assert.ok(report.violations.includes('PHASE11_GATE_ORDERING_INVALID'));  // Should detect violation
+});
+
+test('preflight detects and stops on genuine violations (checksum mismatch)', async () => {
+  const migrations = await loadedMigrations();
+  const mutated = approvedLedgerRow(migrations[0]);
+  mutated.statements.push('select 1');  // Corrupt the ledger entry
+  const violatingLedger = [...predecessorLedger(), mutated];
+  const report = evaluateProductionLedger(violatingLedger, migrations);
+  assert.ok(report.violations.includes('PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH'));  // Should detect violation
+});
+
+test('preflight hard-stops when migration 37 is present', async () => {
+  const migrations = await loadedMigrations();
+  const illegalLedger = [...predecessorLedger(), { version: PHASE11_STAGING_ONLY_MIGRATION.version, name: '', statements: null }];
+  const report = evaluateProductionLedger(illegalLedger, migrations);
+  assert.ok(report.violations.includes('PHASE11_GATE_STAGING_ONLY_37_PRESENT'));  // Must detect 37
+});
+
+test('apply mode with all 5 migrations already applied does not attempt reapply', async () => {
+  const migrations = await loadedMigrations();
+  const allApplied = [
+    ...predecessorLedger(),
+    ...migrations.map(approvedLedgerRow),
+  ];
+  const { result } = await runWithLedger({
+    operation: 'apply',
+    ledger: allApplied,
+  });
+  assert.equal(result.stopped, false);
+  assert.deepEqual(result.applied, []);  // Nothing to apply
+  assert.equal(result.report.pending.length, 0);  // No pending migrations
+});
+
+test('inspect mode correctly returns no mutations', async () => {
+  const { result } = await runWithLedger({ operation: 'inspect' });
+  // Inspect should never apply anything
+  assert.equal(result.applied.length, 0);
+  assert.equal(result.report.pending.length, 5);  // But should see pending
+});
