@@ -1,8 +1,10 @@
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import net from 'node:net';
+import tls from 'node:tls';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
@@ -441,6 +443,122 @@ function safeProductionDatabaseErrorCode(error) {
   return SAFE_DATABASE_ERROR_CODES.has(code) ? code : 'UNCLASSIFIED';
 }
 
+/**
+ * Temporary diagnostic: Test Node.js TLS capability against the production
+ * PostgreSQL endpoint using PostgreSQL SSLRequest + TLS handshake with the
+ * supplied CA. Reports only sanitized metadata; no secrets, no credentials,
+ * no certificate contents. Does NOT authenticate or execute SQL.
+ */
+export async function diagnosticNodeTlsCapability(environment = process.env) {
+  const connectionString = environment.PHASE11_PRODUCTION_DATABASE_URL;
+  const caPem = environment.PHASE11_PRODUCTION_DATABASE_CA_PEM;
+
+  if (!connectionString || !caPem) {
+    return { status: 'skipped', reason: 'missing environment' };
+  }
+
+  const report = { phase: 'tls-diagnostic' };
+
+  try {
+    // Parse URL
+    const url = new URL(connectionString);
+    const host = url.hostname;
+    const port = parseInt(url.port) || 5432;
+    const username = decodeURIComponent(url.username);
+
+    report.host = host;
+    report.port = port;
+    report.username_shape = username.includes('.') ? 'role.projectref' : 'role';
+
+    // CA analysis
+    const caLength = caPem.length;
+    const base64 = caPem
+      .split('\n')
+      .filter(l => !l.includes('-----') && l.trim())
+      .join('');
+    const der = Buffer.from(base64, 'base64');
+    const caSha256 = createHash('sha256').update(der).digest('hex');
+
+    const cert = new X509Certificate(caPem);
+    report.ca_length = caLength;
+    report.ca_sha256 = caSha256;
+    report.ca_subject = cert.subject;
+    report.ca_issuer = cert.issuer;
+    report.ca_basic_constraints = cert.checkCAConstraint ? 'CA:TRUE' : 'CA:FALSE';
+
+    // PostgreSQL STARTTLS
+    const sslRequest = Buffer.alloc(8);
+    sslRequest.writeUInt32BE(8, 0);
+    sslRequest.writeUInt32BE(80877103, 4);
+
+    await new Promise((resolve, reject) => {
+      const socket = net.createConnection({ host, port });
+      socket.setTimeout(10000);
+
+      socket.once('connect', () => {
+        report.postgres_ssl_request_sent = true;
+        socket.write(sslRequest);
+      });
+
+      socket.once('data', (response) => {
+        if (response[0] !== 0x53) {
+          reject(new Error(`SSL negotiation failed: server responded with ${String.fromCharCode(response[0] || 0)}`));
+          socket.destroy();
+          return;
+        }
+
+        report.postgres_ssl_negotiation = 'ok';
+
+        // Upgrade to TLS
+        const tlsSocket = tls.connect(
+          {
+            socket,
+            host,
+            servername: host,
+            ca: caPem,
+            rejectUnauthorized: true,
+          },
+          () => {
+            report.node_tls_protocol = tlsSocket.getProtocol();
+            report.node_tls_cipher = tlsSocket.getCipher().name;
+            report.node_tls_authorized = tlsSocket.authorized;
+            report.node_tls_authorization_error = tlsSocket.authorizationError || null;
+
+            const peer = tlsSocket.getPeerCertificate(false);
+            if (peer?.subject) report.peer_subject = peer.subject;
+            if (peer?.issuer) report.peer_issuer = peer.issuer;
+
+            report.status = 'ok';
+            tlsSocket.destroy();
+            resolve();
+          }
+        );
+
+        tlsSocket.once('error', (err) => {
+          report.status = 'failed';
+          report.node_tls_error = err.code || err.message;
+          tlsSocket.destroy();
+          reject(err);
+        });
+      });
+
+      socket.once('timeout', () => {
+        reject(new Error('Connection timeout'));
+        socket.destroy();
+      });
+
+      socket.once('error', (err) => {
+        reject(err);
+      });
+    });
+  } catch (e) {
+    report.status = 'failed';
+    report.error = e.message;
+  }
+
+  return report;
+}
+
 export class Phase11DatabaseError extends Error {
   constructor(stage, error, { mode } = {}) {
     super('PHASE11_DATABASE_DRIVER_ERROR');
@@ -476,6 +594,13 @@ export async function runPhase11ProductionMigrationGate({
   }
   const migrations = await loadApprovedMigrations(root);
   const target = assertProductionTarget(environment);
+
+  // TEMPORARY DIAGNOSTIC: Test Node TLS capability with production CA
+  if (environment.PHASE11_PRODUCTION_DATABASE_URL && environment.PHASE11_PRODUCTION_DATABASE_CA_PEM) {
+    const tlsDiag = await diagnosticNodeTlsCapability(environment);
+    write(`PHASE11_DIAGNOSTICS_NODE_TLS ${JSON.stringify(tlsDiag)}`);
+  }
+
   let client;
   let connected = false;
   let stage = 'client-create';
