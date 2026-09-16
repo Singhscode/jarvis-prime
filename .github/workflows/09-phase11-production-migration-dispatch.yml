@@ -38,6 +38,7 @@ on:
   repository_dispatch:
     types:
       - phase11-production-inspect
+      - phase11-production-apply
 
 permissions:
   contents: read
@@ -83,7 +84,7 @@ jobs:
     needs: authorize-operator
     runs-on: ubuntu-latest
     steps:
-      - name: Require a read-only session-pooler inspection payload
+      - name: Require inspection or apply payload with valid session-pooler configuration
         shell: bash
         env:
           PAYLOAD_OPERATION: ${{ github.event.client_payload.operation }}
@@ -92,12 +93,16 @@ jobs:
           PAYLOAD_GIT_SHA: ${{ github.event.client_payload.git_sha }}
         run: |
           set -euo pipefail
-          if [[ "${PAYLOAD_OPERATION}" != "inspect" ]]; then
-            echo "operation must be exactly 'inspect' for repository_dispatch." >&2
+          if [[ "${PAYLOAD_OPERATION}" != "inspect" && "${PAYLOAD_OPERATION}" != "apply" ]]; then
+            echo "operation must be exactly 'inspect' or 'apply' for repository_dispatch." >&2
             exit 1
           fi
-          if [[ "${PAYLOAD_CONFIRMATION}" != "INSPECT_ONLY" ]]; then
-            echo "confirmation must be exactly 'INSPECT_ONLY' for repository_dispatch." >&2
+          if [[ "${PAYLOAD_OPERATION}" == "inspect" && "${PAYLOAD_CONFIRMATION}" != "INSPECT_ONLY" ]]; then
+            echo "confirmation must be exactly 'INSPECT_ONLY' for inspect operation." >&2
+            exit 1
+          fi
+          if [[ "${PAYLOAD_OPERATION}" == "apply" && "${PAYLOAD_CONFIRMATION}" != "APPLY_FULL_35_THROUGH_40" ]]; then
+            echo "confirmation must be exactly 'APPLY_FULL_35_THROUGH_40' for apply operation." >&2
             exit 1
           fi
           if [[ "${PAYLOAD_DB_MODE}" != "session-pooler" ]]; then
@@ -108,7 +113,7 @@ jobs:
             echo "git_sha must be a full 40-character lowercase SHA." >&2
             exit 1
           fi
-          echo "Validated read-only inspection payload for ${PAYLOAD_GIT_SHA}."
+          echo "Validated ${PAYLOAD_OPERATION} payload for ${PAYLOAD_GIT_SHA}."
 
   # Run the gate checks directly in the protected Environment. Reusable workflow
   # job outputs are secret-redacted by Actions, so Environment secrets cannot be
@@ -139,7 +144,7 @@ jobs:
             exit 1
           fi
           case "${PAYLOAD_OPERATION}:${PAYLOAD_CONFIRMATION}" in
-            inspect:INSPECT_ONLY|apply:APPLY_35_THEN_36) ;;
+            inspect:INSPECT_ONLY|apply:APPLY_FULL_35_THROUGH_40) ;;
             *) echo "Operation and confirmation do not match." >&2; exit 1 ;;
           esac
           if [[ "${PAYLOAD_DB_MODE}" != "session-pooler" ]]; then
