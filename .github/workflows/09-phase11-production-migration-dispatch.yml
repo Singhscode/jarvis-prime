@@ -111,6 +111,33 @@ jobs:
           fi
           echo "Validated read-only inspection payload for ${PAYLOAD_GIT_SHA}."
 
+  # Intermediate job to retrieve the production secret and pass it to the gate.
+  # GitHub Actions does not auto-inject Environment-scoped secrets into reusable
+  # workflow jobs called via workflow_call, even when the job declares the
+  # environment. This job bridges that gap by explicitly passing the secret as a
+  # workflow_call input (base64-encoded to handle any URL characters).
+  #
+  # This job must run in the protected production Environment to access the
+  # secret. The gate then retrieves it from the input, decodes it, and uses it.
+  provide-production-secret:
+    needs:
+      - authorize-operator
+      - validate-inspect-payload
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+    outputs:
+      database_url_b64: ${{ steps.encode-secret.outputs.database_url_b64 }}
+    steps:
+      - name: Encode production secret for workflow_call input
+        id: encode-secret
+        env:
+          RAW_SECRET: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          # Base64-encode the secret for safe transmission via workflow_call input
+          b64_secret=$(printf '%s' "${RAW_SECRET}" | base64 -w 0)
+          echo "database_url_b64=${b64_secret}" >> "${GITHUB_OUTPUT}"
+
   # The called gate owns the protected Environment, the production database
   # secret and project ref, SHA/ancestry validation, the rollout contract, the
   # immutable migration allowlist, the read-only ledger preflight, session-pooler
@@ -119,9 +146,11 @@ jobs:
     needs:
       - authorize-operator
       - validate-inspect-payload
+      - provide-production-secret
     uses: Singhscode/jarvis-prime/.github/workflows/09-phase11-production-migration-gate.yml@main
     with:
       operation: ${{ github.event.client_payload.operation }}
       confirmation: ${{ github.event.client_payload.confirmation }}
       db_mode: ${{ github.event.client_payload.db_mode }}
       git_sha: ${{ github.event.client_payload.git_sha }}
+      database_url_b64: ${{ needs.provide-production-secret.outputs.database_url_b64 }}

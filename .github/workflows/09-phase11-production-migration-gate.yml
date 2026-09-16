@@ -55,6 +55,10 @@ on:
         description: Exact reviewed main-branch SHA containing this gate (40 lowercase hex characters).
         required: true
         type: string
+      database_url_b64:
+        description: 'Production database URL, base64-encoded and passed from the dispatch caller workflow (which runs in the protected Environment and can access the secret). When provided, decoded and used as PHASE11_PRODUCTION_DATABASE_URL. Ignored when workflow_dispatch is used directly.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -115,22 +119,40 @@ jobs:
 
       # The gate itself opens BEGIN READ ONLY before reading the ledger. This
       # preflight is mandatory even for apply and emits IDs/status only.
+      - name: Decode production database URL from workflow_call input
+        id: decode-db-url
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${{ inputs.database_url_b64 }}" ]]; then
+            # Direct workflow_dispatch call: use the Environment secret directly
+            echo "database_url_source=environment-secret"
+            echo "Using Environment secret directly (workflow_dispatch caller)"
+          else
+            # workflow_call from dispatch caller: decode the base64 input
+            decoded=$(printf '%s' "${{ inputs.database_url_b64 }}" | base64 -d)
+            echo "database_url_source=workflow-call-input"
+            echo "database_url=${decoded}" >> "${GITHUB_OUTPUT}"
+            echo "Using base64-decoded URL from workflow_call input (dispatch caller provided)"
+          fi
+
       - name: Diagnostic - verify Environment context
         shell: bash
         env:
-          DATABASE_URL_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}
+          DATABASE_URL_PROVIDED: ${{ (secrets.PHASE11_PRODUCTION_DATABASE_URL != '' || steps.decode-db-url.outputs.database_url != '') && 'yes' || 'no' }}
           PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
         run: |
           echo "=== Environment Context Diagnostic ==="
           echo "Job Environment: jarvis-prime-api / production"
-          echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${DATABASE_URL_PROVIDED}"
+          echo "Secret PHASE11_PRODUCTION_DATABASE_URL provided: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}"
+          echo "Decoded URL from workflow_call: ${{ steps.decode-db-url.outputs.database_url != '' && 'yes' || 'no' }}"
           echo "Variable PHASE11_PRODUCTION_PROJECT_REF provided: ${PROJECT_REF_PROVIDED} (value: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }})"
           echo "Input db_mode: ${{ inputs.db_mode }}"
           echo "=== End Diagnostic ==="
 
       - name: Read-only production ledger preflight
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
@@ -138,7 +160,7 @@ jobs:
       - name: Selectively apply only 35 then 36
         if: ${{ inputs.operation == 'apply' }}
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --apply
@@ -146,7 +168,7 @@ jobs:
       - name: Read-only post-delivery ledger verification
         if: ${{ inputs.operation == 'apply' }}
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: node database/scripts/phase11-production-migration-gate.mjs --inspect
