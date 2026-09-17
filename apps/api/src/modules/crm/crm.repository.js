@@ -1,5 +1,4 @@
 import { getDb } from '../../database/db.js';
-import { assertSupabaseTrafficEnabled, logTrafficDisabled } from '../../utils/supabase-traffic-guard.js';
 
 function client() {
   const { client: db, usingMemory } = getDb();
@@ -9,13 +8,8 @@ function client() {
   return db;
 }
 
-function guardedClient() {
-  assertSupabaseTrafficEnabled();
-  return client();
-}
-
 async function ownedRecordExists(table, ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from(table)
     .select('id')
     .eq('id', id)
@@ -26,7 +20,7 @@ async function ownedRecordExists(table, ownerUserId, id) {
 }
 
 export async function listCompanies(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('companies')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -36,7 +30,7 @@ export async function listCompanies(ownerUserId) {
 }
 
 export async function createCompany(ownerUserId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('companies')
     .insert({ owner_user_id: ownerUserId, ...values })
     .select()
@@ -46,7 +40,7 @@ export async function createCompany(ownerUserId, values) {
 }
 
 export async function updateCompany(ownerUserId, id, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('companies')
     .update(values)
     .eq('id', id)
@@ -58,7 +52,7 @@ export async function updateCompany(ownerUserId, id, values) {
 }
 
 export async function deleteCompany(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('companies')
     .delete()
     .eq('id', id)
@@ -70,7 +64,7 @@ export async function deleteCompany(ownerUserId, id) {
 }
 
 export async function listContacts(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -80,7 +74,7 @@ export async function listContacts(ownerUserId) {
 }
 
 export async function createContact(ownerUserId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .insert({ owner_user_id: ownerUserId, ...values })
     .select()
@@ -90,7 +84,7 @@ export async function createContact(ownerUserId, values) {
 }
 
 export async function updateContact(ownerUserId, id, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .update(values)
     .eq('id', id)
@@ -102,7 +96,7 @@ export async function updateContact(ownerUserId, id, values) {
 }
 
 export async function deleteContact(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .delete()
     .eq('id', id)
@@ -114,7 +108,7 @@ export async function deleteContact(ownerUserId, id) {
 }
 
 export async function listLeads(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_leads')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -125,7 +119,7 @@ export async function listLeads(ownerUserId) {
 }
 
 export async function createLead(ownerUserId, contactId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_leads')
     .insert({ owner_user_id: ownerUserId, contact_id: contactId })
     .select()
@@ -135,7 +129,7 @@ export async function createLead(ownerUserId, contactId) {
 }
 
 export async function deleteLead(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_leads')
     .delete()
     .eq('id', id)
@@ -147,7 +141,7 @@ export async function deleteLead(ownerUserId, id) {
 }
 
 export async function listClients(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_clients')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -157,7 +151,7 @@ export async function listClients(ownerUserId) {
 }
 
 export async function createDirectClient(ownerUserId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_clients')
     .insert({
       owner_user_id: ownerUserId,
@@ -174,7 +168,7 @@ export async function createDirectClient(ownerUserId, values) {
 }
 
 export async function convertLeadToClient(ownerUserId, leadId, contactId, name) {
-  const { data, error } = await guardedClient().rpc('convert_crm_lead_to_client', {
+  const { data, error } = await client().rpc('convert_crm_lead_to_client', {
     p_owner_user_id: ownerUserId,
     p_lead_id: leadId,
     p_contact_id: contactId,
@@ -185,7 +179,7 @@ export async function convertLeadToClient(ownerUserId, leadId, contactId, name) 
 }
 
 export async function listProjects(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_projects')
     .select('*')
     .eq('owner_user_id', ownerUserId);
@@ -194,7 +188,7 @@ export async function listProjects(ownerUserId) {
 }
 
 export async function createProject(ownerUserId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_projects')
     .insert({ owner_user_id: ownerUserId, ...values })
     .select()
@@ -204,7 +198,7 @@ export async function createProject(ownerUserId, values) {
 }
 
 export async function updateProject(ownerUserId, id, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_projects')
     .update(values)
     .eq('id', id)
@@ -216,7 +210,7 @@ export async function updateProject(ownerUserId, id, values) {
 }
 
 export async function deleteProject(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_projects')
     .delete()
     .eq('id', id)
@@ -228,7 +222,7 @@ export async function deleteProject(ownerUserId, id) {
 }
 
 export async function updateClient(ownerUserId, id, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_clients')
     .update(values)
     .eq('id', id)
@@ -240,7 +234,7 @@ export async function updateClient(ownerUserId, id, values) {
 }
 
 export async function deleteClient(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_clients')
     .delete()
     .eq('id', id)
@@ -252,7 +246,7 @@ export async function deleteClient(ownerUserId, id) {
 }
 
 export async function getOwnedUnconvertedLead(ownerUserId, id) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_leads')
     .select('id, contact_id')
     .eq('id', id)
@@ -264,7 +258,7 @@ export async function getOwnedUnconvertedLead(ownerUserId, id) {
 }
 
 export async function listClientContacts(ownerUserId, clientId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -275,7 +269,7 @@ export async function listClientContacts(ownerUserId, clientId) {
 }
 
 export async function createClientContact(ownerUserId, clientId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .insert({ owner_user_id: ownerUserId, client_id: clientId, ...values })
     .select()
@@ -285,7 +279,7 @@ export async function createClientContact(ownerUserId, clientId, values) {
 }
 
 export async function updateClientContact(ownerUserId, clientId, contactId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .update(values)
     .eq('id', contactId)
@@ -298,7 +292,7 @@ export async function updateClientContact(ownerUserId, clientId, contactId, valu
 }
 
 export async function detachClientContact(ownerUserId, clientId, contactId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('contacts')
     .update({ client_id: null })
     .eq('id', contactId)
@@ -327,7 +321,7 @@ export function ownedProjectExists(ownerUserId, id) {
 }
 
 export async function listTasks(ownerUserId, projectId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_tasks')
     .select('*')
     .eq('owner_user_id', ownerUserId)
@@ -337,7 +331,7 @@ export async function listTasks(ownerUserId, projectId) {
 }
 
 export async function createTask(ownerUserId, projectId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_tasks')
     .insert({ owner_user_id: ownerUserId, project_id: projectId, ...values })
     .select()
@@ -347,7 +341,7 @@ export async function createTask(ownerUserId, projectId, values) {
 }
 
 export async function updateTask(ownerUserId, projectId, taskId, values) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_tasks')
     .update(values)
     .eq('id', taskId)
@@ -360,7 +354,7 @@ export async function updateTask(ownerUserId, projectId, taskId, values) {
 }
 
 export async function deleteTask(ownerUserId, projectId, taskId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_tasks')
     .delete()
     .eq('id', taskId)
@@ -373,7 +367,7 @@ export async function deleteTask(ownerUserId, projectId, taskId) {
 }
 
 export async function getActiveEmployeeById(employeeUserId, ownerUserId = null) {
-  let query = guardedClient()
+  let query = client()
     .from('users')
     .select('id, role, status, portal_owner_user_id')
     .eq('id', employeeUserId)
@@ -386,7 +380,7 @@ export async function getActiveEmployeeById(employeeUserId, ownerUserId = null) 
 }
 
 export async function listAssignedTasks(ownerUserId, assignedUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_tasks')
     .select('id, project_id, name, completed')
     .eq('owner_user_id', ownerUserId)
@@ -397,7 +391,7 @@ export async function listAssignedTasks(ownerUserId, assignedUserId) {
 
 export async function listEmployeeProjects(ownerUserId, projectIds) {
   if (projectIds.length === 0) return [];
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_projects')
     .select('id, client_id, name')
     .eq('owner_user_id', ownerUserId)
@@ -407,7 +401,7 @@ export async function listEmployeeProjects(ownerUserId, projectIds) {
 }
 
 export async function listEmployeeClients(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_clients')
     .select('id, name, created_at')
     .eq('owner_user_id', ownerUserId)
@@ -417,7 +411,7 @@ export async function listEmployeeClients(ownerUserId) {
 }
 
 export async function listEmployeeLeads(ownerUserId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('crm_leads')
     .select('id, contact_id, created_at')
     .eq('owner_user_id', ownerUserId)
@@ -428,7 +422,7 @@ export async function listEmployeeLeads(ownerUserId) {
 }
 
 export async function completeTask(employeeUserId, taskId, completed, justification) {
-  const { data, error } = await guardedClient().rpc('complete_employee_portal_task', {
+  const { data, error } = await client().rpc('complete_employee_portal_task', {
     p_employee_user_id: employeeUserId,
     p_task_id: taskId,
     p_completed: completed,
@@ -439,7 +433,7 @@ export async function completeTask(employeeUserId, taskId, completed, justificat
 }
 
 export async function listActiveClientPortalMemberships(userId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('client_portal_memberships')
     .select('id, crm_client_id, user_id, status')
     .eq('user_id', userId)
@@ -451,8 +445,8 @@ export async function listActiveClientPortalMemberships(userId) {
 
 export async function getClientPortalSnapshot(clientId) {
   const [clientResult, projectsResult, documentsResult] = await Promise.all([
-    guardedClient().from('crm_clients').select('id, name').eq('id', clientId).maybeSingle(),
-    guardedClient().from('crm_projects').select('id, name').eq('client_id', clientId),
+    client().from('crm_clients').select('id, name').eq('id', clientId).maybeSingle(),
+    client().from('crm_projects').select('id, name').eq('client_id', clientId),
     client()
       .from('client_portal_documents')
       .select('id, project_id, title, document_type, created_at')
@@ -469,7 +463,7 @@ export async function getClientPortalSnapshot(clientId) {
   const projectIds = projects.map((project) => project.id);
   let tasks = [];
   if (projectIds.length > 0) {
-    const { data, error } = await guardedClient()
+    const { data, error } = await client()
       .from('crm_tasks')
       .select('id, project_id, name, completed')
       .in('project_id', projectIds);
@@ -486,7 +480,7 @@ export async function getClientPortalSnapshot(clientId) {
 }
 
 export async function getClientPortalDocument(clientId, documentId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('client_portal_documents')
     .select('id, storage_path')
     .eq('id', documentId)
@@ -499,7 +493,7 @@ export async function getClientPortalDocument(clientId, documentId) {
 }
 
 export async function getClientPortalMembership(clientId, membershipId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('client_portal_memberships')
     .select('id, contact_id, email_normalized')
     .eq('id', membershipId)
@@ -510,7 +504,7 @@ export async function getClientPortalMembership(clientId, membershipId) {
 }
 
 export async function reissueClientPortalInvitation(ownerUserId, clientId, contactId, tokenHash, expiresAt) {
-  const { data, error } = await guardedClient().rpc('reissue_client_portal_invitation', {
+  const { data, error } = await client().rpc('reissue_client_portal_invitation', {
     p_owner_user_id: ownerUserId,
     p_client_id: clientId,
     p_contact_id: contactId,
@@ -522,7 +516,7 @@ export async function reissueClientPortalInvitation(ownerUserId, clientId, conta
 }
 
 export async function activateClientPortalInvitation(userId, tokenHash) {
-  const { data, error } = await guardedClient().rpc('activate_client_portal_invitation', {
+  const { data, error } = await client().rpc('activate_client_portal_invitation', {
     p_user_id: userId,
     p_token_hash: tokenHash,
   });
@@ -531,7 +525,7 @@ export async function activateClientPortalInvitation(userId, tokenHash) {
 }
 
 export async function provisionClientAccount(ownerUserId, values, tokenHash, expiresAt) {
-  const { data, error } = await guardedClient().rpc('provision_client_account', {
+  const { data, error } = await client().rpc('provision_client_account', {
     p_owner_user_id: ownerUserId,
     p_client_name: values.name,
     p_contact_name: values.contactName,
@@ -549,7 +543,7 @@ function emailMatches(value, normalizedEmail) {
 }
 
 export async function getClientAccountEmailEligibility(ownerUserId, email) {
-  const existingUserResult = await guardedClient()
+  const existingUserResult = await client()
     .from('users')
     .select('id,role,status,password_hash')
     .eq('email_normalized', email)
@@ -560,7 +554,7 @@ export async function getClientAccountEmailEligibility(ownerUserId, email) {
   if (existingUser) {
     if (existingUser.role === 'client' && existingUser.status === 'active') return { eligibility: 'existing_client' };
     if (existingUser.role === 'client' && existingUser.status === 'pending_verification' && existingUser.password_hash === null) {
-      const membershipsResult = await guardedClient()
+      const membershipsResult = await client()
         .from('client_portal_memberships')
         .select('contact_id,crm_client_id')
         .eq('user_id', existingUser.id)
@@ -570,8 +564,8 @@ export async function getClientAccountEmailEligibility(ownerUserId, email) {
 
       for (const membership of membershipsResult.data || []) {
         const [contactResult, clientResult] = await Promise.all([
-          guardedClient().from('contacts').select('email').eq('id', membership.contact_id).eq('owner_user_id', ownerUserId).eq('client_id', membership.crm_client_id).maybeSingle(),
-          guardedClient().from('crm_clients').select('id').eq('id', membership.crm_client_id).eq('owner_user_id', ownerUserId).maybeSingle(),
+          client().from('contacts').select('email').eq('id', membership.contact_id).eq('owner_user_id', ownerUserId).eq('client_id', membership.crm_client_id).maybeSingle(),
+          client().from('crm_clients').select('id').eq('id', membership.crm_client_id).eq('owner_user_id', ownerUserId).maybeSingle(),
         ]);
         if (contactResult.error) throw contactResult.error;
         if (clientResult.error) throw clientResult.error;
@@ -582,8 +576,8 @@ export async function getClientAccountEmailEligibility(ownerUserId, email) {
   }
 
   const [contactsResult, clientsResult] = await Promise.all([
-    guardedClient().from('contacts').select('email').eq('owner_user_id', ownerUserId),
-    guardedClient().from('crm_clients').select('email').eq('owner_user_id', ownerUserId),
+    client().from('contacts').select('email').eq('owner_user_id', ownerUserId),
+    client().from('crm_clients').select('email').eq('owner_user_id', ownerUserId),
   ]);
   if (contactsResult.error) throw contactsResult.error;
   if (clientsResult.error) throw clientsResult.error;
@@ -595,7 +589,7 @@ export async function getClientAccountEmailEligibility(ownerUserId, email) {
 }
 
 export async function activateProvisionedClientAccount(tokenHash, passwordHash) {
-  const { data, error } = await guardedClient().rpc('activate_provisioned_client_account', {
+  const { data, error } = await client().rpc('activate_provisioned_client_account', {
     p_token_hash: tokenHash,
     p_password_hash: passwordHash,
   });
@@ -604,7 +598,7 @@ export async function activateProvisionedClientAccount(tokenHash, passwordHash) 
 }
 
 export async function revokeClientPortalMembership(ownerUserId, clientId, membershipId) {
-  const { data, error } = await guardedClient().rpc('revoke_client_portal_membership', {
+  const { data, error } = await client().rpc('revoke_client_portal_membership', {
     p_owner_user_id: ownerUserId,
     p_client_id: clientId,
     p_membership_id: membershipId,
@@ -614,19 +608,19 @@ export async function revokeClientPortalMembership(ownerUserId, clientId, member
 }
 
 export async function uploadClientPortalDocument(path, file) {
-  const { error } = await guardedClient().storage
+  const { error } = await client().storage
     .from('client-portal-private')
     .upload(path, file.buffer, { contentType: file.mimeType, upsert: false });
   if (error) throw error;
 }
 
 export async function removeClientPortalDocument(path) {
-  const { error } = await guardedClient().storage.from('client-portal-private').remove([path]);
+  const { error } = await client().storage.from('client-portal-private').remove([path]);
   if (error) throw error;
 }
 
 export async function publishClientPortalDocument(ownerUserId, clientId, projectId, path, title, documentType) {
-  const { data, error } = await guardedClient().rpc('publish_client_portal_document', {
+  const { data, error } = await client().rpc('publish_client_portal_document', {
     p_owner_user_id: ownerUserId,
     p_client_id: clientId,
     p_project_id: projectId,
@@ -640,7 +634,7 @@ export async function publishClientPortalDocument(ownerUserId, clientId, project
 }
 
 export async function revokeClientPortalDocument(clientId, documentId) {
-  const { data, error } = await guardedClient()
+  const { data, error } = await client()
     .from('client_portal_documents')
     .update({ client_visible: false, revoked_at: new Date().toISOString() })
     .eq('id', documentId)
@@ -653,7 +647,7 @@ export async function revokeClientPortalDocument(clientId, documentId) {
 }
 
 export async function createClientPortalDownload(path, expiresIn = 60) {
-  const { data, error } = await guardedClient().storage
+  const { data, error } = await client().storage
     .from('client-portal-private')
     .createSignedUrl(path, expiresIn);
   if (error) throw error;
@@ -661,7 +655,7 @@ export async function createClientPortalDownload(path, expiresIn = 60) {
 }
 
 export async function recordClientPortalAudit(userId, action, resourceType, resourceId, success) {
-  const { error } = await guardedClient().from('audit_logs').insert({
+  const { error } = await client().from('audit_logs').insert({
     user_id: userId,
     event_type: 'client_portal_access',
     action,
@@ -675,7 +669,7 @@ export async function recordClientPortalAudit(userId, action, resourceType, reso
 
 
 async function listPage(table, projection, ownerUserId, options, searchField, filters = {}) {
-  let query = guardedClient().from(table).select(projection).eq('owner_user_id', ownerUserId);
+  let query = client().from(table).select(projection).eq('owner_user_id', ownerUserId);
   for (const [field, value] of Object.entries(filters)) {
     if (value === null) query = query.is(field, null);
     else if (value) query = query.eq(field, value);
@@ -691,7 +685,7 @@ async function listPage(table, projection, ownerUserId, options, searchField, fi
 }
 
 async function getOwnerRecord(table, projection, ownerUserId, id, extra = {}) {
-  let query = guardedClient().from(table).select(projection).eq('id', id).eq('owner_user_id', ownerUserId);
+  let query = client().from(table).select(projection).eq('id', id).eq('owner_user_id', ownerUserId);
   for (const [field, value] of Object.entries(extra)) {
     if (value === null) query = query.is(field, null);
     else if (value !== undefined) query = query.eq(field, value);
@@ -756,7 +750,7 @@ export function getOwnerTask(ownerUserId, id) {
 
 export async function listOwnerProjectReferences(ownerUserId, projectIds) {
   if (projectIds.length === 0) return [];
-  const { data, error } = await guardedClient().from('crm_projects')
+  const { data, error } = await client().from('crm_projects')
     .select('id,client_id,name').eq('owner_user_id', ownerUserId).in('id', projectIds);
   if (error) throw error;
   return data || [];
@@ -764,7 +758,7 @@ export async function listOwnerProjectReferences(ownerUserId, projectIds) {
 
 export async function listOwnerClientReferences(ownerUserId, clientIds) {
   if (clientIds.length === 0) return [];
-  const { data, error } = await guardedClient().from('crm_clients')
+  const { data, error } = await client().from('crm_clients')
     .select('id,name').eq('owner_user_id', ownerUserId).in('id', clientIds);
   if (error) throw error;
   return data || [];
@@ -772,7 +766,7 @@ export async function listOwnerClientReferences(ownerUserId, clientIds) {
 
 export async function listOwnerEmployeeReferences(ownerUserId, employeeIds) {
   if (employeeIds.length === 0) return [];
-  const { data, error } = await guardedClient().from('users')
+  const { data, error } = await client().from('users')
     .select('id,full_name,email').eq('portal_owner_user_id', ownerUserId).eq('role', 'employee').in('id', employeeIds);
   if (error) throw error;
   return data || [];

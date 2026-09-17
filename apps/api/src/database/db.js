@@ -5,7 +5,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/config.js';
 import { log } from '../utils/logger.js';
-import { assertSupabaseTrafficEnabled } from '../utils/supabase-traffic-guard.js';
 
 let client = null;
 let usingMemory = false;
@@ -28,18 +27,6 @@ const mem = {
 
 export function getDb() {
   if (client || usingMemory) return { client, usingMemory };
-  
-  // Check if Supabase traffic is enabled before creating client
-  try {
-    assertSupabaseTrafficEnabled();
-  } catch (error) {
-    // Traffic is disabled; use in-memory fallback
-    usingMemory = true;
-    seedMemory();
-    log.warn('Supabase traffic is disabled via SUPABASE_TRAFFIC_ENABLED=false — using in-memory store.');
-    return { client: null, usingMemory };
-  }
-  
   if (config.supabaseUrl && config.supabaseKey) {
     client = createClient(config.supabaseUrl, config.supabaseKey, {
       auth: { persistSession: false },
