@@ -1,4 +1,5 @@
 import { getDb } from '../../database/db.js';
+import { assertSupabaseTrafficEnabled, logTrafficDisabled } from '../../utils/supabase-traffic-guard.js';
 
 const THREAD_FIELDS = 'id,subject,last_sequence,last_message_at,created_at';
 const PARTICIPANT_FIELDS = 'thread_id,user_id,participant_kind,status,last_read_sequence,joined_at';
@@ -12,6 +13,11 @@ function client() {
   return db;
 }
 
+function guardedClient() {
+  assertSupabaseTrafficEnabled();
+  return client();
+}
+
 function result(response) {
   if (response.error) throw response.error;
   return response.data;
@@ -23,40 +29,41 @@ function applyCursor(query, timestampColumn, cursor) {
 }
 
 export async function getActiveEmployeeActor(userId) {
-  return result(await client().from('users').select('id,role,status,portal_owner_user_id')
+  return result(await guardedClient().from('users').select('id,role,status,portal_owner_user_id')
     .eq('id', userId).eq('role', 'employee').eq('status', 'active').maybeSingle());
 }
 
 export async function getActiveClientActor(userId) {
-  return result(await client().from('users').select('id,role,status')
+  return result(await guardedClient().from('users').select('id,role,status')
     .eq('id', userId).eq('role', 'client').eq('status', 'active').maybeSingle());
 }
 
 export async function listActiveClientMemberships(userId) {
-  return result(await client().from('client_portal_memberships').select('id,crm_client_id,user_id')
+  return result(await guardedClient().from('client_portal_memberships').select('id,crm_client_id,user_id')
     .eq('user_id', userId).eq('status', 'active').limit(2)) || [];
 }
 
 export async function getClientOwner(clientId) {
-  return result(await client().from('crm_clients').select('owner_user_id').eq('id', clientId).maybeSingle());
+  return result(await guardedClient().from('crm_clients').select('owner_user_id').eq('id', clientId).maybeSingle());
 }
 
 export async function resolveOwnerEmployeeCode(ownerUserId, employeeCode) {
-  return result(await client().from('users').select('id')
+  return result(await guardedClient().from('users').select('id')
     .eq('employee_code', employeeCode).eq('portal_owner_user_id', ownerUserId)
     .eq('role', 'employee').eq('status', 'active').maybeSingle());
 }
 
 export async function resolveOwnerClientCode(ownerUserId, clientCode) {
-  const ownedClient = result(await client().from('crm_clients').select('id')
+  const db = guardedClient();
+  const ownedClient = result(await db.from('crm_clients').select('id')
     .eq('client_code', clientCode).eq('owner_user_id', ownerUserId).maybeSingle());
   if (!ownedClient) return null;
 
-  const memberships = result(await client().from('client_portal_memberships').select('id,user_id')
+  const memberships = result(await db.from('client_portal_memberships').select('id,user_id')
     .eq('crm_client_id', ownedClient.id).eq('status', 'active').limit(2)) || [];
   if (!memberships.length) return null;
 
-  const activeUsers = result(await client().from('users').select('id')
+  const activeUsers = result(await db.from('users').select('id')
     .in('id', memberships.map((membership) => membership.user_id)).eq('role', 'client').eq('status', 'active')) || [];
   const activeUserIds = new Set(activeUsers.map((user) => user.id));
   const eligibleMemberships = memberships.filter((membership) => activeUserIds.has(membership.user_id));
@@ -66,26 +73,27 @@ export async function resolveOwnerClientCode(ownerUserId, clientCode) {
 }
 
 export async function syncActorParticipants(actorUserId, ownerUserId) {
-  return result(await client().rpc('communication_sync_actor_participants', {
+  return result(await guardedClient().rpc('communication_sync_actor_participants', {
     p_actor_user_id: actorUserId, p_owner_user_id: ownerUserId,
   }));
 }
 
 export async function listThreads(ownerUserId, actorUserId, options) {
-  const memberships = result(await client().from('communication_participants').select(PARTICIPANT_FIELDS)
+  const db = guardedClient();
+  const memberships = result(await db.from('communication_participants').select(PARTICIPANT_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('user_id', actorUserId).eq('status', 'active')) || [];
   let threadIds = memberships.map((membership) => membership.thread_id);
   if (!threadIds.length) return { rows: [], memberships: new Map(), hasNextPage: false };
 
   if (options.view === 'sent') {
-    const sent = result(await client().from('communication_messages').select('thread_id')
+    const sent = result(await db.from('communication_messages').select('thread_id')
       .eq('owner_user_id', ownerUserId).eq('sender_user_id', actorUserId).in('thread_id', threadIds)) || [];
     const sentIds = new Set(sent.map((message) => message.thread_id));
     threadIds = threadIds.filter((threadId) => sentIds.has(threadId));
     if (!threadIds.length) return { rows: [], memberships: new Map(), hasNextPage: false };
   }
 
-  let query = client().from('communication_threads').select(THREAD_FIELDS)
+  let query = db.from('communication_threads').select(THREAD_FIELDS)
     .eq('owner_user_id', ownerUserId).in('id', threadIds);
   query = applyCursor(query, 'last_message_at', options.cursor);
   const rows = result(await query.order('last_message_at', { ascending: false }).order('id', { ascending: false }).limit(options.limit + 1)) || [];
@@ -95,36 +103,38 @@ export async function listThreads(ownerUserId, actorUserId, options) {
 }
 
 export async function getThread(ownerUserId, threadId) {
-  return result(await client().from('communication_threads').select(THREAD_FIELDS)
+  return result(await guardedClient().from('communication_threads').select(THREAD_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('id', threadId).maybeSingle());
 }
 
 export async function getActiveParticipant(ownerUserId, threadId, actorUserId) {
-  return result(await client().from('communication_participants').select(PARTICIPANT_FIELDS)
+  return result(await guardedClient().from('communication_participants').select(PARTICIPANT_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId).eq('user_id', actorUserId)
     .eq('status', 'active').maybeSingle());
 }
 
 export async function listThreadParticipants(ownerUserId, threadIds) {
   if (!threadIds.length) return [];
-  return result(await client().from('communication_participants').select(PARTICIPANT_FIELDS)
+  return result(await guardedClient().from('communication_participants').select(PARTICIPANT_FIELDS)
     .eq('owner_user_id', ownerUserId).in('thread_id', threadIds).order('joined_at', { ascending: true })) || [];
 }
 
 export async function listSafeUsers(userIds) {
   if (!userIds.length) return [];
-  return result(await client().from('users').select('id,full_name').in('id', userIds)) || [];
+  return result(await guardedClient().from('users').select('id,full_name').in('id', userIds)) || [];
 }
 
 export async function listLatestMessages(ownerUserId, threadIds) {
-  const rows = await Promise.all(threadIds.map(async (threadId) => result(await client().from('communication_messages').select(MESSAGE_FIELDS)
+  const db = guardedClient();
+  const rows = await Promise.all(threadIds.map(async (threadId) => result(await db.from('communication_messages').select(MESSAGE_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId)
     .order('sequence', { ascending: false }).order('id', { ascending: false }).limit(1).maybeSingle())));
   return rows.filter(Boolean);
 }
 
 export async function listMessages(ownerUserId, threadId, options) {
-  let query = client().from('communication_messages').select(MESSAGE_FIELDS)
+  const db = guardedClient();
+  let query = db.from('communication_messages').select(MESSAGE_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId);
   if (options.beforeSequence !== null) query = query.lt('sequence', options.beforeSequence);
   const rows = result(await query.order('sequence', { ascending: false }).order('id', { ascending: false }).limit(options.limit + 1)) || [];
@@ -133,30 +143,32 @@ export async function listMessages(ownerUserId, threadId, options) {
 
 export async function listAttachments(ownerUserId, threadId, messageIds) {
   if (!messageIds.length) return [];
-  return result(await client().from('communication_attachments').select(ATTACHMENT_FIELDS)
+  return result(await guardedClient().from('communication_attachments').select(ATTACHMENT_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId).in('message_id', messageIds)
     .order('created_at', { ascending: true })) || [];
 }
 
 export async function getAttachment(ownerUserId, threadId, attachmentId) {
-  return result(await client().from('communication_attachments')
+  return result(await guardedClient().from('communication_attachments')
     .select('id,message_id,storage_path,display_filename,media_type,size_bytes')
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId).eq('id', attachmentId).maybeSingle());
 }
 
 export async function createAttachmentDownload(storagePath, filename) {
-  const signed = result(await client().storage.from('communication-private').createSignedUrl(storagePath, 60, { download: filename }));
+  const db = guardedClient();
+  const signed = result(await db.storage.from('communication-private').createSignedUrl(storagePath, 60, { download: filename }));
   return signed?.signedUrl ? signed : null;
 }
 
 export async function findMessageByIdempotency(ownerUserId, threadId, senderUserId, idempotencyKey) {
-  return result(await client().from('communication_messages').select('id,sequence,request_sha256')
+  return result(await guardedClient().from('communication_messages').select('id,sequence,request_sha256')
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId).eq('sender_user_id', senderUserId)
     .eq('idempotency_key', idempotencyKey).maybeSingle());
 }
 
 export async function uploadAttachment(storagePath, file) {
-  const response = await client().storage.from('communication-private').upload(storagePath, file.buffer, {
+  const db = guardedClient();
+  const response = await db.storage.from('communication-private').upload(storagePath, file.buffer, {
     contentType: file.mediaType, upsert: false,
   });
   if (!response.error) return { created: true, path: storagePath };
@@ -166,18 +178,19 @@ export async function uploadAttachment(storagePath, file) {
 
 export async function removeAttachments(paths) {
   if (!paths.length) return;
-  const { error } = await client().storage.from('communication-private').remove(paths);
+  const db = guardedClient();
+  const { error } = await db.storage.from('communication-private').remove(paths);
   if (error) throw error;
 }
 
 export async function listAttachmentPaths(ownerUserId, threadId, messageId) {
-  const rows = result(await client().from('communication_attachments').select('storage_path')
+  const rows = result(await guardedClient().from('communication_attachments').select('storage_path')
     .eq('owner_user_id', ownerUserId).eq('thread_id', threadId).eq('message_id', messageId)) || [];
   return rows.map((row) => row.storage_path);
 }
 
 export async function createThread(actorUserId, ownerUserId, values) {
-  return result(await client().rpc('communication_create_thread', {
+  return result(await guardedClient().rpc('communication_create_thread', {
     p_actor_user_id: actorUserId,
     p_owner_user_id: ownerUserId,
     p_subject: values.subject,
@@ -189,7 +202,7 @@ export async function createThread(actorUserId, ownerUserId, values) {
 }
 
 export async function sendMessage(actorUserId, ownerUserId, threadId, values) {
-  return result(await client().rpc('communication_send_message', {
+  return result(await guardedClient().rpc('communication_send_message', {
     p_actor_user_id: actorUserId,
     p_owner_user_id: ownerUserId,
     p_thread_id: threadId,
@@ -201,13 +214,14 @@ export async function sendMessage(actorUserId, ownerUserId, threadId, values) {
 }
 
 export async function markRead(actorUserId, ownerUserId, threadId, sequence) {
-  return result(await client().rpc('communication_mark_read', {
+  return result(await guardedClient().rpc('communication_mark_read', {
     p_actor_user_id: actorUserId, p_owner_user_id: ownerUserId, p_thread_id: threadId, p_sequence: sequence,
   }));
 }
 
 export async function listNotifications(ownerUserId, actorUserId, options) {
-  let query = client().from('communication_notifications').select(NOTIFICATION_FIELDS)
+  const db = guardedClient();
+  let query = db.from('communication_notifications').select(NOTIFICATION_FIELDS)
     .eq('owner_user_id', ownerUserId).eq('recipient_user_id', actorUserId);
   if (options.state) query = query.eq('state', options.state);
   query = applyCursor(query, 'created_at', options.cursor);
@@ -216,25 +230,25 @@ export async function listNotifications(ownerUserId, actorUserId, options) {
 }
 
 export async function setNotificationState(actorUserId, ownerUserId, notificationId, state) {
-  return result(await client().rpc('communication_set_notification_state', {
+  return result(await guardedClient().rpc('communication_set_notification_state', {
     p_actor_user_id: actorUserId, p_owner_user_id: ownerUserId, p_notification_id: notificationId, p_state: state,
   }));
 }
 
 export async function getPreferences(ownerUserId, actorUserId) {
-  return result(await client().from('communication_preferences').select('in_app_enabled,email_enabled')
+  return result(await guardedClient().from('communication_preferences').select('in_app_enabled,email_enabled')
     .eq('owner_user_id', ownerUserId).eq('user_id', actorUserId).maybeSingle());
 }
 
 export async function upsertPreferences(actorUserId, ownerUserId, values) {
-  return result(await client().rpc('communication_upsert_preferences', {
+  return result(await guardedClient().rpc('communication_upsert_preferences', {
     p_actor_user_id: actorUserId, p_owner_user_id: ownerUserId,
     p_in_app_enabled: values.inAppEnabled, p_email_enabled: values.emailEnabled,
   }));
 }
 
 export async function recordDeliveryEvent(values) {
-  return result(await client().rpc('communication_record_delivery_event', {
+  return result(await guardedClient().rpc('communication_record_delivery_event', {
     p_provider: values.provider,
     p_provider_event_id: values.providerEventId,
     p_provider_message_id: values.providerMessageId,

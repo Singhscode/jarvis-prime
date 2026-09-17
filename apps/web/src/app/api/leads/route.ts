@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isSupabaseTrafficEnabled } from '@/utils/supabase-traffic-guard';
 
 function getDatabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -24,6 +25,9 @@ function toDashboardLead(lead: Record<string, unknown>) {
 
 export async function GET() {
   try {
+    if (!isSupabaseTrafficEnabled()) {
+      return NextResponse.json({ error: 'Service is temporarily unavailable' }, { status: 503 });
+    }
     const { data, error } = await getDatabase()
       .from('leads')
       .select('id, name, email, company, revenue, icp_score, status, last_contact_at, next_action, created_at, updated_at')
@@ -38,6 +42,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    if (!isSupabaseTrafficEnabled()) {
+      return NextResponse.json({ error: 'Service is temporarily unavailable' }, { status: 503 });
+    }
     const { prospects } = await request.json();
     if (!Array.isArray(prospects)) return NextResponse.json({ error: 'prospects must be an array' }, { status: 400 });
     const rows = prospects.filter((prospect) => prospect?.email).map((prospect) => ({
