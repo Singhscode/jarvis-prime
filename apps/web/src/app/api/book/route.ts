@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isSupabaseTrafficEnabled } from '@/utils/supabase-traffic-guard';
 
 /**
  * Booking endpoint — captures a "Book a Call" form submission.
@@ -42,6 +43,14 @@ export async function POST(request: Request) {
     // Honeypot field (bot detection)
     if (body.website) {
       return NextResponse.json({ ok: true }); // Fake success for bots
+    }
+
+    // Check if Supabase traffic is enabled
+    if (!isSupabaseTrafficEnabled()) {
+      return NextResponse.json(
+        { error: 'Service is temporarily unavailable. Please try again shortly.' },
+        { status: 503 }
+      );
     }
 
     // Validation
