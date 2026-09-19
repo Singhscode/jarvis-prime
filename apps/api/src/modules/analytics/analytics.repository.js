@@ -34,13 +34,17 @@ export async function getDailyMetrics(ownerUserId, startDate, endDate, limit = 1
 }
 
 /**
- * Get revenue metrics for period
+ * Get revenue metrics for period.
+ * Both the total and the per-invoice breakdown are scoped to the SAME
+ * [startDate, endDate] window — there is exactly one query, so the total
+ * can never drift out of sync with the invoice list it's derived from.
  * @param {string} ownerUserId - Owner UUID
  * @param {string} startDate - ISO date string
  * @param {string} endDate - ISO date string
  * @returns {Promise<{totalRevenueMinor: number, monthlyData: Array}>}
  */
 export async function getRevenueStats(ownerUserId, startDate, endDate) {
+<<<<<<< HEAD
   // Total revenue (all time, paid invoices only) - database-side aggregation via RPC
   const { data: totalRevenueResult, error: totalError } = await client()
     .rpc('get_revenue_by_owner', { 
@@ -65,6 +69,24 @@ export async function getRevenueStats(ownerUserId, startDate, endDate) {
   return {
     totalRevenueMinor,
     monthlyData: monthlyData || [],
+=======
+  const { data: periodRev, error: periodError } = await client()
+    .from('finance_invoices')
+    .select('issued_at, total_amount_minor')
+    .eq('owner_user_id', ownerUserId)
+    .eq('status', 'paid')
+    .gte('issued_at', startDate)
+    .lte('issued_at', endDate);
+
+  if (periodError) throw periodError;
+
+  const monthlyData = periodRev || [];
+  const totalRevenueMinor = monthlyData.reduce((sum, inv) => sum + (inv.total_amount_minor || 0), 0);
+
+  return {
+    totalRevenueMinor,
+    monthlyData,
+>>>>>>> 111daac (Phase 12: fix revenue date-scope, real analytics tests, /daily data source, Owner UI)
   };
 }
 
@@ -246,6 +268,119 @@ export async function getAutomationStats(ownerUserId) {
     runsCompleted: runsCompleted || 0,
     runsFailed: runsFailed || 0,
   };
+}
+
+/**
+ * List owners eligible for analytics (mirrors the authorization predicate in
+ * analytics.service.js `scope()`, but for all owners rather than one).
+ * Used by the daily-snapshot job to know which accounts to aggregate.
+ * @returns {Promise<Array<{id: string}>>}
+ */
+export async function listAnalyticsEligibleOwners() {
+  const { data: owners, error } = await client()
+    .from('users')
+    .select('id')
+    .eq('role', 'client')
+    .eq('status', 'active');
+
+  if (error) throw error;
+  if (!owners || owners.length === 0) return [];
+
+  const { data: memberships, error: membershipError } = await client()
+    .from('client_portal_memberships')
+    .select('user_id');
+
+  if (membershipError) throw membershipError;
+
+  const memberIds = new Set((memberships || []).map((m) => m.user_id));
+  return owners.filter((owner) => !memberIds.has(owner.id));
+}
+
+/**
+ * Compute one owner's activity for a single UTC calendar day and upsert it
+ * into analytics_daily_metrics. This is the data source for GET /daily.
+ *
+ * Two columns (crm_leads_qualified, crm_leads_converted) have no
+ * corresponding concept in the current schema (crm_leads has no
+ * qualification/conversion status) and are intentionally left at their
+ * column default of 0 rather than approximated from unrelated data.
+ *
+ * @param {string} ownerUserId - Owner UUID
+ * @param {string} dateStr - UTC calendar date, YYYY-MM-DD
+ * @returns {Promise<object>} The upserted row
+ */
+export async function computeAndStoreDailySnapshot(ownerUserId, dateStr) {
+  const dayStart = `${dateStr}T00:00:00.000Z`;
+  const dayEnd = `${dateStr}T23:59:59.999Z`;
+  const db = client();
+
+  const countBetween = async (table, column, extraFilters = (q) => q) => {
+    let query = db.from(table).select('id', { count: 'exact', head: true }).eq('owner_user_id', ownerUserId)
+      .gte(column, dayStart).lte(column, dayEnd);
+    query = extraFilters(query);
+    const { count: value, error } = await query;
+    if (error) throw error;
+    return value || 0;
+  };
+
+  const [
+    crmLeadsCreated,
+    paidInvoicesInDay,
+    financeInvoicesIssued,
+    paymentsInDay,
+    financeExpensesSubmitted,
+    communicationThreadsCreated,
+    communicationMessagesSent,
+    communicationDeliveryFailed,
+    automationRunsCompleted,
+    automationRunsFailed,
+    automationWorkItemsCompleted,
+  ] = await Promise.all([
+    countBetween('crm_leads', 'created_at'),
+    db.from('finance_invoices').select('total_amount_minor').eq('owner_user_id', ownerUserId).eq('status', 'paid').gte('issued_at', dayStart).lte('issued_at', dayEnd),
+    countBetween('finance_invoices', 'issued_at'),
+    db.from('finance_payments').select('amount_minor').eq('owner_user_id', ownerUserId).gte('received_at', dayStart).lte('received_at', dayEnd),
+    countBetween('finance_expenses', 'created_at'),
+    countBetween('communication_threads', 'created_at'),
+    countBetween('communication_messages', 'created_at'),
+    countBetween('communication_deliveries', 'updated_at', (q) => q.in('status', ['failed_retryable', 'failed_permanent'])),
+    countBetween('automation_runs', 'completed_at', (q) => q.eq('state', 'COMPLETED')),
+    countBetween('automation_runs', 'completed_at', (q) => q.eq('state', 'FAILED')),
+    countBetween('automation_work_items', 'completed_at', (q) => q.eq('state', 'COMPLETED')),
+  ]);
+
+  if (paidInvoicesInDay.error) throw paidInvoicesInDay.error;
+  if (paymentsInDay.error) throw paymentsInDay.error;
+
+  const financeRevenueMinor = (paidInvoicesInDay.data || []).reduce((sum, inv) => sum + (inv.total_amount_minor || 0), 0);
+  const financePaymentsReceivedMinor = (paymentsInDay.data || []).reduce((sum, p) => sum + (p.amount_minor || 0), 0);
+
+  const row = {
+    owner_user_id: ownerUserId,
+    metric_date: dateStr,
+    crm_leads_created: crmLeadsCreated,
+    crm_leads_qualified: 0,
+    crm_leads_converted: 0,
+    finance_revenue_minor: financeRevenueMinor,
+    finance_invoices_issued: financeInvoicesIssued,
+    finance_payments_received_minor: financePaymentsReceivedMinor,
+    finance_expenses_submitted: financeExpensesSubmitted,
+    communication_threads_created: communicationThreadsCreated,
+    communication_messages_sent: communicationMessagesSent,
+    communication_delivery_failed: communicationDeliveryFailed,
+    automation_runs_completed: automationRunsCompleted,
+    automation_runs_failed: automationRunsFailed,
+    automation_work_items_completed: automationWorkItemsCompleted,
+  };
+
+  const { data, error } = await db
+    .from('analytics_daily_metrics')
+    .upsert(row, { onConflict: 'owner_user_id,metric_date' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 /**

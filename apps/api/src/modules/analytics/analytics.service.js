@@ -341,6 +341,38 @@ export async function getAutomationReport(userId) {
 }
 
 /**
+ * Compute and persist yesterday's (UTC) daily snapshot for every analytics-
+ * eligible owner. Intended to be run once per day by the scheduler
+ * (see jobs/scheduler.js — job id 'analytics-daily-snapshot').
+ *
+ * This is the data source for GET /analytics/daily: without this job (or an
+ * equivalent one-time backfill), analytics_daily_metrics stays empty and
+ * that endpoint always returns an empty list.
+ *
+ * @param {string} [dateStr] - UTC calendar date YYYY-MM-DD. Defaults to yesterday.
+ * @returns {Promise<{ownersProcessed: number, ownersFailed: number, date: string}>}
+ */
+export async function runDailySnapshotForAllOwners(dateStr) {
+  const targetDate = dateStr || new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const owners = await repo.listAnalyticsEligibleOwners();
+
+  let ownersProcessed = 0;
+  let ownersFailed = 0;
+
+  for (const owner of owners) {
+    try {
+      await repo.computeAndStoreDailySnapshot(owner.id, targetDate);
+      ownersProcessed += 1;
+    } catch {
+      // One owner's failure must not block the rest of the batch.
+      ownersFailed += 1;
+    }
+  }
+
+  return { date: targetDate, ownersProcessed, ownersFailed };
+}
+
+/**
  * Get expense metrics report
  * @param {string} userId - User ID from JWT
  * @returns {Promise<{total: number, approved: number, totalMinor: number, totalMajor: number}>}
