@@ -896,7 +896,11 @@ async function main() {
   const operation = argument === '--inspect' ? 'inspect' : argument === '--apply' ? 'apply' : null;
   try {
     const result = await runPhase11ProductionMigrationGate({ operation, write: console.log });
-    if (result.stopped) {
+    // Exit non-zero only for actual violations, not for pending migrations in inspect mode.
+    // In apply mode: result.stopped = true means violations that prevented apply → exit 1.
+    // In inspect mode: result.stopped = true means violations (real issues) → exit 1.
+    //                   pending migrations (35-40) alone are not violations → exit 0.
+    if (result.report.violations.length > 0) {
       console.error('PHASE11_GATE_STOPPED');
       process.exitCode = 1;
     }

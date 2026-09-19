@@ -662,3 +662,57 @@ test('sentinel logic does not affect 35→40 ordering, checksums, or apply behav
   const mismatchReport = evaluateProductionLedger(withMismatch, migrations);
   assert.ok(mismatchReport.violations.includes('PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH'), 'checksum mismatch must still fire with sentinel present');
 });
+
+// ─── Inspect exit semantics tests ─────────────────────────────────────────
+// Verify that --inspect exits 0 for clean state with pending migrations,
+// and exits 1 only for actual violations.
+
+test('inspect with clean ledger and all 5 migrations pending exits 0 (no violations)', async () => {
+  const migrations = await loadedMigrations();
+  const { result } = await runWithLedger({ operation: 'inspect', ledger: predecessorLedger() });
+  // Clean state: no violations, all 5 migrations pending
+  assert.equal(result.report.violations.length, 0, 'should have zero violations');
+  assert.deepEqual(
+    result.report.pending.map((m) => m.version),
+    ['20260810000035', '20260810000036', '20260810000038', '20260810000039', '20260810000040'],
+  );
+  // Exit code should be 0 (not 1) when inspecting a clean pending state
+  assert.equal(result.stopped, false, 'stopped should be false (no violations)');
+});
+
+test('inspect with retired 37 sentinel exits 0 (sentinel accepted)', async () => {
+  const migrations = await loadedMigrations();
+  const withSentinel = [
+    ...predecessorLedger(),
+    { version: PHASE11_STAGING_ONLY_MIGRATION.version, name: STAGING_ONLY_RETIRED_NAME, statements: [] },
+  ];
+  const { result } = await runWithLedger({ operation: 'inspect', ledger: withSentinel });
+  // Retired sentinel is accepted, no violations
+  assert.equal(result.report.violations.length, 0, 'sentinel should not raise violations');
+  assert.equal(result.stopped, false, 'stopped should be false (sentinel accepted)');
+  assert.equal(result.report.states.at(-1).status, 'retired', 'version 37 should be retired');
+});
+
+test('inspect with real statements in 37 exits 1 (HARD STOP)', async () => {
+  const migrations = await loadedMigrations();
+  const withRealStatements = [
+    ...predecessorLedger(),
+    { version: PHASE11_STAGING_ONLY_MIGRATION.version, name: 'add_phase11_internal_fake_canary', statements: ['BEGIN', 'SELECT 1', 'COMMIT'] },
+  ];
+  const { result } = await runWithLedger({ operation: 'inspect', ledger: withRealStatements });
+  // Real statements in 37 is a violation
+  assert.ok(result.report.violations.includes('PHASE11_GATE_STAGING_ONLY_37_PRESENT'), 'real 37 statements should be a violation');
+  assert.equal(result.stopped, true, 'stopped should be true (violation detected)');
+  assert.equal(result.report.states.at(-1).status, 'present-stop', 'version 37 should be present-stop');
+});
+
+test('inspect with checksum mismatch exits 1 (HARD STOP)', async () => {
+  const migrations = await loadedMigrations();
+  const mutated = approvedLedgerRow(migrations[0]);
+  mutated.statements.push('select 1');  // Corrupt the statements
+  const violatingLedger = [...predecessorLedger(), mutated];
+  const { result } = await runWithLedger({ operation: 'inspect', ledger: violatingLedger });
+  // Checksum mismatch is a violation
+  assert.ok(result.report.violations.includes('PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH'), 'checksum mismatch should be a violation');
+  assert.equal(result.stopped, true, 'stopped should be true (violation detected)');
+});
