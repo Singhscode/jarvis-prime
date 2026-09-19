@@ -6,6 +6,7 @@
   "description": "JARVIS PRIME engine — CLI + HTTP API. Finds prospects, scores, personalizes, sends sequences, handles replies. Plugin-based provider system, event-driven architecture.",
   "main": "src/runner.js",
   "scripts": {
+    "start": "node src/runner.js --server",
     "run": "node src/runner.js",
     "source": "node src/runner.js --task=source",
     "outbound": "node src/runner.js --task=outbound",
