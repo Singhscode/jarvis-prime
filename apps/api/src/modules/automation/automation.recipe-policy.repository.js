@@ -108,7 +108,7 @@ export async function listEmployeeCandidates(ownerUserId) {
 }
 export async function getOwnerAutomationHealth(ownerUserId, actorUserId) {
   const [runs, decisions, operational, compatibility] = await Promise.all([
-    client().from('automation_runs').select('state').eq('owner_user_id', ownerUserId),
+    client().from('automation_runs').select('state').eq('owner_user_id', ownerUserId).limit(100),
     client().from('automation_policy_decisions').select('decision,reason_code,created_at,run_id').eq('owner_user_id', ownerUserId).in('decision', ['BLOCK', 'HUMAN_REVIEW']).order('created_at', { ascending: false }).limit(50),
     client().rpc('automation_get_owner_operational_health', { p_owner: ownerUserId, p_actor: actorUserId }),
     client().rpc('automation_check_compatibility', { p_registry: AUTOMATION_REGISTRY_VERSION, p_worker: AUTOMATION_WORKER_VERSION }),

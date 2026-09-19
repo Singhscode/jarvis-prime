@@ -20,24 +20,55 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
-    fetchTasks();
-    const interval = setInterval(fetchTasks, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    // Initial fetch
+    fetchTasks(0, PAGE_SIZE);
 
-  const fetchTasks = async () => {
+    // Visibility-gated polling - only run when tab is visible
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        fetchTasks(page * PAGE_SIZE, PAGE_SIZE);
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(pollInterval);
+      // Cleanup on unmount to prevent stale state
+      setLoading(false);
+    };
+  }, [page]);
+
+  const fetchTasks = async (offset = 0, limit = PAGE_SIZE) => {
     try {
-      const response = await fetch('/api/tasks');
+      setLoading(true);
+      const response = await fetch(`/api/tasks?offset=${offset}&limit=${limit}`);
       if (response.ok) {
         const data = await response.json();
         setTasks(data.tasks);
+        setHasMore(data.hasMore ?? false);
       }
     } catch (error) {
       console.error('Failed to fetch tasks:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (hasMore) {
+      setPage((prev) => prev + 1);
+      fetchTasks((page + 1) * PAGE_SIZE, PAGE_SIZE);
+    }
+  };
+
+  const handleManualRefresh = () => {
+    if (!document.hidden) {
+      fetchTasks(0, PAGE_SIZE);
+      setPage(0);
     }
   };
 
@@ -72,12 +103,26 @@ export default function Tasks() {
           <h1 className="text-4xl font-bold text-white mb-2">Tasks & Operations</h1>
           <p className="text-slate-400">Manage daily operations and workflows</p>
         </div>
-        <Link
-          href="/dashboard"
-          className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:opacity-90 transition"
-        >
-          ← Dashboard
-        </Link>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading || !document.hidden}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              document.hidden
+                ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
+                : 'bg-cyan-600 text-white hover:bg-cyan-500'
+            }`}
+            title={document.hidden ? 'Tab hidden - will refresh when visible' : 'Refresh tasks now'}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+          <Link
+            href="/dashboard"
+            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:opacity-90 transition"
+          >
+            ← Dashboard
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -166,6 +211,18 @@ export default function Tasks() {
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {hasMore && !loading && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={loadMore}
+            className="px-6 py-2 bg-slate-700/50 text-slate-300 rounded-lg hover:bg-slate-600/50 transition"
+          >
+            Load more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

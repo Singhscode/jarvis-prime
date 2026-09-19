@@ -4,12 +4,25 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
+import { URL } from 'node:url';
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Fail-closed: Only allow local Postgres for integration tests
+// This matches the pattern used in other integration tests (finance-billing, etc.)
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables required');
+}
+
+const parsedUrl = new URL(supabaseUrl);
+const allowedHostnames = ['127.0.0.1', 'localhost', '::1'];
+
+if (!allowedHostnames.includes(parsedUrl.hostname)) {
+  throw new Error(
+    `Integration tests must run against local database only. ` +
+    `Received host: ${parsedUrl.hostname}. Allowed: ${allowedHostnames.join(', ')}.`
+  );
 }
 
 const db = createClient(supabaseUrl, supabaseServiceKey);

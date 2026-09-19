@@ -22,14 +22,30 @@ function toDashboardLead(lead: Record<string, unknown>) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await getDatabase()
+    const { searchParams } = new URL(request.url);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
+
+    const { data, error, count } = await getDatabase()
       .from('leads')
-      .select('id, name, email, company, revenue, icp_score, status, last_contact_at, next_action, created_at, updated_at')
-      .order('created_at', { ascending: false });
+      .select('id, name, email, company, revenue, icp_score, status, last_contact_at, next_action, created_at, updated_at', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    
     if (error) throw error;
-    return NextResponse.json({ leads: (data || []).map(toDashboardLead) });
+    
+    const leads = (data || []).map(toDashboardLead);
+    const total = count ?? leads.length;
+    
+    return NextResponse.json({ 
+      leads, 
+      hasMore: offset + limit < total,
+      total,
+      offset,
+      limit
+    });
   } catch (error) {
     console.error('Leads API error:', error);
     return NextResponse.json({ error: 'Failed to fetch leads' }, { status: 500 });

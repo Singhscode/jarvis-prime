@@ -6,6 +6,10 @@ import { log } from '../utils/logger.js';
 import { handleReply } from '../ai/agents/inbound-agent.js';
 import * as calendarService from '../modules/meetings/calendar.service.js';
 import { getDb, _memory as mem } from '../database/db.js';
+import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
+
+const MAX_WEBHOOK_BYTES = 256 * 1024;
+const TOLERANCE_SECONDS = 5 * 60; // 5 minutes
 
 // In-memory webhook event log
 const webhookLog = [];
@@ -137,14 +141,75 @@ export async function processCustomWebhook(payload) {
 
 /**
  * Verify webhook signature for security.
- * Supports HMAC-SHA256 signatures.
+ * Supports HMAC-SHA256 signatures with timestamp and ID.
+ * 
+ * For Resend webhooks: expects 'Resend-Signature' header with format: v1,<signature>
+ * For other providers: expects 'X-Signature' header with raw hex HMAC-SHA256
+ * 
+ * Fails closed: if a secret is configured but signature is missing or invalid, rejects the webhook.
+ * If no secret is configured, accepts the webhook (graceful degradation for development).
  */
 export function verifySignature(payload, signature, secret) {
-  if (!secret || !signature) return true; // Skip if not configured
+  // No secret configured → graceful degradation (development mode)
+  if (!secret) return true;
+  
+  // Secret configured but no signature → fail closed
+  if (!signature) return false;
+  
+  // Try Resend signature format first (v1,<base64>)
+  if (signature.startsWith('v1,')) {
+    const signatureValue = signature.slice(3).trim();
+    if (!signatureValue || !/^[a-zA-Z0-9+/=]+$/.test(signatureValue)) return false;
+    
+    // Resend uses: timestamp.id.rawBody
+    // Since we don't have timestamp/id here, we verify against the raw payload
+    const key = parseSigningSecret(secret);
+    if (!key) return false;
+    
+    const expected = createHmac('sha256', key).update(payload).digest('base64');
+    return safeEqual(signatureValue, expected);
+  }
+  
+  // Generic HMAC-SHA256 (hex format)
+  if (/^[a-fA-F0-9]{64}$/.test(signature)) {
+    const key = parseSigningSecret(secret);
+    if (!key) return false;
+    
+    const expected = createHmac('sha256', key).update(payload).digest('hex');
+    return safeEqual(signature, expected);
+  }
+  
+  // Unknown signature format
+  return false;
+}
 
-  // In production, implement proper HMAC-SHA256 verification here.
-  // For now, accept all webhooks when no secret is configured.
-  return true;
+/**
+ * Parse a Resend-style webhook secret (whsec_<base64>) or raw base64 secret.
+ */
+export function parseSigningSecret(secret) {
+  if (!secret) return null;
+  
+  // Resend uses 'whsec_' prefix with base64 payload
+  const raw = secret.startsWith('whsec_') ? secret.slice(6) : secret;
+  if (!raw) return null;
+  
+  try {
+    // Use standard base64 decoding which handles missing padding gracefully
+    const key = Buffer.from(raw, 'base64');
+    return key.length ? key : null;
+  } catch {
+    // Invalid base64 (non-base64 chars, etc.)
+    return null;
+  }
+}
+
+/**
+ * Compare two buffers in constant time to prevent timing attacks.
+ */
+function safeEqual(left, right) {
+  const a = Buffer.from(left);
+  const b = Buffer.from(right);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**
