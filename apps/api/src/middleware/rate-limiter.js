@@ -61,6 +61,10 @@ export function createRateLimiter(options = {}) {
   }
 
   function rateLimiterMiddleware(req, res, next) {
+    // CORS preflight requests must never be rate limited — they are metadata-only
+    // and must pass through to the CORS middleware to handle properly.
+    if (req.method === 'OPTIONS') return next();
+
     const key = keyFn(req);
     const now = Date.now();
     let entry = store.get(key);
