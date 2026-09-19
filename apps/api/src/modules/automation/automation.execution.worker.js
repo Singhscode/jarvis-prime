@@ -20,9 +20,12 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
   const lease = bounded(leaseSeconds, 60, 10, 3600, 'LEASE_SECONDS');
   const heartbeatInterval = bounded(heartbeatMs, 15000, 1000, Math.max(1000, lease * 500), 'HEARTBEAT_INTERVAL');
   const interval = bounded(pollMs, 5000, MAX.pollMinMs, MAX.pollMaxMs, 'POLL_INTERVAL');
+  const maxIdleInterval = Math.min(MAX.pollMaxMs, 60_000);
   const actionActive = new Map(); const actionWaiters = new Map();
   const metrics = { claims: 0, completed: 0, retryable: 0, failed: 0, blocked: 0, review: 0, heartbeats: 0, heartbeatFailures: 0, staleRecovered: 0, relinquished: 0, lateResults: 0 };
   let draining = false; let ready = false; let active = 0; let compatibility = null;
+  let idleCycles = 0;
+  let lastActiveWorkId = null;
   async function acquireAction(actionCode) {
     while ((actionActive.get(actionCode) || 0) >= actionLimit) {
       await new Promise((resolve) => {
@@ -160,9 +163,27 @@ export function createWorker({ workerId = workerIdentity(), claimBatch = 10, con
       for (const work of claimed) telemetry.log('claim', { workId: work.id, runId: work.run_id, correlationId: work.correlation_id, actorCategory: 'worker', sourceCategory: 'claim', transition: 'WAITING_TO_RUNNING', actionCode: work.action_code, attempt: work.attempt_count });
       const results = [];
       for (let index = 0; index < claimed.length; index += limit) results.push(...await Promise.all(claimed.slice(index, index + limit).map(process)));
+      // Track idle cycles for exponential backoff - reset when work is claimed or processed
+      if (claimed.length === 0 && results.length === 0) {
+        idleCycles += 1;
+      } else {
+        idleCycles = 0;
+        lastActiveWorkId = claimed[0]?.id || lastActiveWorkId;
+      }
       return results;
     },
-    async run(signal) { await this.start(); while (!draining && !signal?.aborted) { await this.runOnce(); if (!draining && !signal?.aborted) await sleep(interval); } },
+    resetIdle() { idleCycles = 0; },
+    async run(signal) {
+      await this.start();
+      while (!draining && !signal?.aborted) {
+        await this.runOnce();
+        if (!draining && !signal?.aborted) {
+          // Exponential backoff when idle - increase interval up to maxIdleInterval
+          const backoffInterval = Math.min(maxIdleInterval, interval * (2 ** idleCycles));
+          await sleep(backoffInterval);
+        }
+      }
+    },
     async shutdown({ graceMs = 30000 } = {}) { draining = true; const deadline = Date.now() + graceMs; while (active && Date.now() < deadline) await sleep(25); ready = false; telemetry.log('worker_stopped', { actorCategory: 'worker', sourceCategory: 'worker', transition: 'STOPPED' }); },
   };
 }
