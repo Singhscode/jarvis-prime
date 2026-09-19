@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.get_revenue_by_owner(p_owner_user_id uuid, p_s
 RETURNS TABLE(total_amount_minor bigint) LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   RETURN QUERY
-    SELECT COALESCE(SUM(fi.total_amount_minor), 0)
+    SELECT COALESCE(SUM(fi.total_amount_minor), 0)::bigint
     FROM public.finance_invoices fi
     WHERE fi.owner_user_id = p_owner_user_id
       AND fi.status = p_status;
@@ -22,7 +22,7 @@ RETURNS TABLE(month date, total_amount_minor bigint) LANGUAGE plpgsql SECURITY D
 BEGIN
   RETURN QUERY
     SELECT DATE_TRUNC('month', fi.issued_at)::DATE AS month,
-           COALESCE(SUM(fi.total_amount_minor), 0) AS total_amount_minor
+           COALESCE(SUM(fi.total_amount_minor), 0)::bigint AS total_amount_minor
     FROM public.finance_invoices fi
     WHERE fi.owner_user_id = p_owner_user_id
       AND fi.status = 'paid'
@@ -38,7 +38,7 @@ CREATE OR REPLACE FUNCTION public.get_expenses_by_owner(p_owner_user_id uuid, p_
 RETURNS TABLE(total_amount_minor bigint) LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   RETURN QUERY
-    SELECT COALESCE(SUM(fe.amount_minor), 0)
+    SELECT COALESCE(SUM(fe.amount_minor), 0)::bigint
     FROM public.finance_expenses fe
     WHERE fe.owner_user_id = p_owner_user_id
       AND fe.status = p_status;
