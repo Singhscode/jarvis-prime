@@ -1,0 +1,114 @@
+name: Phase 11 Remove Staging-Only Migration 37
+
+# One-time remediation workflow to remove the legacy staging-only canary migration 37
+# from the production database ledger. This migration was applied before the Phase 11
+# gate existed and should never have been in production (it is staging-only).
+#
+# This is a breaking state blocker for Phase 11: the gate detects migration 37 as present
+# and refuses to proceed with Phase 11 (35-40) migrations. This workflow provides the
+# sole approved mechanism to remove it.
+#
+# Authorization: same as Phase 11 (PHASE11_APPROVED_OPERATORS) + explicit environment approval.
+
+on:
+  repository_dispatch:
+    types:
+      - phase11-remove-staging-37
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-remove-staging-37
+  cancel-in-progress: false
+
+jobs:
+  authorize-operator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require github.actor to be an approved Phase 11 operator
+        shell: bash
+        env:
+          DISPATCH_ACTOR: ${{ github.actor }}
+          APPROVED_OPERATORS: ${{ vars.PHASE11_APPROVED_OPERATORS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APPROVED_OPERATORS//[[:space:]]/}" ]]; then
+            echo "Repository variable PHASE11_APPROVED_OPERATORS is unset or empty; failing closed." >&2
+            exit 1
+          fi
+          actor_lower="$(printf '%s' "${DISPATCH_ACTOR}" | tr '[:upper:]' '[:lower:]')"
+          authorized=false
+          while IFS= read -r entry; do
+            entry="$(printf '%s' "${entry}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+            if [[ -n "${entry}" && "${entry}" == "${actor_lower}" ]]; then
+              authorized=true
+            fi
+          done < <(printf '%s\n' "${APPROVED_OPERATORS}" | tr ',;' '\n')
+          if [[ "${authorized}" != "true" ]]; then
+            echo "Actor is not an approved Phase 11 production operator; failing closed." >&2
+            exit 1
+          fi
+          echo "Dispatch actor is an approved Phase 11 production operator."
+
+  validate-payload:
+    needs: authorize-operator
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit removal confirmation
+        shell: bash
+        env:
+          PAYLOAD_CONFIRM: ${{ github.event.client_payload.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ "${PAYLOAD_CONFIRM}" != "REMOVE_STAGING_ONLY_37_FROM_PRODUCTION" ]]; then
+            echo "Explicit confirmation required: confirm must be exactly 'REMOVE_STAGING_ONLY_37_FROM_PRODUCTION'" >&2
+            exit 1
+          fi
+          echo "Explicit removal confirmation received."
+
+  remove-migration-37:
+    name: remove-migration-37 / phase11-remove-staging-only-37
+    needs:
+      - authorize-operator
+      - validate-payload
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Remove staging-only migration 37 from production ledger
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: session-pooler
+          PHASE11_REMOVE_STAGING_37_CONFIRM: REMOVE_STAGING_ONLY_37_FROM_PRODUCTION
+        run: node database/scripts/phase11-production-migration-gate.mjs --remove-staging-only-37
+
+      - name: Verify Phase 11 gate now passes
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: session-pooler
+        run: node database/scripts/phase11-production-migration-gate.mjs --inspect
+
+      - name: Report completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Migration 37 removed from production ledger."
+          echo "Phase 11 migration gate is now unblocked."
+          echo "Run Phase 11 production migration dispatch to proceed with 35-40 migrations."

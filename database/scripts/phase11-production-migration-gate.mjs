@@ -788,10 +788,73 @@ export async function runPhase11ProductionMigrationGate({
   }
 }
 
+/**
+ * Remove the staging-only migration 37 from the production ledger.
+ * This is a one-time remediation for the legacy canary that was applied before the gate existed.
+ * Requires explicit confirmation via environment variable to prevent accidental deletion.
+ */
+async function removeStagingOnlyMigration37() {
+  const confirmationCode = process.env.PHASE11_REMOVE_STAGING_37_CONFIRM;
+  if (confirmationCode !== 'REMOVE_STAGING_ONLY_37_FROM_PRODUCTION') {
+    console.error('PHASE11_GATE_REMOVE_STAGING_37_CONFIRMATION_REQUIRED');
+    console.error('Set PHASE11_REMOVE_STAGING_37_CONFIRM=REMOVE_STAGING_ONLY_37_FROM_PRODUCTION to proceed.');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log('PHASE11_GATE_REMOVE_STAGING_37_START');
+  const target = assertProductionTarget(process.env);
+
+  let client;
+  let connected = false;
+  const REMOVE_STAGING_37_SQL = "DELETE FROM supabase_migrations.schema_migrations WHERE version = '20260810000037'";
+  const VERIFY_REMOVED_SQL = "SELECT COUNT(*) as count FROM supabase_migrations.schema_migrations WHERE version = '20260810000037'";
+
+  try {
+    client = await defaultClientFactory({ ...target, root: defaultRoot, dbMode: target.dbMode });
+    await client.connect();
+    connected = true;
+
+    // Begin transaction and remove
+    await client.query('BEGIN');
+    try {
+      console.log('PHASE11_GATE_REMOVE_STAGING_37_EXECUTING');
+      await client.query(REMOVE_STAGING_37_SQL);
+
+      // Verify removal
+      const result = await client.query(VERIFY_REMOVED_SQL);
+      const count = result.rows?.[0]?.count || 0;
+      if (count > 0) {
+        throw new Error('PHASE11_GATE_REMOVE_STAGING_37_VERIFICATION_FAILED');
+      }
+
+      await client.query('COMMIT');
+      console.log('PHASE11_GATE_REMOVE_STAGING_37_SUCCESS');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    }
+  } catch (error) {
+    if (error instanceof Phase11MigrationGateError) {
+      console.error(error.code);
+    } else {
+      console.error('PHASE11_GATE_REMOVE_STAGING_37_FAILED');
+      console.error(error.message);
+    }
+    process.exitCode = 1;
+  } finally {
+    if (connected) await client.end().catch(() => {});
+  }
+}
+
 async function main() {
   const argument = process.argv.slice(2).at(0);
   if (argument === '--describe') {
     describeMigrations(console.log);
+    return;
+  }
+  if (argument === '--remove-staging-only-37') {
+    await removeStagingOnlyMigration37();
     return;
   }
   const operation = argument === '--inspect' ? 'inspect' : argument === '--apply' ? 'apply' : null;

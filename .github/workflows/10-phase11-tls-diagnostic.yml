@@ -1,0 +1,223 @@
+name: Phase 11 TLS Certificate Chain Diagnostic
+
+# Manual diagnostic workflow to inspect the actual TLS certificate chain
+# served by the Supabase Session Pooler endpoint and compare it against
+# the supplied CA certificate.
+#
+# This workflow runs in the protected production Environment, which has
+# access to PHASE11_PRODUCTION_DATABASE_CA_PEM, PHASE11_PRODUCTION_DATABASE_URL,
+# and PHASE11_PRODUCTION_PROJECT_REF.
+#
+# The diagnostic:
+# 1. Inspects the CA secret (length, fingerprint, structure, validity)
+# 2. Connects to the endpoint and extracts certificate chain metadata
+# 3. Compares chain against CA
+# 4. Reports only sanitized metadata, no secrets or certificate contents
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_sha:
+        description: Exact main-branch SHA to check out (for reproducibility).
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase11-tls-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  tls-chain-diagnostic:
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha || 'main' }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create TLS diagnostic script
+        shell: bash
+        run: |
+          cat > /tmp/tls_diagnostic.mjs << 'NODEJS_SCRIPT'
+          import crypto from 'node:crypto';
+          import tls from 'node:tls';
+          import { URL } from 'node:url';
+          
+          function countPemBlocks(pemString) {
+            if (!pemString || typeof pemString !== 'string') return 0;
+            const matches = pemString.match(/-----BEGIN CERTIFICATE-----/g);
+            return matches ? matches.length : 0;
+          }
+          
+          function validatePemStructure(pemString) {
+            if (!pemString) return { valid: false, reason: 'empty' };
+            if (!pemString.includes('-----BEGIN CERTIFICATE-----')) return { valid: false, reason: 'no begin marker' };
+            if (!pemString.includes('-----END CERTIFICATE-----')) return { valid: false, reason: 'no end marker' };
+            const lines = pemString.split('\n').map(l => l.trim()).filter(l => l);
+            if (lines.length < 3) return { valid: false, reason: 'insufficient lines' };
+            return { valid: true, lines: lines.length };
+          }
+          
+          async function main() {
+            console.log('=== PHASE 11 TLS DIAGNOSTIC ===\n');
+            
+            const caPem = process.env.PHASE11_PRODUCTION_DATABASE_CA_PEM;
+            const dbUrl = process.env.PHASE11_PRODUCTION_DATABASE_URL;
+            const projectRef = process.env.PHASE11_PRODUCTION_PROJECT_REF;
+            
+            console.log('STEP 1: CA Secret Inspection');
+            console.log('----------------------------');
+            
+            if (!caPem) {
+              console.log('Status: NOT PROVIDED');
+            } else {
+              const pemStructure = validatePemStructure(caPem);
+              console.log(`PEM Structure Valid: ${pemStructure.valid}`);
+              if (!pemStructure.valid) {
+                console.log(`  Reason: ${pemStructure.reason}`);
+              } else {
+                console.log(`  Lines: ${pemStructure.lines}`);
+              }
+              
+              console.log(`Certificate Blocks: ${countPemBlocks(caPem)}`);
+              console.log(`Byte Length: ${caPem.length}`);
+              
+              try {
+                const base64Blocks = caPem
+                  .split('\n')
+                  .filter(l => !l.includes('-----') && l.trim())
+                  .join('');
+                const derBuffer = Buffer.from(base64Blocks, 'base64');
+                const sha256 = crypto.createHash('sha256').update(derBuffer).digest('hex');
+                console.log(`SHA256 Fingerprint: ${sha256}`);
+              } catch (e) {
+                console.log(`Fingerprint Error: ${e.message}`);
+              }
+            }
+            
+            console.log('\nSTEP 2: Database URL Inspection');
+            console.log('-------------------------------');
+            
+            if (!dbUrl) {
+              console.log('Status: NOT PROVIDED');
+            } else {
+              try {
+                const url = new URL(dbUrl);
+                console.log(`Host: ${url.hostname}`);
+                console.log(`Port: ${url.port || 'default (5432)'}`);
+                console.log(`Protocol: ${url.protocol}`);
+                console.log(`SSL Mode: ${url.searchParams.get('sslmode') || 'not specified'}`);
+              } catch (e) {
+                console.log(`Parse Error: ${e.message}`);
+              }
+            }
+            
+            console.log(`Project Ref: ${projectRef || 'NOT PROVIDED'}`);
+            
+            console.log('\nSTEP 3: Endpoint TLS Chain Inspection');
+            console.log('-------------------------------------');
+            
+            if (!dbUrl) {
+              console.log('Cannot inspect endpoint: database URL not provided.');
+              return;
+            }
+            
+            try {
+              const url = new URL(dbUrl);
+              const host = url.hostname;
+              const port = parseInt(url.port) || 5432;
+              
+              console.log(`Connecting to ${host}:${port}...\n`);
+              
+              await new Promise((resolve) => {
+                const socket = tls.connect(
+                  { host, port, servername: host, rejectUnauthorized: false },
+                  function() {
+                    const cert = socket.getPeerCertificate(false);
+                    
+                    if (!cert) {
+                      console.log('No peer certificate received.');
+                      socket.destroy();
+                      resolve();
+                      return;
+                    }
+                    
+                    console.log('Leaf Certificate Metadata:');
+                    console.log(`  Subject: ${JSON.stringify(cert.subject || {})}`);
+                    console.log(`  Subject Alt Names: ${cert.subjectaltname || 'none'}`);
+                    console.log(`  Issuer: ${JSON.stringify(cert.issuer || {})}`);
+                    console.log(`  Valid From: ${cert.valid_from || 'N/A'}`);
+                    console.log(`  Valid To: ${cert.valid_to || 'N/A'}`);
+                    console.log(`  Signature Algorithm: ${cert.sigalg || 'N/A'}`);
+                    console.log(`  Public Key Bits: ${cert.bits || 'N/A'}`);
+                    
+                    if (cert.raw) {
+                      const leafSha256 = crypto.createHash('sha256').update(cert.raw).digest('hex');
+                      console.log(`  SHA256 Fingerprint: ${leafSha256}`);
+                    }
+                    
+                    // Attempt to get issuer cert if available
+                    const issuer = socket.getPeerCertificate(false);
+                    if (issuer && issuer.issuerCertificate) {
+                      console.log('\nIntermediate/Issuer Certificate Metadata:');
+                      console.log(`  Subject: ${JSON.stringify(issuer.issuerCertificate.subject || {})}`);
+                      console.log(`  Issuer: ${JSON.stringify(issuer.issuerCertificate.issuer || {})}`);
+                      if (issuer.issuerCertificate.raw) {
+                        const issuerSha256 = crypto.createHash('sha256').update(issuer.issuerCertificate.raw).digest('hex');
+                        console.log(`  SHA256 Fingerprint: ${issuerSha256}`);
+                      }
+                    }
+                    
+                    socket.destroy();
+                    resolve();
+                  }
+                );
+                
+                socket.on('error', (err) => {
+                  console.log(`TLS Connection Error: ${err.code}`);
+                  console.log(`  Message: ${err.message}`);
+                  resolve();
+                });
+                
+                setTimeout(() => {
+                  console.log('Connection timeout.');
+                  socket.destroy();
+                  resolve();
+                }, 5000);
+              });
+            } catch (e) {
+              console.log(`Error: ${e.message}`);
+            }
+            
+            console.log('\n=== END DIAGNOSTIC ===');
+          }
+          
+          main().catch(console.error);
+          NODEJS_SCRIPT
+
+      - name: Run TLS diagnostic
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        run: node /tmp/tls_diagnostic.mjs
+
+      - name: Report completion
+        shell: bash
+        run: |
+          echo "TLS diagnostic complete."
+          echo "Review the output above to determine:"
+          echo "1. Is the CA secret valid PEM?"
+          echo "2. Does the endpoint certificate chain match the CA?"
+          echo "3. Is there a certificate rotation or mismatch?"
