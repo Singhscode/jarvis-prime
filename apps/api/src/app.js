@@ -138,6 +138,14 @@ export async function createApp(options = {}) {
   app.use('/api/sales-agents', salesAgentRouter);
   const { default: financeRouter } = await import('./modules/finance/finance.routes.js');
   app.use('/api/finance', financeRouter);
+  // Analytics enforces its own per-request JWT + Owner authorization
+  // (see analytics.routes.js / analytics.service.js `scope()`), the same as
+  // owner-workspace and finance above. It is mounted here, before the
+  // shared-secret gate, so the Owner Workspace browser dashboard can call it
+  // with only a user JWT — the automation secret is a server-to-server
+  // credential and must never be sent from a browser.
+  const { default: analyticsRouter } = await import('./modules/analytics/analytics.routes.js');
+  app.use('/api/analytics', analyticsRouter);
   const { default: communicationsRouter } = await import('./modules/communications/communications.routes.js');
   app.use('/api/communications', communicationsRouter);
   const { default: recipePolicyRouter } = await import('./modules/automation/automation.recipe-policy.routes.js');
@@ -153,7 +161,6 @@ export async function createApp(options = {}) {
   const { default: outreachRouter }    = await import('./modules/prospects/outreach.routes.js');
   const { default: campaignsRouter }   = await import('./modules/campaigns/campaigns.routes.js');
   const { default: linkedinRouter }    = await import('./modules/linkedin/linkedin.routes.js');
-  const { default: analyticsRouter }   = await import('./modules/analytics/analytics.routes.js');
   const { default: calendarRouter }    = await import('./modules/meetings/calendar.routes.js');
   const { default: schedulerRouter }   = await import('./jobs/scheduler.routes.js');
 
@@ -163,10 +170,13 @@ export async function createApp(options = {}) {
     app.use(`${prefix}/outreach`,    outreachRouter);
     app.use(`${prefix}/campaigns`,   campaignsRouter);
     app.use(`${prefix}/linkedin`,    linkedinRouter);
-    app.use(`${prefix}/analytics`,   analyticsRouter);
     app.use(`${prefix}/calendar`,    calendarRouter);
     app.use(`${prefix}/scheduler`,   schedulerRouter);
   }
+  // /api/analytics is mounted earlier (before the shared-secret gate) since
+  // it has its own JWT authorization. Keep the /api/v1 alias consistent
+  // with the other modules' explicit-versioning mount.
+  app.use('/api/v1/analytics', analyticsRouter);
 
   // API directory
   app.get('/api', (req, res) => {
@@ -207,7 +217,23 @@ export async function createApp(options = {}) {
 
   // ---- Scheduler ----
   if (enableScheduler) {
-    const { registerDefaultJobs, startScheduler } = await import('./jobs/scheduler.js');
+    const { registerJob, registerDefaultJobs, startScheduler } = await import('./jobs/scheduler.js');
+
+    // Phase 12: populates analytics_daily_metrics (the data source for
+    // GET /api/analytics/daily) once per day for every owner. Registered
+    // separately from registerDefaultJobs so it does not depend on, or
+    // interact with, the pre-existing daily-report/weekly-report jobs.
+    registerJob({
+      id: 'analytics-daily-snapshot',
+      name: 'Analytics Daily Snapshot',
+      cron: '15 0 * * *', // 00:15 UTC daily — after the day it summarizes has fully elapsed
+      handler: async () => {
+        const { runDailySnapshotForAllOwners } = await import('./modules/analytics/analytics.service.js');
+        const result = await runDailySnapshotForAllOwners();
+        log.info(`[Scheduler] Analytics daily snapshot: ${result.ownersProcessed} owner(s) processed, ${result.ownersFailed} failed, date=${result.date}`);
+      },
+    });
+
     registerDefaultJobs({
       sourceAndScoreAll: async () => {
         const clients = await listActiveClients();
