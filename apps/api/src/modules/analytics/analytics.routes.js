@@ -1,85 +1,128 @@
-// Analytics API Route
-// Dashboard metrics, daily/weekly trends, funnels, and channel breakdowns.
+// Analytics API Routes
+// Dashboard, revenue, clients, projects, tasks, leads, communications, automation, expenses.
 
 import express from 'express';
-import * as analyticsService from './analytics.service.js';
-import { listTests, getTestResults } from '../../utils/ab-testing.js';
+import * as service from './analytics.service.js';
+import { createAuthMiddleware } from '../../middleware/auth-middleware.js';
 
 const router = express.Router();
 
-// GET /api/analytics/dashboard — Full dashboard data
-router.get('/dashboard', async (req, res) => {
-  try {
-    const clientId = req.query.clientId || null;
-    const data = await analyticsService.getDashboard(clientId);
-    return res.json({ success: true, data });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+class AppError extends Error {
+  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
   }
-});
+}
 
-// GET /api/analytics/daily — Daily metrics for a date range
-router.get('/daily', async (req, res) => {
-  try {
-    const { clientId, startDate, endDate } = req.query;
-    const data = await analyticsService.getDailyMetrics(clientId, startDate, endDate);
-    return res.json({ success: true, data });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+const handle = (handler) => (req, res, next) =>
+  Promise.resolve(handler(req, res)).catch(next);
+
+const respond = (res, data, status = 200) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.status(status).json({ success: true, data });
+};
+
+// Require authentication for all analytics endpoints
+router.use(createAuthMiddleware({ required: true }));
+
+// GET /api/analytics/dashboard — Full overview dashboard
+router.get('/dashboard', handle(async (req, res) => {
+  const data = await service.getDashboard(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics/revenue?start=YYYY-MM-DD&end=YYYY-MM-DD
+// Revenue report for period
+router.get('/revenue', handle(async (req, res) => {
+  const { start, end } = req.query;
+  
+  if (!start || !end) {
+    throw new AppError('start and end dates required (format: YYYY-MM-DD)', 400, 'VALIDATION_ERROR');
   }
-});
+  
+  const data = await service.getRevenueReport(req.user.sub, start, end);
+  respond(res, data);
+}));
 
-// GET /api/analytics/funnel — Conversion funnel
-router.get('/funnel', async (req, res) => {
-  try {
-    const clientId = req.query.clientId || null;
-    const data = await analyticsService.getFunnelMetrics(clientId);
-    return res.json({ success: true, data });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
+// GET /api/analytics/daily?start=YYYY-MM-DD&end=YYYY-MM-DD
+// Daily metrics for date range
+router.get('/daily', handle(async (req, res) => {
+  const { start, end } = req.query;
+  
+  if (!start || !end) {
+    throw new AppError('start and end dates required (format: YYYY-MM-DD)', 400, 'VALIDATION_ERROR');
   }
-});
+  
+  const data = await service.getDailyMetrics(req.user.sub, start, end);
+  respond(res, data);
+}));
 
-// GET /api/analytics/channels — Email vs LinkedIn comparison
-router.get('/channels', async (req, res) => {
-  try {
-    const clientId = req.query.clientId || null;
-    const data = await analyticsService.getChannelBreakdown(clientId);
-    return res.json({ success: true, data });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
+// GET /api/analytics/clients
+// Client metrics
+router.get('/clients', handle(async (req, res) => {
+  const data = await service.getClientsReport(req.user.sub);
+  respond(res, data);
+}));
 
-// GET /api/analytics/ab-tests — A/B test results
-router.get('/ab-tests', (req, res) => {
-  try {
-    const clientId = req.query.clientId || null;
-    const tests = listTests(clientId);
-    return res.json({
-      success: true,
-      data: {
-        total: tests.length,
-        running: tests.filter((t) => t.status === 'running').length,
-        completed: tests.filter((t) => t.status === 'completed').length,
-        tests: tests.map((t) => getTestResults(t.id)),
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, error: error.message });
-  }
-});
+// GET /api/analytics/projects
+// Project metrics
+router.get('/projects', handle(async (req, res) => {
+  const data = await service.getProjectsReport(req.user.sub);
+  respond(res, data);
+}));
 
-// GET /api/analytics — Overview endpoint
+// GET /api/analytics/tasks
+// Task metrics
+router.get('/tasks', handle(async (req, res) => {
+  const data = await service.getTasksReport(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics/leads
+// Lead metrics
+router.get('/leads', handle(async (req, res) => {
+  const data = await service.getLeadsReport(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics/communication
+// Communication metrics (last 24h)
+router.get('/communication', handle(async (req, res) => {
+  const data = await service.getCommunicationReport(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics/automation
+// Automation metrics (last 24h)
+router.get('/automation', handle(async (req, res) => {
+  const data = await service.getAutomationReport(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics/expenses
+// Expense metrics
+router.get('/expenses', handle(async (req, res) => {
+  const data = await service.getExpensesReport(req.user.sub);
+  respond(res, data);
+}));
+
+// GET /api/analytics
+// Overview/status endpoint
 router.get('/', (req, res) => {
-  return res.json({
+  respond(res, {
     status: 'ok',
     endpoints: [
       'GET /api/analytics/dashboard',
-      'GET /api/analytics/daily?startDate=&endDate=',
-      'GET /api/analytics/funnel',
-      'GET /api/analytics/channels',
-      'GET /api/analytics/ab-tests',
+      'GET /api/analytics/revenue?start=YYYY-MM-DD&end=YYYY-MM-DD',
+      'GET /api/analytics/daily?start=YYYY-MM-DD&end=YYYY-MM-DD',
+      'GET /api/analytics/clients',
+      'GET /api/analytics/projects',
+      'GET /api/analytics/tasks',
+      'GET /api/analytics/leads',
+      'GET /api/analytics/communication',
+      'GET /api/analytics/automation',
+      'GET /api/analytics/expenses',
     ],
   });
 });
