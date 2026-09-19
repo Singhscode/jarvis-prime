@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const tasks = [
+    const { searchParams } = new URL(request.url);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
+
+    const allTasks = [
       {
         id: '1',
         name: 'Follow up with Rahul Sharma',
@@ -71,7 +75,16 @@ export async function GET() {
       },
     ];
 
-    return NextResponse.json({ tasks });
+    const total = allTasks.length;
+    const paginatedTasks = allTasks.slice(offset, offset + limit);
+
+    return NextResponse.json({
+      tasks: paginatedTasks,
+      hasMore: offset + limit < total,
+      total,
+      offset,
+      limit
+    });
   } catch (error) {
     console.error('Tasks API error:', error);
     return NextResponse.json(

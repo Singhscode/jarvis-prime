@@ -20,24 +20,69 @@ export default function Leads() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+  const [tabVisible, setTabVisible] = useState(true);
+  const PAGE_SIZE = 20;
 
+  // Track tab visibility for UI state
   useEffect(() => {
-    fetchLeads();
-    const interval = setInterval(fetchLeads, 30000);
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined') {
+        setTabVisible(!document.hidden);
+      }
+    };
+
+    handleVisibilityChange();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  const fetchLeads = async () => {
+  useEffect(() => {
+    // Initial fetch
+    fetchLeads(0, PAGE_SIZE);
+
+    // Visibility-gated polling - only run when tab is visible
+    const pollInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchLeads(page * PAGE_SIZE, PAGE_SIZE);
+      }
+    }, 30000);
+
+    return () => {
+      clearInterval(pollInterval);
+      // Cleanup on unmount to prevent stale state
+      setLoading(false);
+    };
+  }, [page, tabVisible]);
+
+  const fetchLeads = async (offset = 0, limit = PAGE_SIZE) => {
     try {
-      const response = await fetch('/api/leads');
+      setLoading(true);
+      const response = await fetch(`/api/leads?offset=${offset}&limit=${limit}`);
       if (response.ok) {
         const data = await response.json();
         setLeads(data.leads);
+        setHasMore(data.hasMore ?? false);
       }
     } catch (error) {
       console.error('Failed to fetch leads:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (hasMore) {
+      setPage((prev) => prev + 1);
+      fetchLeads((page + 1) * PAGE_SIZE, PAGE_SIZE);
+    }
+  };
+
+  const handleManualRefresh = () => {
+    if (tabVisible) {
+      fetchLeads(0, PAGE_SIZE);
+      setPage(0);
     }
   };
 
@@ -71,12 +116,26 @@ export default function Leads() {
           <h1 className="text-4xl font-bold text-white mb-2">Lead Management</h1>
           <p className="text-slate-400">Track and manage all incoming and qualified leads</p>
         </div>
-        <Link
-          href="/dashboard"
-          className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:opacity-90 transition"
-        >
-          ← Dashboard
-        </Link>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading || !tabVisible}
+            className={`px-4 py-2 rounded-lg font-semibold transition ${
+              !tabVisible
+                ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
+                : 'bg-cyan-600 text-white hover:bg-cyan-500'
+            }`}
+            title={!tabVisible ? 'Tab hidden - will refresh when visible' : 'Refresh leads now'}
+          >
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+          <Link
+            href="/dashboard"
+            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:opacity-90 transition"
+          >
+            ← Dashboard
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -179,6 +238,18 @@ export default function Leads() {
           </table>
         </div>
       </div>
+
+      {/* Pagination */}
+      {hasMore && !loading && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={loadMore}
+            className="px-6 py-2 bg-slate-700/50 text-slate-300 rounded-lg hover:bg-slate-600/50 transition"
+          >
+            Load more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

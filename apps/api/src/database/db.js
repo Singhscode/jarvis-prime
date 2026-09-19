@@ -349,12 +349,12 @@ export async function insertCampaign(row) {
   return data;
 }
 
-export async function listCampaigns(clientId) {
+export async function listCampaigns(clientId, limit = 100) {
   const { client: dbClient, usingMemory } = getDb();
   if (usingMemory) {
     return clientId ? mem.campaigns.filter((c) => c.client_id === clientId) : mem.campaigns;
   }
-  let query = dbClient.from('campaigns').select('*').order('created_at', { ascending: false });
+  let query = dbClient.from('campaigns').select('*').order('created_at', { ascending: false }).limit(limit);
   if (clientId) query = query.eq('client_id', clientId);
   const { data, error } = await query;
   if (error) throw new Error(`listCampaigns: ${error.message}`);
@@ -387,16 +387,21 @@ export async function getProspectCounts(clientId) {
     }
     return { total: prospects.length, stages };
   }
-  // Supabase: use RPC or manual aggregation
-  let query = dbClient.from('prospects').select('stage');
-  if (clientId) query = query.eq('client_id', clientId);
-  const { data, error } = await query;
-  if (error) return { total: 0, stages: {} };
-  const stages = {};
-  for (const row of data || []) {
-    stages[row.stage] = (stages[row.stage] || 0) + 1;
+  // Supabase: use RPC for database-side aggregation (count per stage)
+  const { data: counts, error } = await dbClient
+    .rpc('get_prospect_stage_counts', { p_client_id: clientId || null });
+  
+  if (error || !counts || counts.length === 0) {
+    return { total: 0, stages: {} };
   }
-  return { total: (data || []).length, stages };
+  
+  const stages = {};
+  let total = 0;
+  for (const row of counts) {
+    stages[row.stage] = row.count || 0;
+    total += row.count || 0;
+  }
+  return { total, stages };
 }
 
 // ---- Client Helpers ----
