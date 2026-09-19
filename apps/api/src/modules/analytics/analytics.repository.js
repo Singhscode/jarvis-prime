@@ -14,16 +14,20 @@ function client() {
  * @param {string} ownerUserId - Owner UUID
  * @param {string} startDate - ISO date string (YYYY-MM-DD or full ISO)
  * @param {string} endDate - ISO date string
+ * @param {number} limit - Maximum rows to return (default: 100, max: 365)
  * @returns {Promise<Array>} Array of daily metric records
  */
-export async function getDailyMetrics(ownerUserId, startDate, endDate) {
+export async function getDailyMetrics(ownerUserId, startDate, endDate, limit = 100) {
+  const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 365);
+  
   const { data, error } = await client()
     .from('analytics_daily_metrics')
     .select('*')
     .eq('owner_user_id', ownerUserId)
     .gte('metric_date', startDate)
     .lte('metric_date', endDate)
-    .order('metric_date', { ascending: false });
+    .order('metric_date', { ascending: false })
+    .limit(safeLimit);
 
   if (error) throw error;
   return data || [];
@@ -37,46 +41,26 @@ export async function getDailyMetrics(ownerUserId, startDate, endDate) {
  * @returns {Promise<{totalRevenueMinor: number, monthlyData: Array}>}
  */
 export async function getRevenueStats(ownerUserId, startDate, endDate) {
-  // Total revenue (all time, paid invoices only) - database-side aggregation
-  const { count: totalRev, error: totalError } = await client()
-    .from('finance_invoices')
-    .select('total_amount_minor', { count: 'exact', head: true })
-    .eq('owner_user_id', ownerUserId)
-    .eq('status', 'paid');
-
-  if (totalError) throw totalError;
-
-  // Use SUM() via RPC or fetch aggregated data directly
-  // For now, fetch count only (totalRevenueMinor will be 0 if no invoices)
-  // This query returns count not sum, but we need sum - use RPC for proper aggregation
-  const { data: sumResult, error: sumError } = await client()
-    .rpc('sum_revenue_by_owner', { owner_user_id: ownerUserId, status: 'paid' });
-
-  let totalRevenueMinor = 0;
-  if (!sumError && sumResult && Array.isArray(sumResult) && sumResult.length > 0) {
-    totalRevenueMinor = sumResult[0].sum || 0;
-  } else if (!totalError && totalRev) {
-    // Fallback: count-based if RPC not available - this is a limitation
-    // In production, ensure the RPC function is deployed
-    totalRevenueMinor = totalRev * 0; // Placeholder - RPC should be used
-  }
-
-  // Monthly revenue (for date range) - also use aggregation
-  const { data: monthlyData, error: monthlyError } = await client()
-    .rpc('get_monthly_revenue', { 
-      owner_user_id: ownerUserId, 
-      start_date: startDate,
-      end_date: endDate
+  // Total revenue (all time, paid invoices only) - database-side aggregation via RPC
+  const { data: totalRevenueResult, error: totalError } = await client()
+    .rpc('get_revenue_by_owner', { 
+      p_owner_user_id: ownerUserId,
+      p_status: 'paid'
     });
 
-  if (monthlyError) {
-    // Fallback: if RPC not available, return empty array (existing behavior)
-    // In production, ensure the RPC function is deployed
-    return {
-      totalRevenueMinor,
-      monthlyData: [],
-    };
-  }
+  if (totalError) throw new Error(`getRevenueStats total: ${totalError.message}`);
+
+  const totalRevenueMinor = (totalRevenueResult || [])[0]?.total_amount_minor || 0;
+
+  // Monthly revenue (for date range) - also use aggregation via RPC
+  const { data: monthlyData, error: monthlyError } = await client()
+    .rpc('get_monthly_revenue', { 
+      p_owner_user_id: ownerUserId,
+      p_start_date: startDate,
+      p_end_date: endDate
+    });
+
+  if (monthlyError) throw new Error(`getRevenueStats monthly: ${monthlyError.message}`);
 
   return {
     totalRevenueMinor,
@@ -287,17 +271,16 @@ export async function getExpenseStats(ownerUserId) {
 
   if (approvedError) throw approvedError;
 
-  // Total amount (cents/paise) - use database-side SUM aggregation
+  // Total amount (cents/paise) - use database-side SUM aggregation via RPC
   const { data: sumResult, error: sumError } = await client()
-    .rpc('sum_expenses_by_owner', { 
-      owner_user_id: ownerUserId,
-      status: 'approved'
+    .rpc('get_expenses_by_owner', { 
+      p_owner_user_id: ownerUserId,
+      p_status: 'approved'
     });
 
-  let totalExpensesMinor = 0;
-  if (!sumError && sumResult && Array.isArray(sumResult) && sumResult.length > 0) {
-    totalExpensesMinor = sumResult[0].sum || 0;
-  }
+  if (sumError) throw new Error(`getExpenseStats total: ${sumError.message}`);
+
+  const totalExpensesMinor = (sumResult || [])[0]?.total_amount_minor || 0;
 
   return {
     totalExpenses: totalExpenses || 0,

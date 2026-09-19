@@ -186,7 +186,7 @@ export async function getRevenueReport(userId, startDateStr, endDateStr) {
  * @param {string} endDateStr - End date
  * @returns {Promise<{period: Object, metrics: Array}>}
  */
-export async function getDailyMetrics(userId, startDateStr, endDateStr) {
+export async function getDailyMetrics(userId, startDateStr, endDateStr, limit = 100) {
   const { ownerUserId } = await scope(userId);
 
   const startDate = parseDate(startDateStr);
@@ -196,7 +196,11 @@ export async function getDailyMetrics(userId, startDateStr, endDateStr) {
     throw new AppError('Start date must be before end date.', 400, 'VALIDATION_ERROR');
   }
 
-  const metrics = await repo.getDailyMetrics(ownerUserId, startDate, endDate);
+  // Add 24h to end date to include entire day
+  const endDateInclusive = new Date(endDate);
+  endDateInclusive.setDate(endDateInclusive.getDate() + 1);
+
+  const metrics = await repo.getDailyMetrics(ownerUserId, startDate, endDateInclusive.toISOString().split('T')[0], limit);
 
   // Format metrics for API response
   const formatted = metrics.map(m => ({

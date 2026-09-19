@@ -141,16 +141,26 @@ export async function processCustomWebhook(payload) {
 
 /**
  * Verify webhook signature for security.
- * Supports HMAC-SHA256 signatures with timestamp and ID.
+ * WARNING: This function is defined but NOT CALLED by any production webhook route.
  * 
- * For Resend webhooks: expects 'Resend-Signature' header with format: v1,<signature>
- * For other providers: expects 'X-Signature' header with raw hex HMAC-SHA256
+ * The production webhook routes use provider-specific verification:
+ * - Resend: verifyResendWebhook() in communications.webhooks.js
+ * - Cal.com: Not yet implemented (requires configuration)
+ * - n8n/Zapier: Not yet implemented (requires configuration)
  * 
- * Fails closed: if a secret is configured but signature is missing or invalid, rejects the webhook.
- * If no secret is configured, accepts the webhook (graceful degradation for development).
+ * Provider signatures must be configured in environment variables:
+ * - COMMUNICATION_RESEND_WEBHOOK_SECRET (Resend, for email delivery events)
+ * 
+ * If a provider's signing format cannot be safely determined,
+ * the webhook handler should throw an error or return 403.
+ * 
+ * This function is a fallback that fails closed when secrets are configured:
+ * - No secret configured → returns true (development mode)
+ * - Secret configured but no signature → returns false
+ * - Invalid signature → returns false
  */
 export function verifySignature(payload, signature, secret) {
-  // No secret configured → graceful degradation (development mode)
+  // No secret configured → graceful degradation (development mode only)
   if (!secret) return true;
   
   // Secret configured but no signature → fail closed
@@ -162,7 +172,9 @@ export function verifySignature(payload, signature, secret) {
     if (!signatureValue || !/^[a-zA-Z0-9+/=]+$/.test(signatureValue)) return false;
     
     // Resend uses: timestamp.id.rawBody
-    // Since we don't have timestamp/id here, we verify against the raw payload
+    // NOTE: This simplified implementation verifies against raw payload only.
+    // For production, use verifyResendWebhook() in communications.webhooks.js
+    // which correctly includes timestamp and id in the signature calculation.
     const key = parseSigningSecret(secret);
     if (!key) return false;
     
