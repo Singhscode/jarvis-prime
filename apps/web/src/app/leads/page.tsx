@@ -22,7 +22,21 @@ export default function Leads() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+  const [tabVisible, setTabVisible] = useState(true);
   const PAGE_SIZE = 20;
+
+  // Track tab visibility for UI state
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined') {
+        setTabVisible(!document.hidden);
+      }
+    };
+
+    handleVisibilityChange();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   useEffect(() => {
     // Initial fetch
@@ -30,7 +44,7 @@ export default function Leads() {
 
     // Visibility-gated polling - only run when tab is visible
     const pollInterval = setInterval(() => {
-      if (!document.hidden) {
+      if (typeof document !== 'undefined' && !document.hidden) {
         fetchLeads(page * PAGE_SIZE, PAGE_SIZE);
       }
     }, 30000);
@@ -40,7 +54,7 @@ export default function Leads() {
       // Cleanup on unmount to prevent stale state
       setLoading(false);
     };
-  }, [page]);
+  }, [page, tabVisible]);
 
   const fetchLeads = async (offset = 0, limit = PAGE_SIZE) => {
     try {
@@ -66,7 +80,7 @@ export default function Leads() {
   };
 
   const handleManualRefresh = () => {
-    if (!document.hidden) {
+    if (tabVisible) {
       fetchLeads(0, PAGE_SIZE);
       setPage(0);
     }
@@ -105,13 +119,13 @@ export default function Leads() {
         <div className="flex items-center gap-4">
           <button
             onClick={handleManualRefresh}
-            disabled={loading || !document.hidden}
+            disabled={loading || !tabVisible}
             className={`px-4 py-2 rounded-lg font-semibold transition ${
-              document.hidden
+              !tabVisible
                 ? 'bg-slate-700/30 text-slate-500 cursor-not-allowed'
                 : 'bg-cyan-600 text-white hover:bg-cyan-500'
             }`}
-            title={document.hidden ? 'Tab hidden - will refresh when visible' : 'Refresh leads now'}
+            title={!tabVisible ? 'Tab hidden - will refresh when visible' : 'Refresh leads now'}
           >
             {loading ? 'Loading...' : 'Refresh'}
           </button>
