@@ -21,6 +21,12 @@ const ADVISORY_LOCK_SQL = "select pg_advisory_lock(hashtext('jarvis-prime:phase1
 const ADVISORY_UNLOCK_SQL = "select pg_advisory_unlock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
 const LEDGER_SELECT_SQL = 'select version, coalesce(name, \'\') as name, statements from supabase_migrations.schema_migrations order by version';
 const LEDGER_INSERT_SQL = 'insert into supabase_migrations.schema_migrations(version, name, statements) values ($1, $2, $3)';
+// Sentinel written when retiring migration 37 from production: keeps the version
+// in the ledger so Supabase CLI sees it as already-applied, but replaces the
+// statements with an empty array so the gate can distinguish retired from active.
+export const STAGING_ONLY_RETIRED_NAME = 'retired_staging_only_canary';
+const LEDGER_RETIRE_STAGING_37_SQL = "update supabase_migrations.schema_migrations set name = 'retired_staging_only_canary', statements = ARRAY[]::text[] where version = '20260810000037'";
+const LEDGER_VERIFY_STAGING_37_RETIRED_SQL = "select name, statements from supabase_migrations.schema_migrations where version = '20260810000037'";
 
 /** The only migrations this runner can ever execute. */
 export const PHASE11_PRODUCTION_MIGRATIONS = Object.freeze([
@@ -307,7 +313,16 @@ export function evaluateProductionLedger(rows, migrations) {
 
   for (const version of byVersion.keys()) {
     if (version === STAGING_ONLY_VERSION) {
-      violations.push('PHASE11_GATE_STAGING_ONLY_37_PRESENT');
+      // Two sub-cases for version 37:
+      //   retired sentinel  → name='retired_staging_only_canary' AND statements is an empty array
+      //   anything else     → real migration content that must never be in production (HARD STOP)
+      const row = byVersion.get(version);
+      const isRetiredSentinel = row.name === STAGING_ONLY_RETIRED_NAME
+        && Array.isArray(row.statements)
+        && row.statements.length === 0;
+      if (!isRetiredSentinel) {
+        violations.push('PHASE11_GATE_STAGING_ONLY_37_PRESENT');
+      }
     } else if (version > LAST_PREDECESSOR_VERSION && !approvedMigrations.some((migration) => migration.version === version)) {
       violations.push('PHASE11_GATE_UNEXPECTED_POST_31_MIGRATION');
     }
@@ -322,7 +337,21 @@ export function evaluateProductionLedger(rows, migrations) {
     }
     return { version: migration.version, status: 'applied' };
   });
-  const stagingOnly = byVersion.has(STAGING_ONLY_VERSION) ? 'present-stop' : 'absent';
+
+  // Determine the 37 status for the ledger report.
+  // absent        → 37 not in ledger (expected clean state before remediation)
+  // retired       → sentinel present; 37 treated as permanently retired, NOT a violation
+  // present-stop  → real statements present; HARD STOP
+  let stagingOnly;
+  if (!byVersion.has(STAGING_ONLY_VERSION)) {
+    stagingOnly = 'absent';
+  } else {
+    const row = byVersion.get(STAGING_ONLY_VERSION);
+    const isRetiredSentinel = row.name === STAGING_ONLY_RETIRED_NAME
+      && Array.isArray(row.statements)
+      && row.statements.length === 0;
+    stagingOnly = isRetiredSentinel ? 'retired' : 'present-stop';
+  }
 
   const migration35 = states[0];
   const migration36 = states[1];
@@ -788,10 +817,80 @@ export async function runPhase11ProductionMigrationGate({
   }
 }
 
+/**
+ * Retire the staging-only migration 37 in the production ledger by overwriting
+ * its row with a permanent sentinel (name='retired_staging_only_canary',
+ * statements=ARRAY[]::text[]).  The version row is KEPT so Supabase CLI and
+ * every other migration tool sees 37 as already-applied and never re-runs it.
+ * The gate's evaluateProductionLedger will accept this sentinel without raising
+ * a violation.
+ *
+ * Requires explicit confirmation via environment variable to prevent accidental
+ * execution.
+ */
+async function removeStagingOnlyMigration37() {
+  const confirmationCode = process.env.PHASE11_REMOVE_STAGING_37_CONFIRM;
+  if (confirmationCode !== 'REMOVE_STAGING_ONLY_37_FROM_PRODUCTION') {
+    console.error('PHASE11_GATE_REMOVE_STAGING_37_CONFIRMATION_REQUIRED');
+    console.error('Set PHASE11_REMOVE_STAGING_37_CONFIRM=REMOVE_STAGING_ONLY_37_FROM_PRODUCTION to proceed.');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log('PHASE11_GATE_REMOVE_STAGING_37_START');
+  const target = assertProductionTarget(process.env);
+
+  let client;
+  let connected = false;
+
+  try {
+    client = await defaultClientFactory({ ...target, root: defaultRoot, dbMode: target.dbMode });
+    await client.connect();
+    connected = true;
+
+    await client.query('BEGIN');
+    try {
+      console.log('PHASE11_GATE_REMOVE_STAGING_37_EXECUTING');
+      await client.query(LEDGER_RETIRE_STAGING_37_SQL);
+
+      // Verify the sentinel is exactly what we expect before committing.
+      const verifyResult = await client.query(LEDGER_VERIFY_STAGING_37_RETIRED_SQL);
+      const row = verifyResult.rows?.[0];
+      const sentinelOk = row
+        && row.name === STAGING_ONLY_RETIRED_NAME
+        && Array.isArray(row.statements)
+        && row.statements.length === 0;
+      if (!sentinelOk) {
+        throw new Error('PHASE11_GATE_REMOVE_STAGING_37_VERIFICATION_FAILED');
+      }
+
+      await client.query('COMMIT');
+      console.log('PHASE11_GATE_REMOVE_STAGING_37_SUCCESS');
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    }
+  } catch (error) {
+    if (error instanceof Phase11MigrationGateError) {
+      console.error(error.code);
+    } else {
+      console.error('PHASE11_GATE_REMOVE_STAGING_37_FAILED');
+      console.error(error.message);
+    }
+    process.exitCode = 1;
+  } finally {
+    if (connected) await client.end().catch(() => {});
+  }
+}
+
 async function main() {
   const argument = process.argv.slice(2).at(0);
   if (argument === '--describe') {
     describeMigrations(console.log);
+    return;
+  }
+  if (argument === '--remove-staging-only-37') {
+    await removeStagingOnlyMigration37();
     return;
   }
   const operation = argument === '--inspect' ? 'inspect' : argument === '--apply' ? 'apply' : null;

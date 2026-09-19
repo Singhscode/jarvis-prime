@@ -1,0 +1,1406 @@
+
+> jarvis-prime@1.0.0 test
+> turbo run test
+
+
+   • Packages in scope: @jarvis-prime/ai, @jarvis-prime/api, @jarvis-prime/auth, @jarvis-prime/config, @jarvis-prime/logger, @jarvis-prime/types, @jarvis-prime/ui, @jarvis-prime/validation, @jarvis-prime/web, icp-scorer
+   • Running test in 10 packages
+   • Remote caching disabled
+
+@jarvis-prime/web:test: cache hit, replaying logs dcacf3fe22ff36de
+@jarvis-prime/web:test: 
+@jarvis-prime/web:test: > @jarvis-prime/web@1.0.0 test
+@jarvis-prime/web:test: > vitest run
+@jarvis-prime/web:test: 
+@jarvis-prime/web:test: 
+@jarvis-prime/web:test:  RUN  v3.2.4 /Users/anujsingh/Jarvis ai company/apps/web
+@jarvis-prime/web:test: 
+@jarvis-prime/web:test:  ✓ src/app/client/activate/page.test.tsx (5 tests) 350ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/dashboard.test.tsx (4 tests) 289ms
+@jarvis-prime/web:test:  ✓ src/app/employee/automations.test.tsx (9 tests) 386ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/automation-control.test.tsx (8 tests) 539ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/projects.test.tsx (3 tests) 548ms
+@jarvis-prime/web:test:    ✓ Owner Workspace projects > renders a searchable, filterable, cursor-paginated project overview with unavailable progress fidelity  300ms
+@jarvis-prime/web:test:  ✓ src/components/communications/CommunicationWorkspace.test.tsx (8 tests) 682ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/employees.test.tsx (7 tests) 578ms
+@jarvis-prime/web:test:  ✓ src/app/employee/page.test.tsx (4 tests) 296ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/finance.test.tsx (7 tests) 915ms
+@jarvis-prime/web:test:    ✓ Owner Finance workspace > records manual payments and progresses expenses without unsupported ownership fields  336ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/operations.test.tsx (2 tests) 413ms
+@jarvis-prime/web:test:    ✓ Owner Workspace operations > renders document filters, submits the selected client UUID, and supports visibility revocation  310ms
+@jarvis-prime/web:test:  ✓ src/app/activate/page.test.tsx (2 tests) 75ms
+@jarvis-prime/web:test:  ✓ src/app/client/page.test.tsx (3 tests) 308ms
+@jarvis-prime/web:test:  ✓ src/app/client/components/ClientWorkspace.test.tsx (2 tests) 154ms
+@jarvis-prime/web:test:  ✓ src/app/register/page.test.tsx (4 tests) 125ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/automation.test.tsx (1 test) 111ms
+@jarvis-prime/web:test:  ✓ src/app/dashboard/records.test.tsx (10 tests) 1243ms
+@jarvis-prime/web:test: 
+@jarvis-prime/web:test:  Test Files  16 passed (16)
+@jarvis-prime/web:test:       Tests  79 passed (79)
+@jarvis-prime/web:test:    Start at  16:58:50
+@jarvis-prime/web:test:    Duration  2.37s (transform 635ms, setup 0ms, collect 2.96s, tests 7.01s, environment 4.49s, prepare 991ms)
+@jarvis-prime/web:test: 
+icp-scorer:test: cache hit, replaying logs 527df0dc135263df
+icp-scorer:test: 
+icp-scorer:test: > icp-scorer@1.0.0 test
+icp-scorer:test: > vitest run
+icp-scorer:test: 
+icp-scorer:test: [?25l
+icp-scorer:test: [1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/private/tmp/phase11-step5-ui-validation/apps/icp-scorer[39m
+icp-scorer:test: 
+icp-scorer:test: [?2026h
+icp-scorer:test: [1m[33m ❯ [39m[22msrc/index.test.ts[2m [queued][22m
+icp-scorer:test: 
+icp-scorer:test: [2m Test Files [22m[1m[32m0 passed[39m[22m[90m (1)[39m
+icp-scorer:test: [2m      Tests [22m[1m[32m0 passed[39m[22m[90m (0)[39m
+icp-scorer:test: [2m   Start at [22m02:00:52
+icp-scorer:test: [2m   Duration [22m118ms
+icp-scorer:test: [?2026l[K[1A[K[1A[K[1A[K[1A[K[1A[K[1A[K[1A[K [32m✓[39m src/index.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+icp-scorer:test:    [32m✓[39m ICP Scorer [2m(16)[22m
+icp-scorer:test:      [32m✓[39m scoreICP [2m(7)[22m
+icp-scorer:test:        [32m✓[39m should score a qualified B2B lead[32m 1[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should identify hot leads[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should disqualify non-ICP leads[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should score based on revenue tier[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should award points for phone number[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should award points for detailed message[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should handle empty leads[32m 0[2mms[22m[39m
+icp-scorer:test:      [32m✓[39m Custom Scorers [2m(2)[22m
+icp-scorer:test:        [32m✓[39m should allow custom keywords[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should allow custom revenue scores[32m 0[2mms[22m[39m
+icp-scorer:test:      [32m✓[39m Batch Operations [2m(4)[22m
+icp-scorer:test:        [32m✓[39m should batch score leads[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should filter qualified leads[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should filter hot leads[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should sort by score[32m 0[2mms[22m[39m
+icp-scorer:test:      [32m✓[39m Real-world scenarios [2m(3)[22m
+icp-scorer:test:        [32m✓[39m should handle a freelancer with low fit[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should recognize high-fit agency prospect[32m 0[2mms[22m[39m
+icp-scorer:test:        [32m✓[39m should handle multi-keyword matching[32m 0[2mms[22m[39m
+icp-scorer:test: 
+icp-scorer:test: [2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+icp-scorer:test: [2m      Tests [22m [1m[32m16 passed[39m[22m[90m (16)[39m
+icp-scorer:test: [2m   Start at [22m 02:00:52
+icp-scorer:test: [2m   Duration [22m 260ms[2m (transform 26ms, setup 0ms, import 41ms, tests 3ms, environment 0ms)[22m
+icp-scorer:test: 
+icp-scorer:test: [?25h⠙[1G[0K
+@jarvis-prime/api:test: cache hit, replaying logs 4807d30b5a05006f
+@jarvis-prime/api:test: 
+@jarvis-prime/api:test: > @jarvis-prime/api@3.0.0 test
+@jarvis-prime/api:test: > node --test
+@jarvis-prime/api:test: 
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"accepted","requestId":"request-1","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":null,"retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"unavailable","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":null,"outputTokens":null,"totalTokens":null,"estimatedCostUsd":null,"errorCode":"authorization_denied","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"unavailable","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":null,"outputTokens":null,"totalTokens":null,"estimatedCostUsd":null,"errorCode":"scope_mismatch","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"request-1","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":"invalid_output","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"request-1","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":"invalid_output","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"request-1","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":"unsafe_output","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"request-1","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":"low_confidence","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"92edbdc5-4882-482b-be80-48a5b8293985","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":"invalid_output","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"accepted","requestId":"58855b68-8422-4818-9ed8-2b52bb9269c8","provider":"fake","model":"test-model","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":20,"outputTokens":10,"totalTokens":30,"estimatedCostUsd":null,"errorCode":null,"retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  AI generation {"event":"ai_generation","outcome":"rejected","requestId":"d90e43ab-e65b-4f18-b015-bdbbcf8895d6","provider":"fake","model":"llama-3.3-70b-versatile","promptId":"personalization-email","promptVersion":"1.0.0","latencyMs":0,"inputTokens":null,"outputTokens":null,"totalTokens":null,"estimatedCostUsd":null,"errorCode":"generation_failed","retryable":false}
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  AI personalization degraded code=invalid_output; using reviewed template.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ AI personalization blocked code=authorization_denied.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ AI personalization blocked code=authorization_denied.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ AI personalization blocked code=generation_failed.
+@jarvis-prime/api:test: ▶ AI configuration
+@jarvis-prime/api:test:   ✔ rejects unsupported providers and malformed safety controls (4.5125ms)
+@jarvis-prime/api:test:   ✔ requires credentials for the selected live provider (0.243084ms)
+@jarvis-prime/api:test:   ✔ normalizes validated server-only controls (1.026709ms)
+@jarvis-prime/api:test: ✔ AI configuration (7.112958ms)
+@jarvis-prime/api:test: ▶ AI providers
+@jarvis-prime/api:test:   ✔ groq uses the normalized provider contract (1.277291ms)
+@jarvis-prime/api:test:   ✔ openai uses the normalized provider contract (0.1315ms)
+@jarvis-prime/api:test:   ✔ classifies rate limiting without exposing the provider response (0.126166ms)
+@jarvis-prime/api:test:   ✔ classifies transport failures as retryable provider failures (0.139583ms)
+@jarvis-prime/api:test:   ✔ classifies empty successful responses as invalid provider output (0.178209ms)
+@jarvis-prime/api:test: ✔ AI providers (1.977833ms)
+@jarvis-prime/api:test: ▶ Versioned prompt contract
+@jarvis-prime/api:test:   ✔ has reviewable version metadata and deterministic evaluation inputs (0.56075ms)
+@jarvis-prime/api:test: ✔ Versioned prompt contract (0.605333ms)
+@jarvis-prime/api:test: ▶ Controlled structured execution
+@jarvis-prime/api:test:   ✔ accepts schema-valid, safe, sufficiently confident output (0.662334ms)
+@jarvis-prime/api:test:   ✔ preserves trusted system and untrusted user message roles (1.389541ms)
+@jarvis-prime/api:test:   ✔ rejects unauthorized execution before calling the provider (0.124667ms)
+@jarvis-prime/api:test:   ✔ rejects cross-client scope before calling the provider (0.0985ms)
+@jarvis-prime/api:test:   ✔ rejects invalid JSON and schema-invalid output (0.256458ms)
+@jarvis-prime/api:test:   ✔ rejects unsafe and low-confidence output (0.1745ms)
+@jarvis-prime/api:test:   ✔ emits only allowlisted telemetry fields (0.136125ms)
+@jarvis-prime/api:test:   ✔ preserves safe provider failure classification in telemetry (0.108917ms)
+@jarvis-prime/api:test: ✔ Controlled structured execution (3.036292ms)
+@jarvis-prime/api:test: ▶ Personalization fallback boundary
+@jarvis-prime/api:test:   ✔ uses the deterministic template when structured output is invalid (0.53975ms)
+@jarvis-prime/api:test:   ✔ does not call the provider when client scope is unauthorized (0.109125ms)
+@jarvis-prime/api:test:   ✔ enforces client scope before returning a dry-run template (0.061125ms)
+@jarvis-prime/api:test:   ✔ maps campaign steps four and five to the reviewed close-loop contract (0.154125ms)
+@jarvis-prime/api:test:   ✔ fails closed for unclassified generation errors (0.212667ms)
+@jarvis-prime/api:test: ✔ Personalization fallback boundary (1.131667ms)
+@jarvis-prime/api:test: ▶ Analytics Service
+@jarvis-prime/api:test:   ▶ Date Parsing
+@jarvis-prime/api:test:     ✔ parseDate accepts YYYY-MM-DD format (0.370916ms)
+@jarvis-prime/api:test:     ✔ parseDate accepts ISO format (0.04475ms)
+@jarvis-prime/api:test:     ✔ parseDate rejects invalid dates (0.057042ms)
+@jarvis-prime/api:test:     ✔ parseDate rejects date range with start >= end (0.831917ms)
+@jarvis-prime/api:test:   ✔ Date Parsing (1.687667ms)
+@jarvis-prime/api:test:   ▶ Metric Calculations
+@jarvis-prime/api:test:     ✔ revenue calculation: total revenue minor from paid invoices (0.136291ms)
+@jarvis-prime/api:test:     ✔ task completion rate calculation (0.078083ms)
+@jarvis-prime/api:test:     ✔ task completion rate with zero tasks returns 0 (0.070708ms)
+@jarvis-prime/api:test:     ✔ automation success rate calculation (0.075958ms)
+@jarvis-prime/api:test:     ✔ automation success rate with no runs returns null (0.090875ms)
+@jarvis-prime/api:test:   ✔ Metric Calculations (0.6535ms)
+@jarvis-prime/api:test:   ▶ Tenant Isolation
+@jarvis-prime/api:test:     ✔ different owners cannot see each other analytics (0.166959ms)
+@jarvis-prime/api:test:     ✔ query must include owner_user_id filter (0.083458ms)
+@jarvis-prime/api:test:   ✔ Tenant Isolation (0.319959ms)
+@jarvis-prime/api:test:   ▶ Authorization Scope
+@jarvis-prime/api:test:     ✔ Owner can access analytics (0.112958ms)
+@jarvis-prime/api:test:     ✔ Inactive user cannot access analytics (0.049208ms)
+@jarvis-prime/api:test:     ✔ Employee without permission cannot access analytics (MVP) (0.035042ms)
+@jarvis-prime/api:test:   ✔ Authorization Scope (0.251333ms)
+@jarvis-prime/api:test:   ▶ Edge Cases
+@jarvis-prime/api:test:     ✔ empty dataset returns zero metrics (0.052042ms)
+@jarvis-prime/api:test:     ✔ null/undefined values handled gracefully (0.043625ms)
+@jarvis-prime/api:test:     ✔ negative metrics rejected by CHECK constraints (0.037625ms)
+@jarvis-prime/api:test:     ✔ date range boundary: single day query (0.02225ms)
+@jarvis-prime/api:test:     ✔ date range boundary: multi-month query (0.0295ms)
+@jarvis-prime/api:test:   ✔ Edge Cases (0.2375ms)
+@jarvis-prime/api:test:   ▶ Response Format
+@jarvis-prime/api:test:     ✔ dashboard response includes all required fields (2.192917ms)
+@jarvis-prime/api:test:     ✔ revenue report response structure (0.118417ms)
+@jarvis-prime/api:test:     ✔ daily metrics response includes formatted metrics (0.056041ms)
+@jarvis-prime/api:test:   ✔ Response Format (2.43325ms)
+@jarvis-prime/api:test:   ▶ Currency Handling
+@jarvis-prime/api:test:     ✔ minor units (cents/paise) conversion (0.162666ms)
+@jarvis-prime/api:test:     ✔ zero revenue (0.0555ms)
+@jarvis-prime/api:test:     ✔ large revenue values (0.04375ms)
+@jarvis-prime/api:test:   ✔ Currency Handling (0.348417ms)
+@jarvis-prime/api:test: ✔ Analytics Service (6.501875ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] 🧪 [DRY-RUN] Would send transactional email to owner@example.test
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  User registered: 10000000-0000-4000-8000-000000000001
+@jarvis-prime/api:test: ▶ registration activation
+@jarvis-prime/api:test:   ✔ registration stores only a token hash, preserves password hashing, and audits without secrets (140.99725ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  User registered: 11000000-0000-4000-8000-000000000001
+@jarvis-prime/api:test:   ✔ ordinary public registration remains pending and receives no Owner activation capability (140.852708ms)
+@jarvis-prime/api:test:   ✔ valid activation hashes the capability, returns no account or session, and cannot be reused (7.409791ms)
+@jarvis-prime/api:test:   ✔ invalid, expired, wrong-state, and membership-bound capabilities share one response (65.966917ms)
+@jarvis-prime/api:test:   ✔ rejects malformed and caller-selected account fields before database access (22.274833ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  Password reset completed for user: 20000000-0000-4000-8000-000000000002
+@jarvis-prime/api:test:   ✔ rate limits activation attempts by IP (22.729208ms)
+@jarvis-prime/api:test:   ✔ password reset changes a client password without activating the pending client (275.060333ms)
+@jarvis-prime/api:test:   ✔ migration enforces one-time pending-client activation, authorization, audit, and service-only execution (6.983875ms)
+@jarvis-prime/api:test: ✔ registration activation (683.5475ms)
+@jarvis-prime/api:test: ✔ Apollo read adapter classifies rate limit with a durable reconciliation summary (3.504291ms)
+@jarvis-prime/api:test: ✔ Apollo read adapter classifies provider outage with a durable reconciliation summary (0.327708ms)
+@jarvis-prime/api:test: ✔ Apollo read adapter classifies permanent request error with a durable reconciliation summary (0.204792ms)
+@jarvis-prime/api:test: ✔ Apollo read adapter accepts fixed input, discards raw records, and records complete, partial, and unknown completeness honestly (0.832834ms)
+@jarvis-prime/api:test: ✔ Apollo adapter rejects malformed input before any provider call (1.949792ms)
+@jarvis-prime/api:test: ✔ Apollo adapter derives per-work correlation without CRM/outreach and preserves terminal/retry outcomes (0.302333ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.161Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'work-a',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.163Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'work-a',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.163Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'work-a',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {
+@jarvis-prime/api:test:     provider: 'APOLLO',
+@jarvis-prime/api:test:     providerCorrelationId: 'phase11:APOLLO:correlation-a',
+@jarvis-prime/api:test:     outcome: 'COMPLETE_SUCCESS',
+@jarvis-prime/api:test:     completeness: 'COMPLETE',
+@jarvis-prime/api:test:     returnedCount: 1
+@jarvis-prime/api:test:   },
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.164Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.164Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'work-unknown',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.164Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'work-unknown',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.164Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'work-unknown',
+@jarvis-prime/api:test:   runId: 'run-a',
+@jarvis-prime/api:test:   correlationId: 'correlation-a',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_RETRYABLE',
+@jarvis-prime/api:test:   actionCode: 'ACT_APOLLO_SEARCH',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {
+@jarvis-prime/api:test:     provider: 'APOLLO',
+@jarvis-prime/api:test:     providerCorrelationId: 'phase11:APOLLO:correlation-a',
+@jarvis-prime/api:test:     outcome: 'RETRYABLE_FAILURE',
+@jarvis-prime/api:test:     completeness: 'UNKNOWN'
+@jarvis-prime/api:test:   },
+@jarvis-prime/api:test:   reasonCode: 'APOLLO_NETWORK_ERROR',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.164Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ Apollo read timeout is retryable with safe unknown completeness and never becomes a logical duplicate (1000.214833ms)
+@jarvis-prime/api:test: ✔ Apollo resolver is independently default-deny; explicit test-only server enablement uses APOLLO_READ and existing audit lifecycle (3.1765ms)
+@jarvis-prime/api:test: ✔ post-dispatch Apollo uncertainty is persisted as review-safe unknown evidence (0.684125ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Automation request is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Automation request is invalid.
+@jarvis-prime/api:test: ✔ Owner control route forwards valid idempotency keys and rejects missing or malformed keys before the durable RPC (65.624042ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.174Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'normalized',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.176Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'malformed',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.176Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'normalized',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.176Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'normalized',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {
+@jarvis-prime/api:test:     shouldNotify: false,
+@jarvis-prime/api:test:     authorization: '[REDACTED]',
+@jarvis-prime/api:test:     nested: { token: '[REDACTED]' }
+@jarvis-prime/api:test:   },
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.176Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'malformed',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'malformed',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_HUMAN_REVIEW',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   reasonCode: 'AUTOMATION_ACTION_OUTCOME_INVALID',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'work-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_ASSIGN',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'work-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_ASSIGN',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'work-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_ASSIGN',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: { ok: true },
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_stopped',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'STOPPED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'work-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'work-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'work-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_HUMAN_REVIEW',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   reasonCode: 'POST_DISPATCH_UNCERTAIN',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.177Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'work-denied',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatch_denied',
+@jarvis-prime/api:test:   workId: 'work-denied',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_BLOCKED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'DISPATCH_DENIED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'action-0',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'action-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'action-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'action-3',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'action-0',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.178Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'action-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.179Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ automation contracts allow only fixed actions, legal transitions, and deterministic safe retry classification (3.21925ms)
+@jarvis-prime/api:test: ✔ action outcomes are bounded, redact credential-like values, and preserve boolean condition fields (0.270625ms)
+@jarvis-prime/api:test: ✔ worker persists only normalized action results and fails closed on malformed outcomes (4.083333ms)
+@jarvis-prime/api:test: ✔ eligibility scheduler only wakes durable worker logic and never executes actions (0.125417ms)
+@jarvis-prime/api:test: ✔ worker marks dispatch before one fixed action, persists result, and drains safely (0.346875ms)
+@jarvis-prime/api:test: ✔ worker never blindly retries an action after durable dispatch uncertainty (0.210291ms)
+@jarvis-prime/api:test: ✔ worker exits before resolving an adapter when the durable dispatch fence denies work (0.151292ms)
+@jarvis-prime/api:test: ✔ fixed action registry delegates only to the existing CRM and Communication contracts (0.254375ms)
+@jarvis-prime/api:test: ✔ ACT_ASSIGN recognizes a confirmed CRM desired state after an uncertain update error (0.123958ms)
+@jarvis-prime/api:test: ✔ ACT_TASK surfaces a known reconciliation conflict for a differing desired state (0.152916ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'action-0',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.184Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'action-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.184Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'action-1',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.184Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'action-3',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.184Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'action-2',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.189Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'action-3',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.190Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.191Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_stopped',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'STOPPED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.191Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.192Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'heartbeat-ok',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.192Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'heartbeat-ok',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:50.192Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ worker enforces default action-class concurrency before durable dispatch (11.808792ms)
+@jarvis-prime/api:test: ✔ durable schedule materializer serializes database scheduling and stops safely (0.429791ms)
+@jarvis-prime/api:test: ✔ durable schedule materializer reports a rejected tick, re-arms once, recovers, and stops (0.174209ms)
+@jarvis-prime/api:test: ✔ worker blocks startup on an incompatible durable execution contract (0.632417ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'heartbeat-ok',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.243Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.244Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'heartbeat-lost',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.244Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'heartbeat-lost',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:51.244Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'heartbeat_failed',
+@jarvis-prime/api:test:   workId: 'heartbeat-lost',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'HEARTBEAT',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'AUTOMATION_LEASE_LOST',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:52.246Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'heartbeat-lost',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_HUMAN_REVIEW',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   reasonCode: 'POST_DISPATCH_UNCERTAIN',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:52.295Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ worker heartbeats only dispatched work and records lease loss as human review (2104.087875ms)
+@jarvis-prime/api:test: ✔ server-derived run actions remain scoped to the authenticated actor and terminal state (0.211375ms)
+@jarvis-prime/api:test: ✔ worker runtime configuration validates only durable-worker requirements and never treats a probe as execution authority (0.386333ms)
+@jarvis-prime/api:test: ✔ worker health probe reports local liveness and existing-worker readiness without work or secret data (23.176791ms)
+@jarvis-prime/api:test: ✔ worker observability emits bounded structured events and redacts sensitive values (0.317208ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.372Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'late-work',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.372Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'late-work',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.372Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'late_result_observed',
+@jarvis-prime/api:test:   workId: 'late-work',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'LATE_RESULT',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'LATE_RESULT',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.373Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.373Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'drain-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.373Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'drain-second',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.373Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'drain-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.373Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'drain-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.374Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim_released',
+@jarvis-prime/api:test:   workId: 'drain-second',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_WAITING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'WORKER_DRAINING',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.374Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ telemetry failures never interrupt worker startup, claims, actions, heartbeats, shutdown, or status (1051.944708ms)
+@jarvis-prime/api:test: ✔ worker reports the durable late outcome rather than an optimistic completed result (0.99675ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_stopped',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'STOPPED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.400Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.402Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'release-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.402Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'release-second',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.402Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'release-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.402Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition',
+@jarvis-prime/api:test:   workId: 'release-first',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_COMPLETED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   result: {},
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.403Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim_release_failed',
+@jarvis-prime/api:test:   workId: 'release-second',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'CLAIM_RELEASE_FAILED',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'AUTOMATION_CLAIM_RELEASE_FAILED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.403Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ worker graceful drain relinquishes unstarted claims without invoking their actions (28.159958ms)
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_stopped',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'STOPPED',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.428Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'worker_ready',
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'READY',
+@jarvis-prime/api:test:   recipeVersion: 'AUTOMATION_REGISTRY_V1',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.429Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'claim',
+@jarvis-prime/api:test:   workId: 'persist-failure',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'claim',
+@jarvis-prime/api:test:   transition: 'WAITING_TO_RUNNING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.430Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'dispatching',
+@jarvis-prime/api:test:   workId: 'persist-failure',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'dispatch',
+@jarvis-prime/api:test:   transition: 'CLAIMED_TO_DISPATCHING',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.430Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: automation_event {
+@jarvis-prime/api:test:   event: 'transition_failed',
+@jarvis-prime/api:test:   workId: 'persist-failure',
+@jarvis-prime/api:test:   runId: undefined,
+@jarvis-prime/api:test:   correlationId: undefined,
+@jarvis-prime/api:test:   actorCategory: 'worker',
+@jarvis-prime/api:test:   sourceCategory: 'worker',
+@jarvis-prime/api:test:   transition: 'RUNNING_TO_ERROR',
+@jarvis-prime/api:test:   actionCode: 'ACT_TASK',
+@jarvis-prime/api:test:   attempt: 1,
+@jarvis-prime/api:test:   reasonCode: 'database_temporarily_unavailable',
+@jarvis-prime/api:test:   timestamp: '2026-09-19T11:28:53.430Z'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ worker surfaces a drain-release failure without transitioning unstarted work (27.845416ms)
+@jarvis-prime/api:test: ✔ worker surfaces a durable transition persistence failure for lease recovery instead of reporting a false outcome (1.497792ms)
+@jarvis-prime/api:test: ✔ POL_SCORE@V1 reuses the deterministic scorer and normalizes input before hashing (10.081542ms)
+@jarvis-prime/api:test: ✔ POL_SCORE@V1 allows a qualified deterministic ICP fit (0.269958ms)
+@jarvis-prime/api:test: ✔ POL_SCORE@V1 blocks an unqualified deterministic ICP fit (0.159875ms)
+@jarvis-prime/api:test: ✔ POL_SCORE@V1 fails closed for incomplete, malformed, or dynamic score input (0.574958ms)
+@jarvis-prime/api:test: ✔ POL_SCORE@V1 remains audit-only and cannot be browser-enabled in recipe admission (0.687959ms)
+@jarvis-prime/api:test: ✔ Recipe definitions accept only a bounded, linear static graph and typed root input (9.844625ms)
+@jarvis-prime/api:test: ✔ Recipe validation fails closed for unknown fields, dynamic content, invalid graph shapes and disabled execution codes (0.347708ms)
+@jarvis-prime/api:test: ✔ the policy registry is fixed and only static approval can admit or hold a Recipe for review (0.141458ms)
+@jarvis-prime/api:test: ✔ Recipe contracts accept only typed resource references and a bounded boolean successor condition (0.258333ms)
+@jarvis-prime/api:test: ✔ external adapter registry is closed and derives provider idempotency/correlation from server work context (3.002084ms)
+@jarvis-prime/api:test: ✔ external adapter contract blocks browser-dynamic execution fields before an adapter can run (0.243708ms)
+@jarvis-prime/api:test: ✔ side-effect adapters require explicit server capability approval while read-only adapters do not (0.353ms)
+@jarvis-prime/api:test: ✔ provider result classifications map into the existing Phase 11 retry and review lifecycle (0.606958ms)
+@jarvis-prime/api:test: ✔ adapter definitions are static, typed, bounded, and duplicate-free (0.252083ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] 🧪 [DRY-RUN] Would send transactional email to ava@example.test
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INVALID_FIELDS] Fields not allowed: role.
+@jarvis-prime/api:test: ▶ Client account provisioning API
+@jarvis-prime/api:test:   ✔ provisions through owner scope, sends only the email link, and returns safe delivery data (61.939209ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [CLIENT_ACCOUNT_ALREADY_EXISTS] Client account already exists.
+@jarvis-prime/api:test:   ✔ returns the safe existing Client account message without provisioning a duplicate (10.215667ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test:   ✔ denies Employee and Client Portal identities before provisioning (10.778125ms)
+@jarvis-prime/api:test:   ✔ activates with a hash-only invitation, never creates a session, and returns generic failures (259.393084ms)
+@jarvis-prime/api:test: ✔ Client account provisioning API (343.169125ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Authorization failed {
+@jarvis-prime/api:test:   userId: '10000000-0000-4000-8000-000000000001',
+@jarvis-prime/api:test:   path: '/',
+@jarvis-prime/api:test:   requiredRole: [ 'client' ],
+@jarvis-prime/api:test:   userRole: 'employee'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Client access is not permitted.
+@jarvis-prime/api:test: ▶ Client Portal API boundary
+@jarvis-prime/api:test:   ✔ requires a client JWT and exactly one active membership (172.225791ms)
+@jarvis-prime/api:test:   ✔ derives a safe snapshot from membership scope and fixed projections only (3.663083ms)
+@jarvis-prime/api:test:   ✔ rejects ambiguous membership and maps snapshot provider failures safely (0.485542ms)
+@jarvis-prime/api:test:   ✔ validates and hashes activation input while returning one generic invalid result (2.053375ms)
+@jarvis-prime/api:test:   ✔ scopes document signing, audits denial, and never returns storage metadata (6.0425ms)
+@jarvis-prime/api:test:   ✔ rejects unsafe owner document input and compensates a failed metadata publish (6.20825ms)
+@jarvis-prime/api:test:   ✔ keeps the migration additive, private, and service-role-only (8.246958ms)
+@jarvis-prime/api:test: ✔ Client Portal API boundary (202.335ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/threads' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: ✔ Communication API requires JWT, derives Owner scope, and keeps empty state private (103.072958ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Idempotency-Key is invalid.
+@jarvis-prime/api:test: ✔ Communication thread creation requires exact input and an idempotency key before mutation (32.683791ms)
+@jarvis-prime/api:test: ✔ Communication thread creation resolves Owner-scoped business codes without exposing UUID locators (8.911875ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND] Employee recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND] Employee recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_EMPLOYEE_RECIPIENT_NOT_FOUND] Employee recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND] Client recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND] Client recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND] Client recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_CLIENT_RECIPIENT_NOT_FOUND] Client recipient is not available.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [COMMUNICATION_CLIENT_RECIPIENT_AMBIGUOUS] Client recipient selection is ambiguous.
+@jarvis-prime/api:test: ✔ Communication thread creation denies unavailable and ambiguous business-code recipients without calling the RPC (17.721625ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  POST /threads 201 (0ms) [req:390a46e8]
+@jarvis-prime/api:test: ✔ Communication thread preflight preserves approved headers and permits the authenticated idempotent create request (23.219334ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: ✔ Communication mutation rejects malformed message bodies and client-supplied authority fields (2.027958ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Communication request is invalid.
+@jarvis-prime/api:test: ✔ Communication query inputs are exact allowlists (2.080542ms)
+@jarvis-prime/api:test: ✔ Communication notification lifecycle exposes exact read and dismissed projections (2.122333ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token {
+@jarvis-prime/api:test:   path: '/threads/50000000-0000-4000-8000-000000000003/attachments/70000000-0000-4000-8000-000000000005/download'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: ✔ Communication attachment download stays authenticated and returns only a short-lived signed URL (99.935416ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ❌ [COMMUNICATION_UNAVAILABLE] Communication Hub is temporarily unavailable.
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ❌ AppError: Communication Hub is temporarily unavailable.
+@jarvis-prime/api:test:     at unavailable (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/communications/communications.service.js:14:32)
+@jarvis-prime/api:test:     at operationError (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/communications/communications.service.js:56:3)
+@jarvis-prime/api:test:     at Module.sendMessage (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/communications/communications.service.js:299:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/communications/communications.routes.js:27:23
+@jarvis-prime/api:test: ✔ Communication attachment operations are unique and never clean up after a committed or ambiguous send (7021.179667ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ⚠️  [COMMUNICATION_WEBHOOK_INVALID] Communication provider webhook was rejected.
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ⚠️  [COMMUNICATION_WEBHOOK_EVIDENCE_CONFLICT] Communication provider webhook was rejected.
+@jarvis-prime/api:test: ✔ Communication webhook verifies exact raw bytes and only records normalized delivery events (8.021542ms)
+@jarvis-prime/api:test: ✔ Communication migration remains additive, RLS-protected, server-only, and separate from outreach authority (2.859416ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ⚠️  [VALIDATION_ERROR] Attachment content does not match its type.
+@jarvis-prime/api:test: [2026-09-19 11:28:57] ⚠️  [VALIDATION_ERROR] At most five attachments are permitted.
+@jarvis-prime/api:test: ✔ Communication attachment parser accepts only bounded validated private-message files (6.770083ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Authorization failed {
+@jarvis-prime/api:test:   userId: '10000000-0000-4000-8000-000000000001',
+@jarvis-prime/api:test:   path: '/',
+@jarvis-prime/api:test:   requiredRole: [ 'employee' ],
+@jarvis-prime/api:test:   userRole: 'client'
+@jarvis-prime/api:test: }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ [INTERNAL_ERROR] Employee portal load failed.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ AppError: Employee portal load failed.
+@jarvis-prime/api:test:     at Module.getEmployeePortal (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/crm/crm.service.js:470:11)
+@jarvis-prime/api:test:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/crm/crm.routes.js:25:16
+@jarvis-prime/api:test: ▶ Employee Portal
+@jarvis-prime/api:test:   ✔ requires authentication and an employee JWT role (145.139292ms)
+@jarvis-prime/api:test:   ✔ clears an invalid refresh cookie with its original scope (3.730958ms)
+@jarvis-prime/api:test:   ✔ reloads active employee status and requires portal owner scope (2.080417ms)
+@jarvis-prime/api:test:   ✔ isolates snapshot queries by owner and direct assignment (22.014666ms)
+@jarvis-prime/api:test:   ✔ rejects forbidden, malformed, incomplete, and oversized completion input (0.207708ms)
+@jarvis-prime/api:test:   ✔ trims completion input and translates scoped RPC failures (0.47275ms)
+@jarvis-prime/api:test:   ✔ keeps task update and audit insertion in one atomic RPC (13.194708ms)
+@jarvis-prime/api:test: ✔ Employee Portal (188.38ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ Logout endpoint error: { code: 'XX000', message: 'session write failed' }
+@jarvis-prime/api:test: ✔ returns an error when logout session revocation fails (29.829291ms)
+@jarvis-prime/api:test: ✔ allows an owner to assign only an active employee in that owner scope (3.02275ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  [Queue] Registered handler for "test_job"
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  [Queue] Enqueued job job-1-1789817330336 (test_job)
+@jarvis-prime/api:test: ▶ ICP Scorer
+@jarvis-prime/api:test:   ✔ scores a perfect-fit prospect as hot (0.51ms)
+@jarvis-prime/api:test:   ✔ disqualifies an obvious bad fit (0.052834ms)
+@jarvis-prime/api:test:   ✔ low-signal prospect is not qualified (0.088833ms)
+@jarvis-prime/api:test:   ✔ respects custom scoring weights from client config (0.051416ms)
+@jarvis-prime/api:test:   ✔ respects custom disqualifiers from client config (0.043125ms)
+@jarvis-prime/api:test:   ✔ handles empty prospect gracefully (0.0565ms)
+@jarvis-prime/api:test:   ✔ handles missing email (0.039542ms)
+@jarvis-prime/api:test: ✔ ICP Scorer (1.359292ms)
+@jarvis-prime/api:test: ▶ Reply Classification
+@jarvis-prime/api:test:   ✔ detects unsubscribe intent (0.138084ms)
+@jarvis-prime/api:test:   ✔ detects auto-reply (0.079417ms)
+@jarvis-prime/api:test:   ✔ detects negative intent (0.297ms)
+@jarvis-prime/api:test:   ✔ detects positive intent (0.332709ms)
+@jarvis-prime/api:test:   ✔ defaults to question for ambiguous replies (0.033917ms)
+@jarvis-prime/api:test:   ✔ handles empty input (0.024958ms)
+@jarvis-prime/api:test: ✔ Reply Classification (1.130333ms)
+@jarvis-prime/api:test: ▶ Validation Middleware
+@jarvis-prime/api:test:   ✔ validates required fields (0.541625ms)
+@jarvis-prime/api:test:   ✔ rejects missing required fields (0.501041ms)
+@jarvis-prime/api:test:   ✔ allows optional fields (0.055625ms)
+@jarvis-prime/api:test:   ✔ rejects wrong types (0.058167ms)
+@jarvis-prime/api:test: ✔ Validation Middleware (1.197875ms)
+@jarvis-prime/api:test: ▶ Rate Limiter
+@jarvis-prime/api:test:   ✔ allows requests under the limit (1.778375ms)
+@jarvis-prime/api:test:   ✔ blocks requests over the limit (0.2845ms)
+@jarvis-prime/api:test: ✔ Rate Limiter (2.136166ms)
+@jarvis-prime/api:test: ▶ Event Bus
+@jarvis-prime/api:test:   ✔ emits and receives events (1.44625ms)
+@jarvis-prime/api:test:   ✔ once-listener fires only once (0.161708ms)
+@jarvis-prime/api:test:   ✔ unsubscribe works (0.137917ms)
+@jarvis-prime/api:test: ✔ Event Bus (1.832333ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/protected' }
+@jarvis-prime/api:test: ▶ Queue
+@jarvis-prime/api:test:   ✔ enqueue and process jobs (202.90075ms)
+@jarvis-prime/api:test:   ✔ tracks queue stats (0.260708ms)
+@jarvis-prime/api:test: ✔ Queue (203.261917ms)
+@jarvis-prime/api:test: ▶ Config
+@jarvis-prime/api:test:   ✔ getClientConfig merges defaults with client overrides (0.248667ms)
+@jarvis-prime/api:test:   ✔ getClientConfig returns defaults for empty client (0.069334ms)
+@jarvis-prime/api:test: ✔ Config (0.367375ms)
+@jarvis-prime/api:test: ▶ JWT Service
+@jarvis-prime/api:test:   ✔ creates and verifies a valid access token (7.694667ms)
+@jarvis-prime/api:test:   ✔ rejects a token signed with the wrong secret (0.155458ms)
+@jarvis-prime/api:test:   ✔ rejects a tampered token payload (0.128042ms)
+@jarvis-prime/api:test:   ✔ extracts bearer token from Authorization header (0.085042ms)
+@jarvis-prime/api:test: ✔ JWT Service (8.144042ms)
+@jarvis-prime/api:test: ▶ Auth Crypto
+@jarvis-prime/api:test:   ✔ hashes and verifies a password correctly (180.388958ms)
+@jarvis-prime/api:test:   ✔ generates and verifies token hashes (0.276792ms)
+@jarvis-prime/api:test: ✔ Auth Crypto (180.720542ms)
+@jarvis-prime/api:test: ▶ Auth Middleware
+@jarvis-prime/api:test:   ✔ rejects requests with no Authorization header (16.111708ms)
+@jarvis-prime/api:test: ✔ Auth Middleware (16.162417ms)
+@jarvis-prime/api:test: ▶ Logger
+@jarvis-prime/api:test:   ✔ child logger preserves context (0.767916ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ℹ️  ⏱ test-timer: 14ms
+@jarvis-prime/api:test:   ✔ timer works (13.803417ms)
+@jarvis-prime/api:test: ✔ Logger (14.691209ms)
+@jarvis-prime/api:test: ▶ CRM Foundation
+@jarvis-prime/api:test:   ✔ rejects unsupported contact fields before database access (3.097959ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/companies' }
+@jarvis-prime/api:test:   ✔ requires bearer authentication for CRM routes (205.488584ms)
+@jarvis-prime/api:test:   ✔ rejects unsupported client conversion fields before database access (0.446833ms)
+@jarvis-prime/api:test:   ✔ rejects company assignment through client-contact input (0.30425ms)
+@jarvis-prime/api:test:   ✔ rejects unsupported project fields before database access (0.188667ms)
+@jarvis-prime/api:test:   ✔ rejects a generated Client ID before owner-scoped database access (0.450375ms)
+@jarvis-prime/api:test:   ✔ rejects whitespace-only project names before database access (0.197833ms)
+@jarvis-prime/api:test: ✔ CRM Foundation (210.398958ms)
+@jarvis-prime/api:test: ▶ Response-aware Rate Limiter
+@jarvis-prime/api:test:   ✔ counts wrong credentials but releases successful and server-error logins (0.319791ms)
+@jarvis-prime/api:test: ✔ Response-aware Rate Limiter (0.359834ms)
+@jarvis-prime/api:test: ▶ Direct client validation
+@jarvis-prime/api:test:   ✔ rejects invalid direct-client fields before database access (0.272875ms)
+@jarvis-prime/api:test:   ✔ keeps the legacy conversion service conversion-only (0.09325ms)
+@jarvis-prime/api:test: ✔ Direct client validation (0.412125ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/overview' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Invalid token { path: '/overview' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Invalid token { path: '/overview' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: ▶ Finance API
+@jarvis-prime/api:test:   ✔ requires a JWT and derives Owner overview scope from the database subject only (203.177708ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Finance access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Finance access is not permitted.
+@jarvis-prime/api:test:   ✔ allows an explicitly permitted employee but denies normal employees and Client Portal identities (55.099125ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Finance request is invalid.
+@jarvis-prime/api:test:   ✔ validates billing profiles and rejects caller-controlled financial ownership before persistence (20.257792ms)
+@jarvis-prime/api:test:   ✔ creates and updates invoice records only through the scoped audited RPC (5.843083ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Finance request is invalid.
+@jarvis-prime/api:test:   ✔ creates payment and expense records without accepting a caller-supplied submitter (20.952208ms)
+@jarvis-prime/api:test: ✔ Finance API (306.922ms)
+@jarvis-prime/api:test: ✔ keeps Finance writes in explicit service-role-only audited database RPCs (3.100458ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Finance access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Finance access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Field 'invoice_id' must be a valid UUID.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Field 'payment_id' must be a valid UUID.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Field 'expense_id' must be a valid UUID.
+@jarvis-prime/api:test: ✔ derives Finance dashboard admission and client references from server-side Finance scope only (12.2825ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  Missing authorization token { path: '/bootstrap' }
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ✅ Connected to Supabase database.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: ▶ Owner Workspace
+@jarvis-prime/api:test:   ✔ requires the existing JWT and applies the server-side Owner Workspace predicate before bootstrap (132.543625ms)
+@jarvis-prime/api:test:   ✔ uses only the JWT subject for bounded aggregate scope and preserves unavailable states (22.216334ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ [OWNER_WORKSPACE_UNAVAILABLE] Owner Workspace dashboard is temporarily unavailable.
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ❌ AppError: Owner Workspace dashboard is temporarily unavailable.
+@jarvis-prime/api:test:     at Module.getDashboard (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.service.js:180:11)
+@jarvis-prime/api:test:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.routes.js:21:66
+@jarvis-prime/api:test:   ✔ redacts database failures from the dashboard response (4.620583ms)
+@jarvis-prime/api:test: ✔ Owner Workspace (163.558375ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:50] ⚠️  [VALIDATION_ERROR] Query sort is invalid.
+@jarvis-prime/api:test: ✔ provides bounded owner-scoped CRM reads with validated filters, sorting, and pagination (7.057541ms)
+@jarvis-prime/api:test: ✔ returns a scoped portal administration snapshot without invitation or storage secrets (8.322375ms)
+@jarvis-prime/api:test: ✔ delegates portal membership revocation with server-derived owner scope (6.454625ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query cursor is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query 'q' is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query q is not supported for this resource.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [COMPANY_NOT_FOUND] Company not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [COMPANY_NOT_FOUND] Company not found.
+@jarvis-prime/api:test: ✔ rejects malformed list input and gives matching missing and out-of-scope detail responses (14.236625ms)
+@jarvis-prime/api:test: ✔ applies bounded owner-scoped contact filters and fixed-order portal membership cursors (14.107167ms)
+@jarvis-prime/api:test: ✔ returns fixed, owner-scoped project views with client association and unavailable project fields (4.248125ms)
+@jarvis-prime/api:test: ✔ returns owner-scoped project task details and delegates completion and assignment validation (22.013333ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Field 'client_id' must be a valid UUID.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [PROJECT_NOT_FOUND] Project not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [PROJECT_NOT_FOUND] Project not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [TASK_NOT_FOUND] Task not found.
+@jarvis-prime/api:test: ✔ rejects malformed project filters and gives matching missing and out-of-scope project/task responses (6.40325ms)
+@jarvis-prime/api:test: ✔ lists owner-scoped employees with bounded workload counts, assignment eligibility, and no credential fields (3.014917ms)
+@jarvis-prime/api:test: ✔ returns owner-scoped employee assignments and projects while keeping employee portal behavior separate (4.258209ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query cursor is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query sort is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query q is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query limit is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [EMPLOYEE_NOT_FOUND] Employee not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [EMPLOYEE_NOT_FOUND] Employee not found.
+@jarvis-prime/api:test: ✔ rejects invalid employee list input and gives matching absent and out-of-scope employee responses (29.625667ms)
+@jarvis-prime/api:test: ✔ scopes every employee workload aggregate by owner and direct assignment (5.238916ms)
+@jarvis-prime/api:test: ✔ returns owner-scoped document metadata and reuses private publication and revocation services (14.665458ms)
+@jarvis-prime/api:test: ✔ returns only redacted direct-owner audit events and source-fidelity settings status (2.622459ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Query q is invalid.
+@jarvis-prime/api:test: ✔ returns bounded grouped owner search results and validates query input (4.284541ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INVALID_FIELDS] Fields not allowed: owner_user_id.
+@jarvis-prime/api:test: ✔ creates a direct client with JWT-derived owner scope and a database-generated display ID (3.734375ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Field 'name' must be between 2 and 150 characters.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [CLIENT_EMAIL_EXISTS] A client with that email already exists.
+@jarvis-prime/api:test: ✔ validates direct client input and maps duplicate email safely (7.038042ms)
+@jarvis-prime/api:test: ✔ preserves the existing Lead to Client conversion branch on the Owner clients endpoint (6.979ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ [INTERNAL_ERROR] Client creation failed.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ AppError: Client creation failed.
+@jarvis-prime/api:test:     at Module.createDirectClient (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/crm/crm.service.js:229:11)
+@jarvis-prime/api:test:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.routes.js:36:65
+@jarvis-prime/api:test: ✔ redacts unexpected direct-client database failures (3.295541ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Employee invitation is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] 🧪 [DRY-RUN] Would send transactional email to employee@example.test
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: ✔ creates employee invitations only through the owner-scoped RPC, validates fields, returns a server-issued Employee ID, and never returns credentials (9.350709ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ [EMPLOYEE_INVITATION_DELIVERY_FAILED] Employee invitation could not be delivered. Please try again later.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ AppError: Employee invitation could not be delivered. Please try again later.
+@jarvis-prime/api:test:     at deliverEmployeeInvitation (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.service.js:58:42)
+@jarvis-prime/api:test:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.routes.js:61:94
+@jarvis-prime/api:test: ✔ records an owner-attributed failed delivery and returns a controlled error when invitation delivery setup throws (7.074208ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Automation request is invalid.
+@jarvis-prime/api:test: ✔ rejects unapproved automation workflow requests before queueing work (3.639416ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [EMPLOYEE_NOT_FOUND] Employee not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] 🧪 [DRY-RUN] Would send transactional email to employee@example.test
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ℹ️  Password reset completed for user: 30000000-0000-4000-8000-000000000003
+@jarvis-prime/api:test: ✔ resends an existing pending employee invitation through the Owner-scoped RPC without returning setup credentials (3.695916ms)
+@jarvis-prime/api:test: ✔ uses the atomic invitation-acceptance RPC for pending employee password setup (0.482458ms)
+@jarvis-prime/api:test: ✔ accepts a pending employee invitation during a successful password setup (60.135625ms)
+@jarvis-prime/api:test: ✔ keeps the employee business identifier migration forward-only and invitation-compatible (4.250667ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [CLIENT_NOT_FOUND] Client not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [CLIENT_NOT_FOUND] Client not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: ✔ creates client contacts only for the authorized Owner and denies invalid or unavailable owner scope (12.379833ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Client account is invalid.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [CLIENT_ACCOUNT_NOT_FOUND] Client account not found.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [CLIENT_ACCOUNT_DELETE_CONFLICT] Client account cannot be deleted while protected records or shared access remain.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ [CLIENT_ACCOUNT_DELETE_UNAVAILABLE] Client account deletion is temporarily unavailable.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ❌ AppError: Client account deletion is temporarily unavailable.
+@jarvis-prime/api:test:     at Module.deleteClientAccount (file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.service.js:230:11)
+@jarvis-prime/api:test:     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+@jarvis-prime/api:test:     at async file:///Users/anujsingh/Jarvis%20ai%20company/apps/api/src/modules/owner-workspace/owner-workspace.routes.js:41:66
+@jarvis-prime/api:test: ✔ deletes a client account only through the owner route with server-derived scope and redacted outcomes (19.2065ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [VALIDATION_ERROR] Field 'email' must be a valid email address.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  Missing authorization token { path: '/client-accounts/email-eligibility' }
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: ✔ checks Client account email eligibility as an Owner with a minimal, read-only response (17.019542ms)
+@jarvis-prime/api:test: [2026-09-19 11:28:51] 🧪 [DRY-RUN] Would send transactional email to employee@example.test
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ℹ️  Password reset initiated for user: 30000000-0000-4000-8000-000000000003
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [INSUFFICIENT_PERMISSIONS] Owner Workspace access is not permitted.
+@jarvis-prime/api:test: [2026-09-19 11:28:51] ⚠️  [EMPLOYEE_NOT_FOUND] Employee not found.
+@jarvis-prime/api:test: ✔ issues an active employee reset only through Owner scope and never returns credentials or reset capabilities (7.854083ms)
+@jarvis-prime/api:test: ▶ Phase 15A sales-agent approval boundary
+@jarvis-prime/api:test:   ✔ requires JWT authentication and the existing active Owner predicate (123.077333ms)
+@jarvis-prime/api:test:   ✔ rejects browser evidence and derives preparation evidence only from persisted scope (15.094208ms)
+@jarvis-prime/api:test:   ✔ limits Phase 15A preparation to the first email and maps compliance failures safely (23.543042ms)
+@jarvis-prime/api:test:   ✔ evaluates drafts deterministically and fails closed on prohibited claims (1.390666ms)
+@jarvis-prime/api:test:   ✔ rejects browser-controlled approval hashes and computes the rendered-body hash server-side (13.636667ms)
+@jarvis-prime/api:test:   ✔ passes only the server-rendered body and bounded cap to dry-run release (6.583292ms)
+@jarvis-prime/api:test:   ✔ keeps legacy email and every LinkedIn delivery path closed without provider calls or counters (0.664625ms)
+@jarvis-prime/api:test: ✔ Phase 15A sales-agent approval boundary (206.898791ms)
+@jarvis-prime/api:test: ℹ tests 228
+@jarvis-prime/api:test: ℹ suites 34
+@jarvis-prime/api:test: ℹ pass 228
+@jarvis-prime/api:test: ℹ fail 0
+@jarvis-prime/api:test: ℹ cancelled 0
+@jarvis-prime/api:test: ℹ skipped 0
+@jarvis-prime/api:test: ℹ todo 0
+@jarvis-prime/api:test: ℹ duration_ms 7689.569083
+
+ Tasks:    3 successful, 3 total
+Cached:    3 cached, 3 total
+  Time:    13ms >>> FULL TURBO
+
