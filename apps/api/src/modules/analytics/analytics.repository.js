@@ -44,7 +44,6 @@ export async function getDailyMetrics(ownerUserId, startDate, endDate, limit = 1
  * @returns {Promise<{totalRevenueMinor: number, monthlyData: Array}>}
  */
 export async function getRevenueStats(ownerUserId, startDate, endDate) {
-<<<<<<< HEAD
   // Total revenue (all time, paid invoices only) - database-side aggregation via RPC
   const { data: totalRevenueResult, error: totalError } = await client()
     .rpc('get_revenue_by_owner', { 
@@ -69,24 +68,6 @@ export async function getRevenueStats(ownerUserId, startDate, endDate) {
   return {
     totalRevenueMinor,
     monthlyData: monthlyData || [],
-=======
-  const { data: periodRev, error: periodError } = await client()
-    .from('finance_invoices')
-    .select('issued_at, total_amount_minor')
-    .eq('owner_user_id', ownerUserId)
-    .eq('status', 'paid')
-    .gte('issued_at', startDate)
-    .lte('issued_at', endDate);
-
-  if (periodError) throw periodError;
-
-  const monthlyData = periodRev || [];
-  const totalRevenueMinor = monthlyData.reduce((sum, inv) => sum + (inv.total_amount_minor || 0), 0);
-
-  return {
-    totalRevenueMinor,
-    monthlyData,
->>>>>>> 111daac (Phase 12: fix revenue date-scope, real analytics tests, /daily data source, Owner UI)
   };
 }
 
