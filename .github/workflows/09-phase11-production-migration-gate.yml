@@ -155,13 +155,22 @@ jobs:
 
       - name: Read-only production ledger preflight
         id: preflight
-        env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
-          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
-          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
-          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: |
           set -euo pipefail
+          
+          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+          if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
+            DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
+          else
+            DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          # Set environment variables for the gate command
+          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
+          export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
+          export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
+          export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
+          
           # The gate command is intentionally captured so its diagnostic output can be
           # inspected before this step decides whether to fail.
           OUTPUT=$(node database/scripts/phase11-production-migration-gate.mjs --inspect 2>&1 || true)
@@ -180,21 +189,43 @@ jobs:
 
       - name: Selectively apply 35 through 40
         if: ${{ inputs.operation == 'apply' && steps.preflight.outputs.violations_detected == 'false' }}
-        env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
-          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
-          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
-          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
-        run: node database/scripts/phase11-production-migration-gate.mjs --apply
+        run: |
+          set -euo pipefail
+          
+          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+          if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
+            DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
+          else
+            DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          # Set environment variables for the gate command
+          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
+          export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
+          export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
+          export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
+          
+          node database/scripts/phase11-production-migration-gate.mjs --apply
 
       - name: Read-only post-delivery ledger verification
         if: ${{ inputs.operation == 'apply' }}
-        env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
-          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
-          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
-          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
-        run: node database/scripts/phase11-production-migration-gate.mjs --inspect
+        run: |
+          set -euo pipefail
+          
+          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+          if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
+            DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
+          else
+            DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
+          fi
+          
+          # Set environment variables for the gate command
+          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
+          export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
+          export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
+          export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
+          
+          node database/scripts/phase11-production-migration-gate.mjs --inspect
 
       - name: Report constrained boundary
         shell: bash
