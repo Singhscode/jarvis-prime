@@ -155,7 +155,7 @@ jobs:
       - name: Read-only production ledger preflight
         id: preflight
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
@@ -180,7 +180,7 @@ jobs:
       - name: Selectively apply 35 through 40
         if: ${{ inputs.operation == 'apply' && steps.preflight.outputs.violations_detected == 'false' }}
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
@@ -189,7 +189,7 @@ jobs:
       - name: Read-only post-delivery ledger verification
         if: ${{ inputs.operation == 'apply' }}
         env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ steps.decode-db-url.outputs.database_url != '' && steps.decode-db-url.outputs.database_url || secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
