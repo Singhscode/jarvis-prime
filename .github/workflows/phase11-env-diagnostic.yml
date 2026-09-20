@@ -1,0 +1,43 @@
+name: Phase11 Environment Diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+
+    steps:
+      - name: Diagnose Environment Configuration
+        env:
+          DB_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PROJECT_REF_VAR: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Extract project ref from Session Pooler username: postgres.<PROJECT_REF>
+          # Database URL format: postgres://postgres.<PROJECT_REF>:password@host:port/db
+          
+          PROJECT_REF_FROM_URL=$(echo "$DB_URL" | grep -oP '(?<=postgres\.)[a-z0-9]{20,}(?=:)' | head -1 || true)
+          
+          echo "PROJECT_REF_FROM_DATABASE_URL=${PROJECT_REF_FROM_URL}"
+          echo "PROJECT_REF_VARIABLE=${PROJECT_REF_VAR}"
+          
+          if [[ "$PROJECT_REF_FROM_URL" == "$PROJECT_REF_VAR" ]]; then
+            echo "MATCH=YES"
+            exit 0
+          else
+            echo "MATCH=NO"
+            if [[ -z "$PROJECT_REF_FROM_URL" ]]; then
+              echo ""
+              echo "ERROR: Could not extract project reference from database URL username."
+              echo "Expected format: postgres.<PROJECT_REF>:password@..."
+              exit 1
+            fi
+            exit 1
+          fi
