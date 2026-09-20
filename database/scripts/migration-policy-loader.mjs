@@ -53,8 +53,17 @@ export async function loadMigrationPolicy(root = defaultRoot) {
     stagingOnlySentinelName: policy.phases.PHASE11.retiredSentinel.sentinelName,
     allApprovedMigrations: Object.freeze(new Set(policy.allProductionApprovedMigrations)),
     stagingOnlyMigrations: Object.freeze(new Set(policy.stagingOnlyMigrations)),
+    historicalApprovedVersions: Object.freeze(buildHistoricalApprovedSet(policy)),
     laterPhasesByVersion: buildLaterPhaseIndex(policy),
   });
+}
+
+/**
+ * Build the set of HISTORICAL_APPROVED versions from the HISTORICAL phase entry.
+ */
+function buildHistoricalApprovedSet(policy) {
+  const entries = policy.phases?.HISTORICAL?.productionApproved?.entries || [];
+  return new Set(entries.map((e) => e.version));
 }
 
 /**
@@ -83,7 +92,7 @@ function buildLaterPhaseIndex(policy) {
  * 
  * @param {string} version - Migration version (e.g., "20260810000035")
  * @param {Object} policyData - Loaded policy data from loadMigrationPolicy()
- * @returns {string} Classification: "PHASE11_REQUIRED" | "PHASE11_PREDECESSOR" | "LATER_PHASE_APPROVED" | "STAGING_ONLY" | "UNKNOWN"
+ * @returns {string} Classification: "PHASE11_REQUIRED" | "PHASE11_PREDECESSOR" | "HISTORICAL_APPROVED" | "LATER_PHASE_APPROVED" | "STAGING_ONLY" | "UNKNOWN"
  */
 export function classifyMigration(version, policyData) {
   if (policyData.phase11Predecessors.includes(version)) {
@@ -94,6 +103,11 @@ export function classifyMigration(version, policyData) {
   }
   if (policyData.stagingOnlyMigrations.has(version)) {
     return 'STAGING_ONLY';
+  }
+  // Historical baseline: explicitly registered pre-Phase-11 production migrations.
+  // Check before allApprovedMigrations so these get their own classification.
+  if (policyData.historicalApprovedVersions.has(version)) {
+    return 'HISTORICAL_APPROVED';
   }
   if (policyData.allApprovedMigrations.has(version)) {
     return 'LATER_PHASE_APPROVED';

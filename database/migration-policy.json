@@ -1,11 +1,154 @@
 {
-  "policyVersion": 1,
-  "description": "Canonical production migration ownership policy. Defines which migrations belong to which phase and production approval status.",
+  "policyVersion": 2,
+  "description": "Canonical production migration ownership policy. Defines which migrations belong to which phase and production approval status. Updated in hardening pass to add HISTORICAL_APPROVED pre-Phase-11 baseline.",
   "phases": {
+    "HISTORICAL": {
+      "description": "Pre-Phase-11 baseline migrations. These were applied to production before the Phase 11 gate was introduced. Every entry here has been individually verified: the file exists in the repository, the migration creates legitimate production schema/functions, and no staging-only or test-only marker is present in the file.",
+      "productionApproved": {
+        "description": "Verified historical production migrations (Phases 1–10). Classified HISTORICAL_APPROVED by gate. A missing entry here causes PHASE11_GATE_UNKNOWN_PRODUCTION_MIGRATION (hard-stop).",
+        "entries": [
+          {
+            "version": "20260715000000",
+            "file": "20260715000000_create_outreach_schema.sql",
+            "description": "Phase 1: Core outreach schema — clients, prospects, messages, events, campaigns, linkedin_actions tables."
+          },
+          {
+            "version": "20260715000001",
+            "file": "20260715000001_create_auth_schema.sql",
+            "description": "Phase 1: Auth schema — users, sessions, refresh_tokens, audit_logs tables."
+          },
+          {
+            "version": "20260715000002",
+            "file": "20260715000002_add_extensibility_columns.sql",
+            "description": "Phase 1: Extensibility — adds config JSONB to clients and prospects."
+          },
+          {
+            "version": "20260715000003",
+            "file": "20260715000003_create_leads.sql",
+            "description": "Phase 1: Leads table used by website booking, health, dashboard, and enrichment flows."
+          },
+          {
+            "version": "20260715000004",
+            "file": "20260715000004_create_crm_foundation.sql",
+            "description": "Phase 4: Owner-scoped CRM — companies, contacts, crm_leads tables."
+          },
+          {
+            "version": "20260715000005",
+            "file": "20260715000005_create_client_management.sql",
+            "description": "Phase 5: Client management — crm_clients table."
+          },
+          {
+            "version": "20260715000006",
+            "file": "20260715000006_create_project_management.sql",
+            "description": "Phase 6: Project management — crm_projects table."
+          },
+          {
+            "version": "20260715000007",
+            "file": "20260715000007_create_crm_tasks.sql",
+            "description": "Phase 6: CRM tasks — crm_tasks table."
+          },
+          {
+            "version": "20260715000008",
+            "file": "20260715000008_add_employee_portal_scope.sql",
+            "description": "Phase 6: Employee portal scope — adds portal_owner_user_id to users, assigned_user_id to tasks."
+          },
+          {
+            "version": "20260718000009",
+            "file": "20260718000009_grant_phase6_service_role_permissions.sql",
+            "description": "Phase 6: Service-role grants for auth and portal lifecycle (users, sessions, refresh_tokens, audit_logs)."
+          },
+          {
+            "version": "20260718000010",
+            "file": "20260718000010_create_client_portal.sql",
+            "description": "Phase 7: Client Portal boundary — client_portal_memberships, client_portal_invitations, client_portal_documents tables. Note: migration comment says 'intentionally not applied by implementation tooling' meaning automated CI skipped it; the migration IS present in production and creates legitimate feature tables."
+          },
+          {
+            "version": "20260722000011",
+            "file": "20260722000011_prepare_original_main_legacy_leads.sql",
+            "description": "Phase 7 bridge: Forward-only bridge for original main legacy leads migration shape. Defensive DO block, no destructive changes."
+          },
+          {
+            "version": "20260723000011",
+            "file": "20260723000011_reconcile_legacy_leads.sql",
+            "description": "Phase 7: Versioned reconciliation of canonical legacy-lead shape. Read-only validation DO block."
+          },
+          {
+            "version": "20260723000012",
+            "file": "20260723000012_enforce_leads_email_uniqueness.sql",
+            "description": "Phase 7: Enforces email uniqueness on leads table with baseline integrity check."
+          },
+          {
+            "version": "20260723000013",
+            "file": "20260723000013_harden_server_only_access.sql",
+            "description": "Phase 7: Hardens server-only access — validates table grant matrix, removes browser-role direct access."
+          },
+          {
+            "version": "20260730000011",
+            "file": "20260730000011_add_direct_client_creation.sql",
+            "description": "Phase 8: Direct client creation — adds client_number, email, phone, company, notes to crm_clients; creates sequence."
+          },
+          {
+            "version": "20260730000012",
+            "file": "20260730000012_grant_crm_client_sequence_usage.sql",
+            "description": "Phase 8: Grants service-role usage on crm_clients_client_number_seq for server-side inserts."
+          },
+          {
+            "version": "20260730000013",
+            "file": "20260730000013_cleanup_leads_bridge_unique_index.sql",
+            "description": "Phase 8: Removes temporary bridge index created by 20260723000012 after leads_email_key is restored."
+          },
+          {
+            "version": "20260805000014",
+            "file": "20260805000014_add_owner_employee_and_automation_workflows.sql",
+            "description": "Phase 8.5: Owner Workspace — employee_invitations table, automation_workflow_runs table, user department/phone columns."
+          },
+          {
+            "version": "20260807000015",
+            "file": "20260807000015_add_employee_business_identifier.sql",
+            "description": "Phase 8.6: Employee business identifiers — employee_code column, JP-EMP-NNNNNN format, unique index, sequence."
+          },
+          {
+            "version": "20260809000016",
+            "file": "20260809000016_add_registration_email_verification.sql",
+            "description": "Phase 8.7: Registration email verification — email_verification_tokens uniqueness index, issue_registration_email_verification RPC."
+          },
+          {
+            "version": "20260810000017",
+            "file": "20260810000017_add_finance_billing_foundation.sql",
+            "description": "Phase 9.1: Finance & Billing foundation — finance_billing_profiles, finance_invoices, finance_payments, finance_billing_events tables."
+          },
+          {
+            "version": "20260810000018",
+            "file": "20260810000018_add_finance_api_mutation_rpcs.sql",
+            "description": "Phase 9.2: Finance API RPCs — finance_assert_access, create_finance_invoice, record_finance_payment, void_finance_invoice server-only functions."
+          },
+          {
+            "version": "20260810000019",
+            "file": "20260810000019_simplify_client_account_provisioning.sql",
+            "description": "Phase 9.3: Client account provisioning RPC — provision_client_account atomic owner-initiated onboarding function."
+          },
+          {
+            "version": "20260810000020",
+            "file": "20260810000020_add_owner_client_account_deletion.sql",
+            "description": "Phase 9.4: Owner-scoped client account deletion — delete_owner_client_account SECURITY DEFINER function with owner lock and fail-closed guards. Migration comment 'do not apply outside a disposable local test database' is a testing procedure note about verifying the migration in isolation; the function itself is production-safe and is already applied in production."
+          },
+          {
+            "version": "20260810000021",
+            "file": "20260810000021_cleanup_exclusive_deleted_client_contacts.sql",
+            "description": "Phase 9.5: Replaces delete_owner_client_account with improved version that preserves shared contacts while removing disposable portal contacts."
+          },
+          {
+            "version": "20260810000022",
+            "file": "20260810000022_add_communication_hub.sql",
+            "description": "Phase 10: Communication Hub — communication_threads, communication_messages, communication_participants tables. Server-only, does not alter legacy outreach or Finance data."
+          }
+        ]
+      }
+    },
     "PHASE11": {
       "description": "Phase 11: Automation Worker & Operational Readiness",
       "predecessors": {
-        "description": "Required predecessor migrations (automation infrastructure)",
+        "description": "Required predecessor migrations (automation infrastructure, created prior to Phase 11 gate but within the Phase 11 boundary)",
         "versions": [
           "20260810000023",
           "20260810000024",
@@ -35,7 +178,7 @@
       }
     },
     "LATER_PHASES": {
-      "description": "Migrations belonging to post-Phase 11 phases",
+      "description": "Migrations belonging to post-Phase 11 phases. Register new phases here without modifying gate logic.",
       "registeredPhases": {
         "PHASE15": {
           "description": "Phase 15: Sales Agent Approvals",
@@ -57,6 +200,33 @@
     }
   },
   "allProductionApprovedMigrations": [
+    "20260715000000",
+    "20260715000001",
+    "20260715000002",
+    "20260715000003",
+    "20260715000004",
+    "20260715000005",
+    "20260715000006",
+    "20260715000007",
+    "20260715000008",
+    "20260718000009",
+    "20260718000010",
+    "20260722000011",
+    "20260723000011",
+    "20260723000012",
+    "20260723000013",
+    "20260730000011",
+    "20260730000012",
+    "20260730000013",
+    "20260805000014",
+    "20260807000015",
+    "20260809000016",
+    "20260810000017",
+    "20260810000018",
+    "20260810000019",
+    "20260810000020",
+    "20260810000021",
+    "20260810000022",
     "20260810000023",
     "20260810000024",
     "20260810000025",

@@ -157,74 +157,79 @@ jobs:
         id: preflight
         run: |
           set -euo pipefail
-          
-          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+
+          # Select database URL: decode-db-url output when non-empty (workflow_call path),
+          # otherwise fall back to the Environment secret (direct workflow_dispatch path).
           if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
             DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
           else
             DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
           fi
-          
-          # Set environment variables for the gate command
-          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
-          export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
-          export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
-          export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
-          
-          # The gate command is intentionally captured so its diagnostic output can be
-          # inspected before this step decides whether to fail.
-          OUTPUT=$(node database/scripts/phase11-production-migration-gate.mjs --inspect 2>&1 || true)
-          printf '%s\n' "$OUTPUT"
-
-          if grep -Eq \
-            'PHASE11_GATE_(PRODUCTION_TARGET_UNVERIFIED|ORDERING_INVALID|LEDGER_CHECKSUM_MISMATCH|UNEXPECTED_POST_31_MIGRATION|PREDECESSOR_MISSING|STAGING_ONLY_37_PRESENT|LEDGER_INVALID)' \
-            <<< "$OUTPUT"; then
-            echo "violations_detected=true" >> "$GITHUB_OUTPUT"
-            echo "Preflight detected violations - stopping." >&2
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "ERROR: PHASE11_PRODUCTION_DATABASE_URL is empty" >&2
             exit 1
           fi
 
-          echo "violations_detected=false" >> "$GITHUB_OUTPUT"
-          echo "Preflight clean - no violations detected."
+          export PHASE11_PRODUCTION_DATABASE_URL="$DATABASE_URL"
+          export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
+          export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
+          export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
+
+          # Run the gate in inspect mode and rely entirely on its exit code.
+          # The gate exits 1 when ANY violation is detected — regardless of violation
+          # type or code — and exits 0 when clean. No grep is used; unknown future
+          # violation codes are caught automatically.
+          if node database/scripts/phase11-production-migration-gate.mjs --inspect; then
+            echo "violations_detected=false" >> "$GITHUB_OUTPUT"
+            echo "Preflight clean — gate exited 0, zero violations."
+          else
+            echo "violations_detected=true" >> "$GITHUB_OUTPUT"
+            echo "Preflight failed — gate exited non-zero, violations detected." >&2
+            exit 1
+          fi
 
       - name: Selectively apply 35 through 40
         if: ${{ inputs.operation == 'apply' && steps.preflight.outputs.violations_detected == 'false' }}
         run: |
           set -euo pipefail
-          
-          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+
           if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
             DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
           else
             DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
           fi
-          
-          # Set environment variables for the gate command
-          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "ERROR: PHASE11_PRODUCTION_DATABASE_URL is empty" >&2
+            exit 1
+          fi
+
+          export PHASE11_PRODUCTION_DATABASE_URL="$DATABASE_URL"
           export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
           export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
           export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
-          
+
           node database/scripts/phase11-production-migration-gate.mjs --apply
 
       - name: Read-only post-delivery ledger verification
         if: ${{ inputs.operation == 'apply' }}
         run: |
           set -euo pipefail
-          
-          # Select database URL: from decode-db-url output if it exists and is non-empty, else from secret
+
           if [[ -n "${{ steps.decode-db-url.outputs.database_url }}" ]]; then
             DATABASE_URL="${{ steps.decode-db-url.outputs.database_url }}"
           else
             DATABASE_URL="${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}"
           fi
-          
-          # Set environment variables for the gate command
-          export PHASE11_PRODUCTION_DATABASE_URL="${DATABASE_URL}"
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "ERROR: PHASE11_PRODUCTION_DATABASE_URL is empty" >&2
+            exit 1
+          fi
+
+          export PHASE11_PRODUCTION_DATABASE_URL="$DATABASE_URL"
           export PHASE11_PRODUCTION_DATABASE_CA_PEM="${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}"
           export PHASE11_PRODUCTION_PROJECT_REF="${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
           export PHASE11_PRODUCTION_DB_MODE="${{ inputs.db_mode }}"
-          
+
           node database/scripts/phase11-production-migration-gate.mjs --inspect
 
       - name: Report constrained boundary
