@@ -358,6 +358,10 @@ export function evaluateProductionLedger(rows, migrations, policyData) {
       migrationDetails.push({ version, classification, status: 'required-present' });
     } else if (classification === 'PHASE11_REQUIRED') {
       migrationDetails.push({ version, classification, status: 'present' });
+    } else if (classification === 'HISTORICAL_APPROVED') {
+      // Pre-Phase-11 baseline migration explicitly registered in migration-policy.json.
+      // Do not block; these are part of the expected production baseline.
+      migrationDetails.push({ version, classification, status: 'present' });
     } else if (classification === 'LATER_PHASE_APPROVED') {
       // Legitimate later-phase migration; do not block
       const laterPhaseName = getLaterPhaseName(version, policyData);
@@ -483,16 +487,34 @@ async function applyOneMigration(client, migration) {
   }
 }
 
+/**
+ * Format a single violation object into a human-readable, machine-parseable line.
+ * Never prints secrets, connection strings, passwords, CA PEM, or tokens.
+ * Safe to emit to stdout/stderr in CI logs.
+ *
+ * @param {Object} violation - Violation object with .code, .version, .classification, .reason
+ * @returns {string} Formatted violation line
+ */
+export function formatViolation(violation) {
+  const code = (typeof violation?.code === 'string' && violation.code)
+    ? violation.code
+    : 'PHASE11_GATE_UNKNOWN_VIOLATION';
+  const parts = [`PHASE11_VIOLATION ${code}`];
+  if (violation?.version) parts.push(`version=${violation.version}`);
+  if (violation?.classification) parts.push(`classification=${violation.classification}`);
+  if (violation?.reason) parts.push(`reason="${violation.reason}"`);
+  return parts.join(' ');
+}
+
 function writeLedgerReport(write, report) {
   // Write ledger state summary
   for (const detail of report.migrationDetails) {
     write(`PHASE11_LEDGER ${detail.version} ${detail.status}`);
   }
   
-  // Write violations with full context
+  // Write violations with full context — uses formatViolation so output is never [object Object]
   for (const violation of report.violations) {
-    const detail = `[${violation.classification}] ${violation.reason}`;
-    write(`PHASE11_VIOLATION ${violation.code} version=${violation.version} detail="${detail}"`);
+    write(formatViolation(violation));
   }
 }
 
@@ -933,9 +955,11 @@ async function main() {
     // In inspect mode: result.stopped = true means violations (real issues) → exit 1.
     //                   pending migrations (35-40) alone are not violations → exit 0.
     if (result.report.violations.length > 0) {
-      // Emit exact violation codes for diagnostic purposes
-      for (const violationCode of result.report.violations) {
-        console.error(`PHASE11_VIOLATION ${violationCode}`);
+      // Emit structured violation lines — each violation is an object with .code,
+      // .version, .classification and .reason fields. Never print connection strings,
+      // passwords, CA PEM, or any secret.
+      for (const violation of result.report.violations) {
+        console.error(formatViolation(violation));
       }
       console.error(`PHASE11_VIOLATION_COUNT ${result.report.violations.length}`);
       console.error('PHASE11_GATE_STOPPED');
