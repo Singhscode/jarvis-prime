@@ -1,4 +1,4 @@
-name: Phase 11 - Verify Production Target Configuration
+name: "Phase 11 - Verify Production Target Configuration"
 
 # This workflow is diagnostic only.
 # It extracts the project reference from the production database URL
