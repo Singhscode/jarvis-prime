@@ -1,0 +1,85 @@
+name: 'Phase 11 Verify Production Environment'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: jarvis-prime-api / production
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify production environment configuration
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== Phase 11 Production Environment Verification ==="
+          echo ""
+          echo "Current PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}"
+          echo ""
+
+          if [[ -z "$PHASE11_PRODUCTION_DATABASE_URL" ]]; then
+            echo "ERROR: PHASE11_PRODUCTION_DATABASE_URL is not set" >&2
+            exit 1
+          fi
+
+          # Extract project reference from database URL
+          EXTRACTED=$(node <<'NODE_SCRIPT'
+            try {
+              const dbUrl = process.env.PHASE11_PRODUCTION_DATABASE_URL;
+              console.error('DEBUG: Attempting to extract project ref from URL (length=' + dbUrl.length + ')');
+              
+              let hostname;
+              try {
+                const { URL } = require('url');
+                const parsed = new URL(dbUrl);
+                hostname = parsed.hostname;
+                console.error('DEBUG: URL.hostname = ' + hostname);
+              } catch (e) {
+                console.error('DEBUG: URL parsing failed: ' + e.message);
+                const match = dbUrl.match(/^postgres:\/\/[^@]*@([^:\/]+)/);
+                if (match && match[1]) {
+                  hostname = match[1];
+                  console.error('DEBUG: Regex extraction = ' + hostname);
+                } else {
+                  throw new Error('Could not extract hostname');
+                }
+              }
+              
+              const ref = hostname.match(/^([a-z0-9]{20,}?)(?:[-\.]|$)/);
+              if (ref && ref[1] && /^[a-z0-9]{20,}$/.test(ref[1])) {
+                console.log(ref[1]);
+              } else {
+                throw new Error('Invalid project reference in hostname: ' + hostname);
+              }
+            } catch (e) {
+              console.error('FATAL: ' + e.message);
+              process.exit(1);
+            }
+NODE_SCRIPT
+) || { echo "ERROR: Could not extract project reference" >&2; exit 1; }
+
+          echo "Extracted from URL: ${EXTRACTED}"
+          echo ""
+
+          if [[ "$EXTRACTED" == "${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}" ]]; then
+            echo "✓ PASS: Project reference matches"
+          else
+            echo "✗ FAIL: Project reference mismatch"
+            echo ""
+            echo "Required fix:"
+            echo "  Update PHASE11_PRODUCTION_PROJECT_REF to: ${EXTRACTED}"
+          fi
