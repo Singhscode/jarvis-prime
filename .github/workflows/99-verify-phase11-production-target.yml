@@ -53,24 +53,30 @@ jobs:
             try {
               const parsed = new url.URL(dbUrl);
               const hostname = parsed.hostname;
+              console.error('DEBUG: Hostname = ' + hostname);
+              
               // Try multiple patterns:
               // 1. Supabase: abc123def456.supabase.co or abc123def456-pooler.supabase.co
-              // 2. Direct postgres: abc123def456.db.supabase.co
-              // 3. Azure or other: extract first segment before first dot
-              let match = hostname.match(/^([a-z0-9]{20,})(?:[-\.]|$)/);
-              if (match && match[1]) {
+              // 2. Direct postgres: abc123def456.db.supabase.co  
+              // 3. Azure or custom: extract alphanumeric prefix (20+ chars)
+              let match = hostname.match(/^([a-z0-9]{20,}?)(?:[-\.]|$)/);
+              if (!match) {
+                // Fallback: just extract the first alphanumeric segment
+                match = hostname.match(/^([a-z0-9]+)/);
+              }
+              
+              if (match && match[1] && match[1].length >= 20) {
                 const projectRef = match[1];
-                // Validate: must be alphanumeric lowercase, typically 20-30 chars
+                console.error('DEBUG: Extracted ref = ' + projectRef);
                 if (/^[a-z0-9]{20,}$/.test(projectRef)) {
                   console.log(projectRef);
-                } else {
-                  throw new Error('Extracted reference does not match expected format');
+                  process.exit(0);
                 }
-              } else {
-                throw new Error('Could not extract project reference from hostname: ' + hostname);
               }
+              
+              throw new Error('Could not extract valid project reference from hostname: ' + hostname);
             } catch (e) {
-              console.error('Failed to parse URL:', e.message);
+              console.error('Failed to parse URL: ' + e.message);
               process.exit(1);
             }
           " 2>&1) || { echo "ERROR: Could not extract project reference from database URL" >&2; exit 1; }
