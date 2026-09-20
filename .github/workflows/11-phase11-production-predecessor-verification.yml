@@ -42,7 +42,6 @@ jobs:
       - name: Create read-only verification script
         run: |
           cat > /tmp/phase11-verify-production-schema.mjs << 'VERIFY_SCRIPT_EOF'
-          import { createConnection } from 'postgresql';
           import { readFileSync } from 'fs';
 
           async function verifyPredecessors() {
@@ -232,6 +231,9 @@ jobs:
           });
           VERIFY_SCRIPT_EOF
           chmod +x /tmp/phase11-verify-production-schema.mjs
+
+      - name: Install pg module
+        run: npm install pg
 
       - name: Run read-only verification
         env:
