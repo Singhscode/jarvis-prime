@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   evaluateProductionLedger,
   loadApprovedMigrations,
+  assertProductionTarget,
+  Phase11MigrationGateError,
   PHASE11_PRODUCTION_MIGRATIONS,
   PHASE11_STAGING_ONLY_MIGRATION,
   STAGING_ONLY_RETIRED_NAME,
@@ -214,4 +216,60 @@ test('All Phase 11 predecessors are in all approved migrations', () => {
 
 test('Staging-only migration 37 is NOT in allApprovedMigrations', () => {
   assert(!policyData.allApprovedMigrations.has('20260810000037'));
+});
+
+// Database mode and target validation tests
+const projectRef = 'fytnwpnnvqecjmyhrzcx';
+const directUrl = `postgresql://postgres:password@db.${projectRef}.supabase.co:5432/postgres?sslmode=verify-full`;
+const poolerUrl = 'postgresql://postgres.fytnwpnnvqecjmyhrzcx:password@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres?sslmode=verify-full';
+const ca = '-----BEGIN CERTIFICATE-----\nMIIC...\n-----END CERTIFICATE-----';
+
+test('Session Pooler URL + session-pooler mode = accepted', () => {
+  const env = {
+    PHASE11_PRODUCTION_DATABASE_URL: poolerUrl,
+    PHASE11_PRODUCTION_PROJECT_REF: projectRef,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+    PHASE11_PRODUCTION_DATABASE_CA_PEM: ca,
+  };
+  const result = assertProductionTarget(env);
+  assert.equal(result.dbMode, 'session-pooler');
+  assert(result.connectionString.includes('pooler.supabase.com'));
+});
+
+test('Direct URL + direct mode = accepted', () => {
+  const env = {
+    PHASE11_PRODUCTION_DATABASE_URL: directUrl,
+    PHASE11_PRODUCTION_PROJECT_REF: projectRef,
+    PHASE11_PRODUCTION_DB_MODE: 'direct',
+    PHASE11_PRODUCTION_DATABASE_CA_PEM: ca,
+  };
+  const result = assertProductionTarget(env);
+  assert.equal(result.dbMode, 'direct');
+  assert(result.connectionString.includes(`db.${projectRef}`));
+});
+
+test('Session Pooler URL + direct mode = rejected', () => {
+  const env = {
+    PHASE11_PRODUCTION_DATABASE_URL: poolerUrl,
+    PHASE11_PRODUCTION_PROJECT_REF: projectRef,
+    PHASE11_PRODUCTION_DB_MODE: 'direct',
+    PHASE11_PRODUCTION_DATABASE_CA_PEM: ca,
+  };
+  assert.throws(() => assertProductionTarget(env), (err) => {
+    return err instanceof Phase11MigrationGateError 
+      && err.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED';
+  }, 'Should reject session-pooler URL with direct mode');
+});
+
+test('Direct URL + session-pooler mode = rejected', () => {
+  const env = {
+    PHASE11_PRODUCTION_DATABASE_URL: directUrl,
+    PHASE11_PRODUCTION_PROJECT_REF: projectRef,
+    PHASE11_PRODUCTION_DB_MODE: 'session-pooler',
+    PHASE11_PRODUCTION_DATABASE_CA_PEM: ca,
+  };
+  assert.throws(() => assertProductionTarget(env), (err) => {
+    return err instanceof Phase11MigrationGateError 
+      && err.code === 'PHASE11_GATE_PRODUCTION_TARGET_UNVERIFIED';
+  }, 'Should reject direct URL with session-pooler mode');
 });
