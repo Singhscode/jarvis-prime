@@ -35,10 +35,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
@@ -50,250 +46,100 @@ jobs:
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: |
-          # Write CA cert to file
-          echo "$PHASE11_PRODUCTION_DATABASE_CA_PEM" > /tmp/ca.crt
+          # Parse PostgreSQL connection string
+          # Format: postgresql://user:password@host:port/database?sslmode=require
+          DB_URL="$PHASE11_PRODUCTION_DATABASE_URL"
           
-          # Parse connection string
-          DB_HOST=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://.*@\([^:]*\).*|\1|')
-          DB_USER=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://\([^:]*\):.*|\1|')
-          DB_PASS=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://[^:]*:\([^@]*\)@.*|\1|')
-          DB_NAME="postgres"
+          # Extract components
+          DB_USERPASS=$(echo "$DB_URL" | sed -n 's|postgresql://\([^@]*\)@.*|\1|p')
+          DB_HOST=$(echo "$DB_URL" | sed -n 's|.*@\([^:/]*\).*|\1|p')
+          DB_PORT=$(echo "$DB_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
+          DB_NAME=$(echo "$DB_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
           
+          DB_USER=$(echo "$DB_USERPASS" | cut -d: -f1)
+          DB_PASS=$(echo "$DB_USERPASS" | cut -d: -f2-)
+          
+          # Defaults
+          DB_PORT=${DB_PORT:-5432}
+          DB_NAME=${DB_NAME:-postgres}
+          
+          # Write CA cert
+          mkdir -p /tmp/pgsql
+          echo "$PHASE11_PRODUCTION_DATABASE_CA_PEM" > /tmp/pgsql/ca.crt
+          chmod 600 /tmp/pgsql/ca.crt
+          
+          echo "=== CONNECTION INFO ==="
+          echo "Host: $DB_HOST"
+          echo "Port: $DB_PORT"
+          echo "Database: $DB_NAME"
+          echo "User: $DB_USER"
+          
+          echo ""
           echo "=== LEDGER CHECK ==="
-          LEDGER_COUNT=$(PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
+          LEDGER_COUNT=$(PGPASSWORD="$DB_PASS" psql \
+            -h "$DB_HOST" -p "$DB_PORT" \
+            -U "$DB_USER" -d "$DB_NAME" \
             -c "SELECT COUNT(*) FROM supabase_migrations.schema_migrations WHERE version >= '20260810000023' AND version <= '20260810000031';" \
-            -t -A -w 2>/dev/null || echo "0")
+            -t -A 2>&1 | grep -oE '^[0-9]+$' || echo "ERROR")
+          
           echo "LEDGER_VERSIONS_FOUND: $LEDGER_COUNT"
+          
+          if [ "$LEDGER_COUNT" = "ERROR" ]; then
+            echo "ERROR: Could not query ledger"
+            exit 1
+          fi
           
           echo ""
           echo "=== SCHEMA OBJECTS ==="
           
-          PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -w << 'QUERY_EOF' 2>/dev/null
-          \set QUIET on
+          # Create verification query script
+          cat > /tmp/verify_objects.sql << 'SQL_EOF'
+          \set ON_ERROR_STOP on
+          \pset tuples_only on
+          \pset format unaligned
+          
           -- 23
           SELECT CASE WHEN COUNT(*) = 2 THEN 'MIGRATION_23_TABLES: PRESENT' ELSE 'MIGRATION_23_TABLES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('automation_recipes', 'automation_work_items');
+          
           -- 24
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_24_AUTOMATION_SCHEDULES: PRESENT' ELSE 'MIGRATION_24_AUTOMATION_SCHEDULES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_schedules';
+          
           -- 25
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_25_AUTOMATION_RESERVE_WORK: PRESENT' ELSE 'MIGRATION_25_AUTOMATION_RESERVE_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_reserve_work';
+          
           -- 26
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: PRESENT' ELSE 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_recipe_activations';
+          
           -- 27
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: PRESENT' ELSE 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_set_employee_run_pause';
+          
           -- 28
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: PRESENT' ELSE 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: ABSENT' END FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'automation_policy_decisions' AND column_name = 'idempotency_key';
+          
           -- 29
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: PRESENT' ELSE 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_provider_action_configs';
+          
           -- 30
           SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_30_AUTOMATION_CLAIM_WORK: PRESENT' ELSE 'MIGRATION_30_AUTOMATION_CLAIM_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_claim_work';
+          
           -- 31
           SELECT 'MIGRATION_31_OPERATIONAL_HEALTH: ' || CASE WHEN (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_get_owner_operational_health') = 1 THEN 'PRESENT' ELSE 'ABSENT' END;
-          QUERY_EOF
+          SQL_EOF
+          
+          PGPASSWORD="$DB_PASS" psql \
+            -h "$DB_HOST" -p "$DB_PORT" \
+            -U "$DB_USER" -d "$DB_NAME" \
+            -f /tmp/verify_objects.sql 2>&1
           
           echo ""
           echo "=== FINAL CLASSIFICATION ==="
           if [ "$LEDGER_COUNT" = "0" ]; then
-            echo "FINAL_CLASSIFICATION: APPLIED_BUT_LEDGER_MISSING"
-            echo "Ledger rows 23-31 are absent but schema objects are present."
+            echo "FINAL_CLASSIFICATION: APPLIED_BUT_LEDGER_MISSING (tentative)"
+            echo "Note: Schema object query results above will confirm final classification."
           else
             echo "FINAL_CLASSIFICATION: MIXED"
-            echo "Ledger has $LEDGER_COUNT rows; full state verification needed."
+            echo "Ledger has $LEDGER_COUNT rows; see schema objects above."
           fi
 
-      - name: Create read-only verification script (archived)
-        run: |
-          cat > /tmp/phase11-verify-production-schema.mjs << 'VERIFY_SCRIPT_EOF'
-          import { readFileSync } from 'fs';
-
-          async function verifyPredecessors() {
-            const connectionString = process.env.PHASE11_PRODUCTION_DATABASE_URL;
-            const caPem = process.env.PHASE11_PRODUCTION_DATABASE_CA_PEM;
-            const projectRef = process.env.PHASE11_PRODUCTION_PROJECT_REF;
-            const dbMode = process.env.PHASE11_PRODUCTION_DB_MODE || 'direct';
-
-            if (!connectionString || !caPem || !projectRef) {
-              console.error('VERIFY_ERROR: Missing environment variables');
-              process.exit(1);
-            }
-
-            const url = new URL(connectionString);
-            const host = url.hostname;
-            const port = parseInt(url.port) || 5432;
-            const username = decodeURIComponent(url.username);
-
-            // Validate target
-            if (dbMode === 'direct') {
-              const expectedHost = `db.${projectRef}.supabase.co`;
-              if (host !== expectedHost) {
-                console.error(`VERIFY_ERROR: Host mismatch. Expected ${expectedHost}, got ${host}`);
-                process.exit(1);
-              }
-            } else if (dbMode === 'session-pooler') {
-              if (!host.endsWith('.pooler.supabase.com')) {
-                console.error(`VERIFY_ERROR: Invalid pooler host: ${host}`);
-                process.exit(1);
-              }
-              const lastDot = username.lastIndexOf('.');
-              const usernameProjectRef = lastDot === -1 ? '' : username.slice(lastDot + 1);
-              if (usernameProjectRef !== projectRef) {
-                console.error(`VERIFY_ERROR: Project ref mismatch in username`);
-                process.exit(1);
-              }
-            }
-
-            const pg = (await import('pg')).default;
-            const caBuffer = Buffer.from(caPem, 'utf8');
-
-            const client = new pg.Client({
-              connectionString,
-              ssl: {
-                ca: caBuffer,
-                rejectUnauthorized: true,
-              },
-            });
-
-            try {
-              await client.connect();
-              console.log('VERIFY_CONNECTION: Connected to production database');
-
-              // 1. Check ledger for versions 23-31
-              console.log('\n=== LEDGER CHECK ===');
-              const ledgerResult = await client.query(
-                'SELECT version FROM supabase_migrations.schema_migrations WHERE version >= $1 AND version <= $2 ORDER BY version',
-                ['20260810000023', '20260810000031']
-              );
-              const ledgerVersions = ledgerResult.rows.map(r => r.version);
-              console.log(`LEDGER_VERSIONS_FOUND: ${ledgerVersions.length}`);
-              if (ledgerVersions.length > 0) {
-                console.log(`LEDGER_VERSIONS: ${ledgerVersions.join(', ')}`);
-              } else {
-                console.log('LEDGER_VERSIONS: NONE (23-31 not in ledger)');
-              }
-
-              // 2. Check schema objects
-              console.log('\n=== SCHEMA OBJECTS ===');
-
-              // 23: automation_recipes, automation_work_items
-              const tables23 = await client.query(
-                `SELECT table_name FROM information_schema.tables 
-                 WHERE table_schema = 'public' AND table_name IN ('automation_recipes', 'automation_work_items')`
-              );
-              console.log(`MIGRATION_23_TABLES: ${tables23.rows.length === 2 ? 'PRESENT' : 'ABSENT'}`);
-              if (tables23.rows.length > 0) console.log(`  Found: ${tables23.rows.map(r => r.table_name).join(', ')}`);
-
-              // 24: automation_schedules
-              const tables24 = await client.query(
-                `SELECT table_name FROM information_schema.tables 
-                 WHERE table_schema = 'public' AND table_name = 'automation_schedules'`
-              );
-              console.log(`MIGRATION_24_AUTOMATION_SCHEDULES: ${tables24.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 25: automation_reserve_work (check function)
-              const func25 = await client.query(
-                `SELECT routine_name FROM information_schema.routines 
-                 WHERE routine_schema = 'public' AND routine_name = 'automation_reserve_work'`
-              );
-              console.log(`MIGRATION_25_AUTOMATION_RESERVE_WORK: ${func25.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 26: automation_recipe_activations
-              const tables26 = await client.query(
-                `SELECT table_name FROM information_schema.tables 
-                 WHERE table_schema = 'public' AND table_name = 'automation_recipe_activations'`
-              );
-              console.log(`MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: ${tables26.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 27: automation_set_employee_run_pause (check function)
-              const func27 = await client.query(
-                `SELECT routine_name FROM information_schema.routines 
-                 WHERE routine_schema = 'public' AND routine_name = 'automation_set_employee_run_pause'`
-              );
-              console.log(`MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: ${func27.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 28: automation_policy_decisions.idempotency_key column
-              const col28 = await client.query(
-                `SELECT column_name FROM information_schema.columns 
-                 WHERE table_schema = 'public' AND table_name = 'automation_policy_decisions' AND column_name = 'idempotency_key'`
-              );
-              console.log(`MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: ${col28.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 29: automation_provider_action_configs
-              const tables29 = await client.query(
-                `SELECT table_name FROM information_schema.tables 
-                 WHERE table_schema = 'public' AND table_name = 'automation_provider_action_configs'`
-              );
-              console.log(`MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: ${tables29.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 30: Check automation_claim_work for Apollo references (check function exists)
-              const func30 = await client.query(
-                `SELECT routine_name FROM information_schema.routines 
-                 WHERE routine_schema = 'public' AND routine_name = 'automation_claim_work'`
-              );
-              console.log(`MIGRATION_30_AUTOMATION_CLAIM_WORK: ${func30.rows.length === 1 ? 'PRESENT' : 'ABSENT'}`);
-
-              // 31: automation_get_owner_operational_health and indexes
-              const func31 = await client.query(
-                `SELECT routine_name FROM information_schema.routines 
-                 WHERE routine_schema = 'public' AND routine_name = 'automation_get_owner_operational_health'`
-              );
-              const idx31_health = await client.query(
-                `SELECT indexname FROM pg_indexes 
-                 WHERE schemaname = 'public' AND indexname = 'automation_work_items_owner_health_idx'`
-              );
-              const idx31_recovery = await client.query(
-                `SELECT indexname FROM pg_indexes 
-                 WHERE schemaname = 'public' AND indexname = 'automation_run_events_owner_recovery_idx'`
-              );
-              const healthPresent = func31.rows.length === 1 && idx31_health.rows.length === 1 && idx31_recovery.rows.length === 1;
-              console.log(`MIGRATION_31_OPERATIONAL_HEALTH: ${healthPresent ? 'PRESENT' : 'ABSENT'}`);
-              if (func31.rows.length === 1) console.log(`  Function: automation_get_owner_operational_health`);
-              if (idx31_health.rows.length === 1) console.log(`  Index: automation_work_items_owner_health_idx`);
-              if (idx31_recovery.rows.length === 1) console.log(`  Index: automation_run_events_owner_recovery_idx`);
-
-              // Classification
-              console.log('\n=== CLASSIFICATION ===');
-              const allObjectsPresent = 
-                tables23.rows.length === 2 &&
-                tables24.rows.length === 1 &&
-                func25.rows.length === 1 &&
-                tables26.rows.length === 1 &&
-                func27.rows.length === 1 &&
-                col28.rows.length === 1 &&
-                tables29.rows.length === 1 &&
-                func30.rows.length === 1 &&
-                healthPresent;
-
-              if (allObjectsPresent && ledgerVersions.length === 0) {
-                console.log('FINAL_CLASSIFICATION: APPLIED_BUT_LEDGER_MISSING');
-                console.log('All migration 23-31 schema objects present in production.');
-                console.log('Ledger rows 23-31 absent from supabase_migrations.schema_migrations.');
-                console.log('Migrations were applied outside the gate (e.g., via db:push or manual SQL).');
-              } else if (allObjectsPresent && ledgerVersions.length > 0) {
-                console.log('FINAL_CLASSIFICATION: MIXED');
-                console.log(`Ledger has ${ledgerVersions.length} of 9 versions; all objects present.`);
-              } else if (!allObjectsPresent && ledgerVersions.length === 0) {
-                console.log('FINAL_CLASSIFICATION: NOT_APPLIED');
-                console.log('Schema objects for 23-31 are absent; ledger is also empty.');
-              } else {
-                console.log('FINAL_CLASSIFICATION: INSUFFICIENT_EVIDENCE');
-                console.log('Partial object/ledger state; manual inspection required.');
-              }
-
-            } catch (error) {
-              console.error(`VERIFY_ERROR: ${error.message}`);
-              process.exit(1);
-            } finally {
-              await client.end();
-            }
-          }
-
-          verifyPredecessors().catch(err => {
-            console.error(err);
-            process.exit(1);
-          });
-
-          VERIFY_SCRIPT_EOF
-          chmod +x /tmp/phase11-verify-production-schema.mjs
-
-      - name: "NOTE: Node.js script validation (archived, not executed)"
-        run: |
-          echo "The previous Node.js approach has been replaced with native psql CLI."
+      - name: "Workflow complete"
+        run: echo "Read-only verification complete. Check output above for FINAL_CLASSIFICATION."
