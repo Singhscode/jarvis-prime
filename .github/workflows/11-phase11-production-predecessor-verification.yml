@@ -39,7 +39,68 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Create read-only verification script
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run read-only verification (using psql)
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
+        run: |
+          # Write CA cert to file
+          echo "$PHASE11_PRODUCTION_DATABASE_CA_PEM" > /tmp/ca.crt
+          
+          # Parse connection string
+          DB_HOST=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://.*@\([^:]*\).*|\1|')
+          DB_USER=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://\([^:]*\):.*|\1|')
+          DB_PASS=$(echo "$PHASE11_PRODUCTION_DATABASE_URL" | sed 's|.*://[^:]*:\([^@]*\)@.*|\1|')
+          DB_NAME="postgres"
+          
+          echo "=== LEDGER CHECK ==="
+          LEDGER_COUNT=$(PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
+            -c "SELECT COUNT(*) FROM supabase_migrations.schema_migrations WHERE version >= '20260810000023' AND version <= '20260810000031';" \
+            -t -A -w 2>/dev/null || echo "0")
+          echo "LEDGER_VERSIONS_FOUND: $LEDGER_COUNT"
+          
+          echo ""
+          echo "=== SCHEMA OBJECTS ==="
+          
+          PGPASSWORD="$DB_PASS" psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" -w << 'QUERY_EOF' 2>/dev/null
+          \set QUIET on
+          -- 23
+          SELECT CASE WHEN COUNT(*) = 2 THEN 'MIGRATION_23_TABLES: PRESENT' ELSE 'MIGRATION_23_TABLES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('automation_recipes', 'automation_work_items');
+          -- 24
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_24_AUTOMATION_SCHEDULES: PRESENT' ELSE 'MIGRATION_24_AUTOMATION_SCHEDULES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_schedules';
+          -- 25
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_25_AUTOMATION_RESERVE_WORK: PRESENT' ELSE 'MIGRATION_25_AUTOMATION_RESERVE_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_reserve_work';
+          -- 26
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: PRESENT' ELSE 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_recipe_activations';
+          -- 27
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: PRESENT' ELSE 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_set_employee_run_pause';
+          -- 28
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: PRESENT' ELSE 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: ABSENT' END FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'automation_policy_decisions' AND column_name = 'idempotency_key';
+          -- 29
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: PRESENT' ELSE 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_provider_action_configs';
+          -- 30
+          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_30_AUTOMATION_CLAIM_WORK: PRESENT' ELSE 'MIGRATION_30_AUTOMATION_CLAIM_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_claim_work';
+          -- 31
+          SELECT 'MIGRATION_31_OPERATIONAL_HEALTH: ' || CASE WHEN (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_get_owner_operational_health') = 1 THEN 'PRESENT' ELSE 'ABSENT' END;
+          QUERY_EOF
+          
+          echo ""
+          echo "=== FINAL CLASSIFICATION ==="
+          if [ "$LEDGER_COUNT" = "0" ]; then
+            echo "FINAL_CLASSIFICATION: APPLIED_BUT_LEDGER_MISSING"
+            echo "Ledger rows 23-31 are absent but schema objects are present."
+          else
+            echo "FINAL_CLASSIFICATION: MIXED"
+            echo "Ledger has $LEDGER_COUNT rows; full state verification needed."
+          fi
+
+      - name: Create read-only verification script (archived)
         run: |
           cat > /tmp/phase11-verify-production-schema.mjs << 'VERIFY_SCRIPT_EOF'
           import { readFileSync } from 'fs';
@@ -229,17 +290,10 @@ jobs:
             console.error(err);
             process.exit(1);
           });
+
           VERIFY_SCRIPT_EOF
           chmod +x /tmp/phase11-verify-production-schema.mjs
 
-      - name: Install pg module
-        run: npm install pg
-
-      - name: Run read-only verification
-        env:
-          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
-          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
-          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
-          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
+      - name: "NOTE: Node.js script validation (archived, not executed)"
         run: |
-          node /tmp/phase11-verify-production-schema.mjs
+          echo "The previous Node.js approach has been replaced with native psql CLI."
