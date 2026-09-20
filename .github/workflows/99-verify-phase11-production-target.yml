@@ -47,39 +47,66 @@ jobs:
           fi
 
           # Parse hostname from database URL using node
-          EXTRACTED_REF=$(node -e "
-            const url = require('url');
-            const dbUrl = process.env.PHASE11_PRODUCTION_DATABASE_URL;
+          EXTRACTED_REF=$(node <<'NODE_EOF' 2>&1
             try {
-              const parsed = new url.URL(dbUrl);
-              const hostname = parsed.hostname;
-              console.error('DEBUG: Hostname = ' + hostname);
-              
-              // Try multiple patterns:
-              // 1. Supabase: abc123def456.supabase.co or abc123def456-pooler.supabase.co
-              // 2. Direct postgres: abc123def456.db.supabase.co  
-              // 3. Azure or custom: extract alphanumeric prefix (20+ chars)
-              let match = hostname.match(/^([a-z0-9]{20,}?)(?:[-\.]|$)/);
-              if (!match) {
-                // Fallback: just extract the first alphanumeric segment
-                match = hostname.match(/^([a-z0-9]+)/);
+              const dbUrl = process.env.PHASE11_PRODUCTION_DATABASE_URL;
+              if (!dbUrl) {
+                console.error('FATAL: PHASE11_PRODUCTION_DATABASE_URL is empty');
+                process.exit(1);
               }
+              console.error('DEBUG: DB URL length=' + dbUrl.length);
               
-              if (match && match[1] && match[1].length >= 20) {
-                const projectRef = match[1];
-                console.error('DEBUG: Extracted ref = ' + projectRef);
-                if (/^[a-z0-9]{20,}$/.test(projectRef)) {
-                  console.log(projectRef);
-                  process.exit(0);
+              // Try to parse as URL
+              let hostname;
+              try {
+                const url = require('url');
+                const parsed = new url.URL(dbUrl);
+                hostname = parsed.hostname;
+                console.error('DEBUG: Parsed hostname=' + hostname);
+              } catch (e) {
+                console.error('DEBUG: URL parsing failed, trying regex');
+                // Fallback: extract host from postgres://user:pass@host:port/db format
+                const match = dbUrl.match(/^postgres:\/\/[^@]*@([^:\/]+)/);
+                if (match && match[1]) {
+                  hostname = match[1];
+                  console.error('DEBUG: Regex extracted hostname=' + hostname);
+                } else {
+                  throw new Error('Could not extract hostname from URL');
                 }
               }
               
-              throw new Error('Could not extract valid project reference from hostname: ' + hostname);
+              if (!hostname || hostname.length === 0) {
+                throw new Error('Hostname is empty');
+              }
+              
+              // Extract project reference: alphanumeric prefix, at least 20 chars
+              const hostMatch = hostname.match(/^([a-z0-9]{20,}?)(?:[-\.]|$)/);
+              let projectRef = null;
+              
+              if (hostMatch && hostMatch[1]) {
+                projectRef = hostMatch[1];
+                console.error('DEBUG: Pattern matched, extracted=' + projectRef);
+              } else {
+                // Fallback: take first 20+ alphanumeric chars
+                const simpleMatch = hostname.match(/^([a-z0-9]{20,})/);
+                if (simpleMatch && simpleMatch[1]) {
+                  projectRef = simpleMatch[1];
+                  console.error('DEBUG: Simple match, extracted=' + projectRef);
+                }
+              }
+              
+              if (!projectRef || !/^[a-z0-9]{20,}$/.test(projectRef)) {
+                throw new Error('Could not extract valid project ref from hostname: ' + hostname);
+              }
+              
+              console.log(projectRef);
+              process.exit(0);
             } catch (e) {
-              console.error('Failed to parse URL: ' + e.message);
+              console.error('FATAL: ' + e.message);
               process.exit(1);
             }
-          " 2>&1) || { echo "ERROR: Could not extract project reference from database URL" >&2; exit 1; }
+NODE_EOF
+) || { echo "ERROR: Could not extract project reference from database URL" >&2; exit 1; }
 
           echo "  PHASE11_PRODUCTION_PROJECT_REF (from URL): ${EXTRACTED_REF}"
           echo ""
