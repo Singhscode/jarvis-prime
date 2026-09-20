@@ -161,19 +161,21 @@ jobs:
           PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: |
           set -euo pipefail
+          # The gate command is intentionally captured so its diagnostic output can be
+          # inspected before this step decides whether to fail.
           OUTPUT=$(node database/scripts/phase11-production-migration-gate.mjs --inspect 2>&1 || true)
-          echo "$OUTPUT"
-          # Extract violations: if any line contains a violation code (e.g., PHASE11_GATE_*INVALID, PHASE11_GATE_*MISMATCH)
-          # excluding PHASE11_GATE_STOPPED which is just a normal stop indicator
-          HAS_VIOLATIONS=$(echo "$OUTPUT" | grep -E 'PHASE11_GATE_(ORDERING_INVALID|LEDGER_CHECKSUM_MISMATCH|UNEXPECTED_POST_31_MIGRATION|PREDECESSOR_MISSING|STAGING_ONLY_37_PRESENT|LEDGER_INVALID)' | wc -l)
-          if [ "$HAS_VIOLATIONS" -gt 0 ]; then
-            echo "violations_detected=true" >> $GITHUB_OUTPUT
-            echo "Preflight detected violations - stopping."
+          printf '%s\n' "$OUTPUT"
+
+          if grep -Eq \
+            'PHASE11_GATE_(PRODUCTION_TARGET_UNVERIFIED|ORDERING_INVALID|LEDGER_CHECKSUM_MISMATCH|UNEXPECTED_POST_31_MIGRATION|PREDECESSOR_MISSING|STAGING_ONLY_37_PRESENT|LEDGER_INVALID)' \
+            <<< "$OUTPUT"; then
+            echo "violations_detected=true" >> "$GITHUB_OUTPUT"
+            echo "Preflight detected violations - stopping." >&2
             exit 1
-          else
-            echo "violations_detected=false" >> $GITHUB_OUTPUT
-            echo "Preflight clean - no violations detected."
           fi
+
+          echo "violations_detected=false" >> "$GITHUB_OUTPUT"
+          echo "Preflight clean - no violations detected."
 
       - name: Selectively apply 35 through 40
         if: ${{ inputs.operation == 'apply' && steps.preflight.outputs.violations_detected == 'false' }}
