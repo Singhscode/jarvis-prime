@@ -1,0 +1,84 @@
+{
+  "policyVersion": 1,
+  "description": "Canonical production migration ownership policy. Defines which migrations belong to which phase and production approval status.",
+  "phases": {
+    "PHASE11": {
+      "description": "Phase 11: Automation Worker & Operational Readiness",
+      "predecessors": {
+        "description": "Required predecessor migrations (automation infrastructure)",
+        "versions": [
+          "20260810000023",
+          "20260810000024",
+          "20260810000025",
+          "20260810000026",
+          "20260810000027",
+          "20260810000028",
+          "20260810000029",
+          "20260810000030",
+          "20260810000031"
+        ]
+      },
+      "productionRequired": {
+        "description": "Phase 11 core migrations required in production",
+        "versions": [
+          "20260810000035",
+          "20260810000036",
+          "20260810000038",
+          "20260810000039",
+          "20260810000040"
+        ]
+      },
+      "retiredSentinel": {
+        "description": "Migration 37 was staging-only and must be retired in production with sentinel marker",
+        "version": "20260810000037",
+        "sentinelName": "retired_staging_only_canary"
+      }
+    },
+    "LATER_PHASES": {
+      "description": "Migrations belonging to post-Phase 11 phases",
+      "registeredPhases": {
+        "PHASE15": {
+          "description": "Phase 15: Sales Agent Approvals",
+          "productionApproved": [
+            "20260810000032",
+            "20260810000033",
+            "20260810000034"
+          ]
+        },
+        "ANALYTICS": {
+          "description": "Analytics infrastructure (post-Phase 15)",
+          "productionApproved": [
+            "20260810000041",
+            "20260810000042",
+            "20260810000043"
+          ]
+        }
+      }
+    }
+  },
+  "allProductionApprovedMigrations": [
+    "20260810000023",
+    "20260810000024",
+    "20260810000025",
+    "20260810000026",
+    "20260810000027",
+    "20260810000028",
+    "20260810000029",
+    "20260810000030",
+    "20260810000031",
+    "20260810000032",
+    "20260810000033",
+    "20260810000034",
+    "20260810000035",
+    "20260810000036",
+    "20260810000038",
+    "20260810000039",
+    "20260810000040",
+    "20260810000041",
+    "20260810000042",
+    "20260810000043"
+  ],
+  "stagingOnlyMigrations": [
+    "20260810000037"
+  ]
+}

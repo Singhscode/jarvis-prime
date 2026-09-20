@@ -5,22 +5,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
 import tls from 'node:tls';
+import { loadMigrationPolicy, classifyMigration, getLaterPhaseName } from './migration-policy-loader.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultRoot = path.resolve(here, '..', '..');
 const migrationDirectory = path.join('database', 'supabase', 'migrations');
 
-const PREDECESSOR_VERSIONS = Object.freeze([
-  '20260810000023', '20260810000024', '20260810000025',
-  '20260810000026', '20260810000027', '20260810000028',
-  '20260810000029', '20260810000030', '20260810000031',
-]);
-const LAST_PREDECESSOR_VERSION = PREDECESSOR_VERSIONS.at(-1);
-const STAGING_ONLY_VERSION = '20260810000037';
+// Load policy at module init to catch configuration errors early
+let gPolicyData = null;
+
 const ADVISORY_LOCK_SQL = "select pg_advisory_lock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
 const ADVISORY_UNLOCK_SQL = "select pg_advisory_unlock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
 const LEDGER_SELECT_SQL = 'select version, coalesce(name, \'\') as name, statements from supabase_migrations.schema_migrations order by version';
 const LEDGER_INSERT_SQL = 'insert into supabase_migrations.schema_migrations(version, name, statements) values ($1, $2, $3)';
+
 // Sentinel written when retiring migration 37 from production: keeps the version
 // in the ledger so Supabase CLI sees it as already-applied, but replaces the
 // statements with an empty array so the gate can distinguish retired from active.
@@ -28,7 +26,7 @@ export const STAGING_ONLY_RETIRED_NAME = 'retired_staging_only_canary';
 const LEDGER_RETIRE_STAGING_37_SQL = "update supabase_migrations.schema_migrations set name = 'retired_staging_only_canary', statements = ARRAY[]::text[] where version = '20260810000037'";
 const LEDGER_VERIFY_STAGING_37_RETIRED_SQL = "select name, statements from supabase_migrations.schema_migrations where version = '20260810000037'";
 
-/** The only migrations this runner can ever execute. */
+/** The only Phase 11 migrations this runner can ever execute. */
 export const PHASE11_PRODUCTION_MIGRATIONS = Object.freeze([
   Object.freeze({
     version: '20260810000035',
@@ -58,7 +56,7 @@ export const PHASE11_PRODUCTION_MIGRATIONS = Object.freeze([
 ]);
 
 export const PHASE11_STAGING_ONLY_MIGRATION = Object.freeze({
-  version: STAGING_ONLY_VERSION,
+  version: '20260810000037',
   file: '20260810000037_add_phase11_internal_fake_canary.sql',
   sha256: 'f65ee2e7101749e614c9b22638a00734bb41a07818d82a7e4b155568504a5399',
 });
@@ -293,117 +291,139 @@ function ledgerStatementsMatch(row, migration) {
 /**
  * Evaluate only the remote ledger. The result is deliberately descriptive so
  * inspect mode can emit migration IDs and statuses before failing closed.
+ * 
+ * Uses the canonical migration policy to classify migrations and validate
+ * Phase 11 ownership without blocking legitimate later-phase productions migrations.
  */
-export function evaluateProductionLedger(rows, migrations) {
-  const approvedMigrations = migrations || PHASE11_PRODUCTION_MIGRATIONS;
+export function evaluateProductionLedger(rows, migrations, policyData) {
+  if (!policyData) {
+    throw new Error('evaluateProductionLedger requires policyData from loadMigrationPolicy()');
+  }
+  
+  const phase11Required = migrations || PHASE11_PRODUCTION_MIGRATIONS;
   const byVersion = new Map();
   const violations = [];
+  const migrationDetails = [];
+
+  // Parse ledger into map
   for (const row of rows || []) {
     const version = String(row.version || '');
     if (!version || byVersion.has(version)) {
-      violations.push('PHASE11_GATE_LEDGER_INVALID');
+      violations.push({
+        code: 'PHASE11_GATE_LEDGER_INVALID',
+        version,
+        classification: 'UNKNOWN',
+        reason: 'Duplicate or invalid version in ledger',
+      });
       continue;
     }
     byVersion.set(version, { version, name: String(row.name || ''), statements: row.statements });
   }
 
-  for (const version of PREDECESSOR_VERSIONS) {
-    if (!byVersion.has(version)) violations.push('PHASE11_GATE_PREDECESSOR_MISSING');
+  // Validate Phase 11 predecessors are present
+  for (const version of policyData.phase11Predecessors) {
+    if (!byVersion.has(version)) {
+      violations.push({
+        code: 'PHASE11_GATE_PREDECESSOR_MISSING',
+        version,
+        classification: 'PHASE11_PREDECESSOR',
+        reason: 'Required Phase 11 predecessor migration is missing from ledger',
+      });
+    }
   }
 
+  // Validate each migration in ledger
   for (const version of byVersion.keys()) {
-    if (version === STAGING_ONLY_VERSION) {
-      // Two sub-cases for version 37:
-      //   retired sentinel  → name='retired_staging_only_canary' AND statements is an empty array
-      //   anything else     → real migration content that must never be in production (HARD STOP)
-      const row = byVersion.get(version);
-      const isRetiredSentinel = row.name === STAGING_ONLY_RETIRED_NAME
+    const row = byVersion.get(version);
+    const classification = classifyMigration(version, policyData);
+
+    if (version === policyData.stagingOnlySentinelVersion) {
+      // Special handling for migration 37:
+      //   retired sentinel  → name='retired_staging_only_canary' AND statements is empty
+      //   real migration    → must never appear in production (HARD STOP)
+      const isRetiredSentinel = row.name === policyData.stagingOnlySentinelName
         && Array.isArray(row.statements)
         && row.statements.length === 0;
+      
       if (!isRetiredSentinel) {
-        violations.push('PHASE11_GATE_STAGING_ONLY_37_PRESENT');
+        violations.push({
+          code: 'PHASE11_GATE_STAGING_ONLY_37_PRESENT',
+          version,
+          classification: 'STAGING_ONLY',
+          reason: 'Migration 37 (staging-only) cannot appear in production; must be retired with sentinel marker',
+        });
       }
-    } else if (version > LAST_PREDECESSOR_VERSION && !approvedMigrations.some((migration) => migration.version === version)) {
-      violations.push('PHASE11_GATE_UNEXPECTED_POST_31_MIGRATION');
+      migrationDetails.push({ version, classification, status: isRetiredSentinel ? 'retired-sentinel' : 'present-stop' });
+    } else if (classification === 'PHASE11_PREDECESSOR') {
+      migrationDetails.push({ version, classification, status: 'required-present' });
+    } else if (classification === 'PHASE11_REQUIRED') {
+      migrationDetails.push({ version, classification, status: 'present' });
+    } else if (classification === 'LATER_PHASE_APPROVED') {
+      // Legitimate later-phase migration; do not block
+      const laterPhaseName = getLaterPhaseName(version, policyData);
+      migrationDetails.push({ version, classification, laterPhase: laterPhaseName, status: 'present' });
+    } else if (classification === 'STAGING_ONLY') {
+      // Already handled above for 37; others should not exist
+      violations.push({
+        code: 'PHASE11_GATE_STAGING_ONLY_PRESENT',
+        version,
+        classification,
+        reason: 'Staging-only migration present in production',
+      });
+    } else if (classification === 'UNKNOWN') {
+      // Unknown migration: unknown version number, not in policy, not staged-only
+      violations.push({
+        code: 'PHASE11_GATE_UNKNOWN_PRODUCTION_MIGRATION',
+        version,
+        classification,
+        reason: 'Unknown production migration not classified in migration policy',
+      });
+      migrationDetails.push({ version, classification, status: 'unknown' });
     }
   }
 
-  const states = approvedMigrations.map((migration) => {
+  // Validate Phase 11 required migrations (checksum, status)
+  const phase11States = phase11Required.map((migration) => {
     const row = byVersion.get(migration.version);
-    if (!row) return { version: migration.version, status: 'pending' };
-    if (!ledgerStatementsMatch(row, migration)) {
-      violations.push('PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH');
-      return { version: migration.version, status: 'checksum-mismatch' };
+    if (!row) {
+      return { version: migration.version, classification: 'PHASE11_REQUIRED', status: 'pending' };
     }
-    return { version: migration.version, status: 'applied' };
+    if (!ledgerStatementsMatch(row, migration)) {
+      violations.push({
+        code: 'PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH',
+        version: migration.version,
+        classification: 'PHASE11_REQUIRED',
+        reason: 'Phase 11 migration ledger entry does not match approved source file',
+      });
+      return { version: migration.version, classification: 'PHASE11_REQUIRED', status: 'checksum-mismatch' };
+    }
+    return { version: migration.version, classification: 'PHASE11_REQUIRED', status: 'applied' };
   });
 
-  // Determine the 37 status for the ledger report.
-  // absent        → 37 not in ledger (expected clean state before remediation)
-  // retired       → sentinel present; 37 treated as permanently retired, NOT a violation
-  // present-stop  → real statements present; HARD STOP
-  let stagingOnly;
-  if (!byVersion.has(STAGING_ONLY_VERSION)) {
-    stagingOnly = 'absent';
-  } else {
-    const row = byVersion.get(STAGING_ONLY_VERSION);
-    const isRetiredSentinel = row.name === STAGING_ONLY_RETIRED_NAME
-      && Array.isArray(row.statements)
-      && row.statements.length === 0;
-    stagingOnly = isRetiredSentinel ? 'retired' : 'present-stop';
-  }
+  // Enforce sequential ordering of Phase 11 core migrations (35→36→38→39→40)
+  const phase11VersionOrder = policyData.phase11Required;
+  for (let i = 1; i < phase11VersionOrder.length; i++) {
+    const prevVersion = phase11VersionOrder[i - 1];
+    const currVersion = phase11VersionOrder[i];
+    const prevState = phase11States[i - 1];
+    const currState = phase11States[i];
 
-  const migration35 = states[0];
-  const migration36 = states[1];
-  const migration38 = states[2];
-  const migration39 = states[3];
-  const migration40 = states[4];
-
-  // Enforce sequential ordering: 36 requires 35, 38 requires 36, 39 requires 38, 40 requires 39
-  if (migration36.status === 'applied' && migration35.status !== 'applied') {
-    violations.push('PHASE11_GATE_ORDERING_INVALID');
-  }
-  if (migration38.status === 'applied' && migration36.status !== 'applied') {
-    violations.push('PHASE11_GATE_ORDERING_INVALID');
-  }
-  if (migration39.status === 'applied' && migration38.status !== 'applied') {
-    violations.push('PHASE11_GATE_ORDERING_INVALID');
-  }
-  if (migration40.status === 'applied' && migration39.status !== 'applied') {
-    violations.push('PHASE11_GATE_ORDERING_INVALID');
-  }
-
-  const pending = [];
-  if (migration35.status === 'pending') pending.push(approvedMigrations[0]);
-  if (migration36.status === 'pending') {
-    if (migration35.status !== 'applied' && migration35.status !== 'pending') {
-      violations.push('PHASE11_GATE_ORDERING_INVALID');
+    if (currState.status === 'applied' && prevState.status !== 'applied') {
+      violations.push({
+        code: 'PHASE11_GATE_ORDERING_INVALID',
+        version: currVersion,
+        classification: 'PHASE11_REQUIRED',
+        reason: `Migration ${currVersion} requires prior migration ${prevVersion} to be applied first`,
+      });
     }
-    pending.push(approvedMigrations[1]);
-  }
-  if (migration38.status === 'pending') {
-    if (migration36.status !== 'applied' && migration36.status !== 'pending') {
-      violations.push('PHASE11_GATE_ORDERING_INVALID');
-    }
-    pending.push(approvedMigrations[2]);
-  }
-  if (migration39.status === 'pending') {
-    if (migration38.status !== 'applied' && migration38.status !== 'pending') {
-      violations.push('PHASE11_GATE_ORDERING_INVALID');
-    }
-    pending.push(approvedMigrations[3]);
-  }
-  if (migration40.status === 'pending') {
-    if (migration39.status !== 'applied' && migration39.status !== 'pending') {
-      violations.push('PHASE11_GATE_ORDERING_INVALID');
-    }
-    pending.push(approvedMigrations[4]);
   }
 
   return Object.freeze({
-    states: Object.freeze([...states, { version: STAGING_ONLY_VERSION, status: stagingOnly }]),
-    pending: Object.freeze(pending),
-    violations: Object.freeze([...new Set(violations)]),
+    byVersion,
+    migrationDetails: Object.freeze(migrationDetails),
+    phase11States: Object.freeze(phase11States),
+    violations: Object.freeze(violations),
+    hasViolations: violations.length > 0,
   });
 }
 
@@ -464,7 +484,16 @@ async function applyOneMigration(client, migration) {
 }
 
 function writeLedgerReport(write, report) {
-  for (const state of report.states) write(`PHASE11_LEDGER ${state.version} ${state.status}`);
+  // Write ledger state summary
+  for (const detail of report.migrationDetails) {
+    write(`PHASE11_LEDGER ${detail.version} ${detail.status}`);
+  }
+  
+  // Write violations with full context
+  for (const violation of report.violations) {
+    const detail = `[${violation.classification}] ${violation.reason}`;
+    write(`PHASE11_VIOLATION ${violation.code} version=${violation.version} detail="${detail}"`);
+  }
 }
 
 function describeMigrations(write) {
@@ -750,6 +779,9 @@ export async function runPhase11ProductionMigrationGate({
   if (!['inspect', 'apply'].includes(operation)) {
     throw new Phase11MigrationGateError('PHASE11_GATE_OPERATION_REQUIRED');
   }
+  
+  // Load the canonical migration policy
+  const policyData = await loadMigrationPolicy(root);
   const migrations = await loadApprovedMigrations(root);
   const target = assertProductionTarget(environment);
 
@@ -771,7 +803,7 @@ export async function runPhase11ProductionMigrationGate({
     await client.connect();
     connected = true;
     stage = 'ledger-read';
-    let report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+    let report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations, policyData);
     stage = 'ledger-evaluate';
     writeLedgerReport(write, report);
     if (report.violations.length || operation === 'inspect') {
@@ -782,7 +814,7 @@ export async function runPhase11ProductionMigrationGate({
     await client.query(ADVISORY_LOCK_SQL);
     try {
       stage = 'ledger-read';
-      report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+      report = evaluateProductionLedger(await readLedgerReadOnly(client), migrations, policyData);
       stage = 'ledger-evaluate';
       writeLedgerReport(write, report);
       if (report.violations.length) {
@@ -794,10 +826,10 @@ export async function runPhase11ProductionMigrationGate({
         stage = 'migration-apply';
         await applyOneMigration(client, migration);
         stage = 'ledger-read';
-        const verified = evaluateProductionLedger(await readLedgerReadOnly(client), migrations);
+        const verified = evaluateProductionLedger(await readLedgerReadOnly(client), migrations, policyData);
         stage = 'ledger-evaluate';
         writeLedgerReport(write, verified);
-        if (verified.violations.length || !verified.states.some((state) => state.version === migration.version && state.status === 'applied')) {
+        if (verified.violations.length || !verified.phase11States.some((state) => state.version === migration.version && state.status === 'applied')) {
           return Object.freeze({ report: verified, applied: Object.freeze(applied), stopped: true });
         }
         applied.push(migration.version);
