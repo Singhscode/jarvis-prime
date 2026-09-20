@@ -901,6 +901,11 @@ async function main() {
     // In inspect mode: result.stopped = true means violations (real issues) → exit 1.
     //                   pending migrations (35-40) alone are not violations → exit 0.
     if (result.report.violations.length > 0) {
+      // Emit exact violation codes for diagnostic purposes
+      for (const violationCode of result.report.violations) {
+        console.error(`PHASE11_VIOLATION ${violationCode}`);
+      }
+      console.error(`PHASE11_VIOLATION_COUNT ${result.report.violations.length}`);
       console.error('PHASE11_GATE_STOPPED');
       process.exitCode = 1;
     }
