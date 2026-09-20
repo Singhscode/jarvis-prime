@@ -39,107 +39,87 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Run read-only verification (using psql)
+      - name: Run exact read-only ledger verification
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
-          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
-          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
-          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
         run: |
-          # Parse PostgreSQL connection string
-          # Format: postgresql://user:password@host:port/database?sslmode=require
+          set -euo pipefail
+
           DB_URL="$PHASE11_PRODUCTION_DATABASE_URL"
-          
-          # Extract components
-          DB_USERPASS=$(echo "$DB_URL" | sed -n 's|postgresql://\([^@]*\)@.*|\1|p')
-          DB_HOST=$(echo "$DB_URL" | sed -n 's|.*@\([^:/]*\).*|\1|p')
-          DB_PORT=$(echo "$DB_URL" | sed -n 's|.*:\([0-9]*\)/.*|\1|p')
-          DB_NAME=$(echo "$DB_URL" | sed -n 's|.*/\([^?]*\).*|\1|p')
-          
-          DB_USER=$(echo "$DB_USERPASS" | cut -d: -f1)
-          DB_PASS=$(echo "$DB_USERPASS" | cut -d: -f2-)
-          
-          # Defaults
-          DB_PORT=${DB_PORT:-5432}
-          DB_NAME=${DB_NAME:-postgres}
-          
-          # Write CA cert
-          mkdir -p /tmp/pgsql
-          echo "$PHASE11_PRODUCTION_DATABASE_CA_PEM" > /tmp/pgsql/ca.crt
-          chmod 600 /tmp/pgsql/ca.crt
-          
-          echo "=== CONNECTION INFO ==="
-          echo "Host: $DB_HOST"
-          echo "Port: $DB_PORT"
-          echo "Database: $DB_NAME"
-          echo "User: $DB_USER"
-          
-          echo ""
-          echo "=== LEDGER CHECK ==="
-          LEDGER_COUNT=$(PGPASSWORD="$DB_PASS" psql \
-            -h "$DB_HOST" -p "$DB_PORT" \
-            -U "$DB_USER" -d "$DB_NAME" \
-            -c "SELECT COUNT(*) FROM supabase_migrations.schema_migrations WHERE version >= '20260810000023' AND version <= '20260810000031';" \
-            -t -A 2>&1 | grep -oE '^[0-9]+$' || echo "ERROR")
-          
-          echo "LEDGER_VERSIONS_FOUND: $LEDGER_COUNT"
-          
-          if [ "$LEDGER_COUNT" = "ERROR" ]; then
-            echo "ERROR: Could not query ledger"
+          LEDGER_QUERY_FILE=/tmp/phase11_exact_ledger.sql
+          LEDGER_RESULT_FILE=/tmp/phase11_exact_ledger.csv
+          IDENTITY_QUERY_FILE=/tmp/phase11_database_identity.sql
+          IDENTITY_RESULT_FILE=/tmp/phase11_database_identity.csv
+          ERROR_FILE=/tmp/phase11_psql_error.log
+          trap 'rm -f "$LEDGER_QUERY_FILE" "$LEDGER_RESULT_FILE" "$IDENTITY_QUERY_FILE" "$IDENTITY_RESULT_FILE" "$ERROR_FILE"' EXIT
+
+          cat > "$LEDGER_QUERY_FILE" <<'SQL_EOF'
+          SELECT version, name, statements
+          FROM supabase_migrations.schema_migrations
+          WHERE version IN (
+            '20260810000023',
+            '20260810000024',
+            '20260810000025',
+            '20260810000026',
+            '20260810000027',
+            '20260810000028',
+            '20260810000029',
+            '20260810000030',
+            '20260810000031'
+          )
+          ORDER BY version;
+          SQL_EOF
+
+          cat > "$IDENTITY_QUERY_FILE" <<'SQL_EOF'
+          SELECT current_database(), inet_server_addr(), inet_server_port();
+          SQL_EOF
+
+          # Execute the exact row query, but retain its CSV result privately so
+          # names/statements are never printed. No write-capable SQL is used.
+          if ! psql --no-psqlrc --quiet --tuples-only --csv "$DB_URL" \
+            --file "$LEDGER_QUERY_FILE" > "$LEDGER_RESULT_FILE" 2> "$ERROR_FILE"; then
             exit 1
           fi
-          
-          echo ""
-          echo "=== SCHEMA OBJECTS ==="
-          
-          # Create verification query script
-          cat > /tmp/verify_objects.sql << 'SQL_EOF'
-          \set ON_ERROR_STOP on
-          \pset tuples_only on
-          \pset format unaligned
-          
-          -- 23
-          SELECT CASE WHEN COUNT(*) = 2 THEN 'MIGRATION_23_TABLES: PRESENT' ELSE 'MIGRATION_23_TABLES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('automation_recipes', 'automation_work_items');
-          
-          -- 24
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_24_AUTOMATION_SCHEDULES: PRESENT' ELSE 'MIGRATION_24_AUTOMATION_SCHEDULES: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_schedules';
-          
-          -- 25
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_25_AUTOMATION_RESERVE_WORK: PRESENT' ELSE 'MIGRATION_25_AUTOMATION_RESERVE_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_reserve_work';
-          
-          -- 26
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: PRESENT' ELSE 'MIGRATION_26_AUTOMATION_RECIPE_ACTIVATIONS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_recipe_activations';
-          
-          -- 27
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: PRESENT' ELSE 'MIGRATION_27_AUTOMATION_SET_EMPLOYEE_RUN_PAUSE: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_set_employee_run_pause';
-          
-          -- 28
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: PRESENT' ELSE 'MIGRATION_28_IDEMPOTENCY_KEY_COLUMN: ABSENT' END FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'automation_policy_decisions' AND column_name = 'idempotency_key';
-          
-          -- 29
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: PRESENT' ELSE 'MIGRATION_29_AUTOMATION_PROVIDER_ACTION_CONFIGS: ABSENT' END FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'automation_provider_action_configs';
-          
-          -- 30
-          SELECT CASE WHEN COUNT(*) = 1 THEN 'MIGRATION_30_AUTOMATION_CLAIM_WORK: PRESENT' ELSE 'MIGRATION_30_AUTOMATION_CLAIM_WORK: ABSENT' END FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_claim_work';
-          
-          -- 31
-          SELECT 'MIGRATION_31_OPERATIONAL_HEALTH: ' || CASE WHEN (SELECT COUNT(*) FROM information_schema.routines WHERE routine_schema = 'public' AND routine_name = 'automation_get_owner_operational_health') = 1 THEN 'PRESENT' ELSE 'ABSENT' END;
-          SQL_EOF
-          
-          PGPASSWORD="$DB_PASS" psql \
-            -h "$DB_HOST" -p "$DB_PORT" \
-            -U "$DB_USER" -d "$DB_NAME" \
-            -f /tmp/verify_objects.sql 2>&1
-          
-          echo ""
-          echo "=== FINAL CLASSIFICATION ==="
-          if [ "$LEDGER_COUNT" = "0" ]; then
-            echo "FINAL_CLASSIFICATION: APPLIED_BUT_LEDGER_MISSING (tentative)"
-            echo "Note: Schema object query results above will confirm final classification."
-          else
-            echo "FINAL_CLASSIFICATION: MIXED"
-            echo "Ledger has $LEDGER_COUNT rows; see schema objects above."
+
+          # Execute the database identity query against the same protected URL.
+          if ! psql --no-psqlrc --quiet --tuples-only --csv "$DB_URL" \
+            --file "$IDENTITY_QUERY_FILE" > "$IDENTITY_RESULT_FILE" 2> "$ERROR_FILE"; then
+            exit 1
           fi
 
-      - name: "Workflow complete"
-        run: echo "Read-only verification complete. Check output above for FINAL_CLASSIFICATION."
+          python3 - "$LEDGER_RESULT_FILE" "$IDENTITY_RESULT_FILE" <<'PY_EOF'
+          import csv
+          import sys
+
+          ledger_path, identity_path = sys.argv[1:]
+          canonical = [
+              '20260810000023', '20260810000024', '20260810000025',
+              '20260810000026', '20260810000027', '20260810000028',
+              '20260810000029', '20260810000030', '20260810000031',
+          ]
+
+          with open(ledger_path, newline='', encoding='utf-8') as handle:
+              ledger_rows = list(csv.reader(handle))
+          found_versions = [row[0] for row in ledger_rows if row and row[0]]
+          missing_versions = [version for version in canonical if version not in set(found_versions)]
+
+          for version in found_versions:
+              print(version)
+          print(f'EXACT_COUNT_FOUND: {len(found_versions)}')
+
+          with open(identity_path, newline='', encoding='utf-8') as handle:
+              identity_rows = list(csv.reader(handle))
+          if len(identity_rows) != 1 or len(identity_rows[0]) != 3:
+              raise SystemExit(1)
+          database_name, server_address, server_port = identity_rows[0]
+          print(f'DATABASE_NAME: {database_name}')
+          print(f'SERVER_ADDRESS: {server_address}')
+          print(f'SERVER_PORT: {server_port}')
+
+          if missing_versions:
+              print('MISSING_CANONICAL_VERSIONS:')
+              for version in missing_versions:
+                  print(version)
+          else:
+              print('MISSING_CANONICAL_VERSIONS: NONE')
+          PY_EOF
