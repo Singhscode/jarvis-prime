@@ -127,6 +127,7 @@ jobs:
           if [[ -z "${{ inputs.database_url_b64 }}" ]]; then
             # Direct workflow_dispatch call: use the Environment secret directly
             echo "database_url_source=environment-secret"
+            echo "database_url=" >> "${GITHUB_OUTPUT}"
             echo "Using Environment secret directly (workflow_dispatch caller)"
           else
             # workflow_call from dispatch caller: decode the base64 input
