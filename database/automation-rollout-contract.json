@@ -3,7 +3,7 @@
   "workerCommand": "npm run worker:automation --workspace=apps/api",
   "compatibility": {
     "registryVersion": "AUTOMATION_REGISTRY_V1",
-    "workerVersion": "AUTOMATION_WORKER_V1"
+    "workerVersion": "AUTOMATION_WORKER_V2"
   },
   "migrations": [
     { "file": "20260810000023_add_automation_control_plane.sql", "sha256": "efb966cc2d39e0b269658acfdb8f1b659a1f267bc55119163b533c0d17378c65" },

@@ -48,7 +48,7 @@ export async function verifyAutomationRolloutContract(root = defaultRoot) {
 
   if (contract.contractVersion !== 1) fail(errors, 'contractVersion must be 1');
   if (contract.workerCommand !== 'npm run worker:automation --workspace=apps/api') fail(errors, 'workerCommand is not the approved separate-worker command');
-  if (contract.compatibility?.registryVersion !== 'AUTOMATION_REGISTRY_V1' || contract.compatibility?.workerVersion !== 'AUTOMATION_WORKER_V1') {
+  if (contract.compatibility?.registryVersion !== 'AUTOMATION_REGISTRY_V1' || contract.compatibility?.workerVersion !== 'AUTOMATION_WORKER_V2') {
     fail(errors, 'compatibility versions do not match the durable worker contract');
   }
   const manifestFiles = Array.isArray(contract.migrations) ? contract.migrations.map(({ file }) => file) : [];
