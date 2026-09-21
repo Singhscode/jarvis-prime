@@ -181,6 +181,47 @@ test('production worker deployment requires trusted main source before Azure OID
   assert.doesNotMatch(stagingWorkflow, /if: github\.ref == 'refs\/heads\/main'/);
 });
 
+test('production worker baseline capture writes only scalar env values (regression: JSON in $GITHUB_ENV)', async () => {
+  const productionWorkflow = await readFile(
+    path.join(repositoryRoot, '.github', 'workflows', '08-deploy-aca-production.yml'),
+    'utf8',
+  );
+
+  // Isolate the "Capture ready worker baseline" step so we only reason about its script.
+  const captureStepMatch = productionWorkflow.match(
+    /- name: Capture ready worker baseline[\s\S]*?(?=\n {6}- name: |\n {4}[a-zA-Z_-]+:)/,
+  );
+  assert.ok(captureStepMatch, 'production workflow must contain "Capture ready worker baseline" step');
+  const captureStep = captureStepMatch[0];
+
+  // The step defines a show_app() wrapper around `az containerapp show`. Because callers
+  // append `--query ... -o tsv` to select scalar fields, the wrapper MUST forward its
+  // arguments; otherwise `az` returns the full resource JSON and the later
+  // `$GITHUB_ENV` writes corrupt the file with brace/newline content.
+  assert.match(
+    captureStep,
+    /show_app\(\)\s*\{\s*\n\s*az containerapp show --name "\$CONTAINER_APP_NAME" --resource-group "\$RESOURCE_GROUP" "\$@"\s*\n\s*\}/,
+    'show_app() must forward "$@" so --query/-o tsv reach az',
+  );
+
+  // Every value written to $GITHUB_ENV in this step must come from a scalar tsv query;
+  // block accidental writes of unbounded JSON. Extract the block and assert its shape.
+  const envBlockMatch = captureStep.match(/\{\s*([^{}]*?)\}\s*>>\s*"\$GITHUB_ENV"/);
+  assert.ok(envBlockMatch, 'baseline capture step must append to $GITHUB_ENV via a { ... } block');
+  const envBlock = envBlockMatch[1];
+
+  // Only allow: echo "KEY=$var" or printf '%s=%s\n' KEY "$var"; block bare `az ...` or object serializers.
+  for (const line of envBlock.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    assert.match(
+      trimmed,
+      /^(?:echo "[A-Z_][A-Z0-9_]*=\$[a-zA-Z_][a-zA-Z0-9_]*"|printf '%s=%s\\n' [A-Z_][A-Z0-9_]* "\$[a-zA-Z_][a-zA-Z0-9_]*")$/,
+      `$GITHUB_ENV writes must be scalar key=value from a shell variable, got: ${trimmed}`,
+    );
+  }
+});
+
 test('first production worker image bootstrap is manual, provenance-gated, and ACR-push-only', async () => {
   const bootstrapWorkflow = await readFile(
     path.join(repositoryRoot, '.github', 'workflows', '10-bootstrap-aca-production-image.yml'),
