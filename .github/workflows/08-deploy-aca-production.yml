@@ -131,7 +131,7 @@ jobs:
         run: |
           set -euo pipefail
           show_app() {
-            az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP"
+            az containerapp show --name "$CONTAINER_APP_NAME" --resource-group "$RESOURCE_GROUP" "$@"
           }
           baseline_revision="$(show_app --query 'properties.latestRevisionName' -o tsv)"
           baseline_ready_revision="$(show_app --query 'properties.latestReadyRevisionName' -o tsv)"
