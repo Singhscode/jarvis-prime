@@ -1,0 +1,202 @@
+name: Phase 12 Analytics Production Migration
+
+# Manual, repository-owned production migration path for the Phase 12 Analytics
+# corrective migration 20260810000043_fix_analytics_rpc_bigint_cast.sql.
+#
+# This workflow is deliberately separate from "Phase 11 Production Migration Gate".
+# It does NOT widen, reuse, or re-verify the immutable Phase 11 apply allowlist
+# (35, 36, 38, 39, 40). It can only ever execute the migrations pinned in
+# database/scripts/phase12-analytics-migration-gate.mjs — today exactly one:
+# 20260810000043, content-pinned by SHA-256.
+#
+# It never invokes `supabase db push`, never runs operator-supplied SQL, never
+# deploys an artefact, never provisions infrastructure, never changes secrets or
+# identities, and never activates a provider.
+#
+# Production database access comes only from the protected
+# `jarvis-prime-api / production` Environment, which requires reviewer approval
+# before any job step runs. The PHASE11_PRODUCTION_* secret/variable names are
+# reused verbatim because they identify the production *target* rather than a
+# phase, so this workflow introduces no new secret and grants no new access.
+#
+# Serialisation: the Phase 12 runner acquires the SAME PostgreSQL advisory lock as
+# the Phase 11 gate, so two production migration runners can never mutate
+# supabase_migrations.schema_migrations concurrently even if both workflows run at
+# once. The workflow-level concurrency group below is an additional guard and is
+# intentionally distinct so that adding it required no change to the Phase 11
+# workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Read-only inspection, the explicit Phase 12 apply, or post-apply ledger verification.
+        required: true
+        type: choice
+        options:
+          - inspect
+          - apply
+          - verify
+      confirmation:
+        description: Must match the requested operation exactly.
+        required: true
+        type: choice
+        options:
+          - INSPECT_ONLY
+          - APPLY_PHASE12_ANALYTICS_43
+      db_mode:
+        description: 'Database connection mode: direct or session-pooler (for IPv4-only GitHub Actions runners).'
+        required: true
+        type: choice
+        options:
+          - direct
+          - session-pooler
+      git_sha:
+        description: Exact reviewed main-branch SHA containing this workflow and runner (40 lowercase hex characters).
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase12-analytics-production-migration
+  cancel-in-progress: false
+
+jobs:
+  phase12-analytics-migration:
+    name: phase12-analytics-migration
+    runs-on: ubuntu-latest
+    # Protected reviewers and the runtime-only secret/variable live here. No
+    # production value is committed to this workflow.
+    environment: jarvis-prime-api / production
+
+    steps:
+      - name: Validate operation, confirmation token, and reviewed SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "Refusing to run outside main; got ${GITHUB_REF}." >&2
+            exit 1
+          fi
+          if [[ ! "${{ inputs.git_sha }}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "git_sha must be a full 40-character lowercase SHA." >&2
+            exit 1
+          fi
+          # Fail closed on any operation/confirmation pair that is not explicitly
+          # allowed. The apply path requires its own distinct token so an operator
+          # cannot reach a production mutation with a read-only confirmation.
+          case "${{ inputs.operation }}:${{ inputs.confirmation }}" in
+            inspect:INSPECT_ONLY|verify:INSPECT_ONLY|apply:APPLY_PHASE12_ANALYTICS_43) ;;
+            *) echo "Operation and confirmation do not match." >&2; exit 1 ;;
+          esac
+
+      - name: Check out the exact reviewed main-branch SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirm requested SHA is reachable from main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${{ inputs.git_sha }}" origin/main
+          [[ "$(git rev-parse HEAD)" == "${{ inputs.git_sha }}" ]]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Print immutable Phase 12 migration boundary
+        run: node database/scripts/phase12-analytics-migration-gate.mjs --describe
+
+      - name: Diagnostic - verify Environment context
+        shell: bash
+        env:
+          DATABASE_URL_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL != '' && 'yes' || 'no' }}
+          DATABASE_CA_PROVIDED: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM != '' && 'yes' || 'no' }}
+          PROJECT_REF_PROVIDED: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF != '' && 'yes' || 'no' }}
+        run: |
+          echo "=== Environment Context Diagnostic ==="
+          echo "Job Environment: jarvis-prime-api / production"
+          echo "Production database URL provided: ${DATABASE_URL_PROVIDED}"
+          echo "Production database CA provided: ${DATABASE_CA_PROVIDED}"
+          echo "Production project ref provided: ${PROJECT_REF_PROVIDED}"
+          echo "Requested operation: ${{ inputs.operation }}"
+          echo "Requested db_mode: ${{ inputs.db_mode }}"
+          echo "=== End Diagnostic ==="
+
+      # Mandatory read-only preflight, for every operation including apply.
+      # The runner opens BEGIN READ ONLY before reading the ledger and takes no
+      # advisory lock in inspect mode. Exit code is authoritative: non-zero means
+      # at least one violation, so no unknown future violation code can slip past.
+      - name: Read-only production ledger preflight
+        id: preflight
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
+          PHASE12_ANALYTICS_CONFIRM: INSPECT_ONLY
+        run: |
+          set -euo pipefail
+          if [[ -z "${PHASE11_PRODUCTION_DATABASE_URL}" ]]; then
+            echo "ERROR: production database URL is empty" >&2
+            exit 1
+          fi
+          if node database/scripts/phase12-analytics-migration-gate.mjs --inspect; then
+            echo "violations_detected=false" >> "$GITHUB_OUTPUT"
+            echo "Preflight clean — Phase 12 gate exited 0, zero violations."
+          else
+            echo "violations_detected=true" >> "$GITHUB_OUTPUT"
+            echo "Preflight failed — Phase 12 gate exited non-zero, violations detected." >&2
+            exit 1
+          fi
+
+      # Applies ONLY the hash-pinned Phase 12 apply set (migration 43). Runs solely
+      # when apply was requested with its distinct token AND the preflight was clean.
+      # Idempotent: if 43 is already recorded, the pending set is empty and no write
+      # occurs.
+      - name: Apply Phase 12 Analytics migration 43
+        if: ${{ inputs.operation == 'apply' && steps.preflight.outputs.violations_detected == 'false' }}
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
+          PHASE12_ANALYTICS_CONFIRM: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          node database/scripts/phase12-analytics-migration-gate.mjs --apply
+
+      # Independent post-apply verification in a fresh process: confirms migration
+      # 43 exists in the ledger with the expected name and byte-exact statements,
+      # and that no unclassified migration is present. This does NOT use the
+      # Phase 11 phase11States verification path.
+      - name: Read-only Phase 12 post-apply ledger verification
+        if: ${{ inputs.operation == 'apply' || inputs.operation == 'verify' }}
+        env:
+          PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
+          PHASE11_PRODUCTION_DATABASE_CA_PEM: ${{ secrets.PHASE11_PRODUCTION_DATABASE_CA_PEM }}
+          PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: ${{ inputs.db_mode }}
+          PHASE12_ANALYTICS_CONFIRM: INSPECT_ONLY
+        run: |
+          set -euo pipefail
+          node database/scripts/phase12-analytics-migration-gate.mjs --verify
+
+      - name: Report constrained boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Phase 12 Analytics migration operation completed: ${{ inputs.operation }}"
+          echo "Only the hash-pinned Phase 12 apply set is reachable from this workflow."
+          echo "Phase 11 allowlist 35/36/38/39/40 was neither executed nor modified."
+          echo "No supabase db push, arbitrary SQL, deployment, provisioning, or secret change was performed."
