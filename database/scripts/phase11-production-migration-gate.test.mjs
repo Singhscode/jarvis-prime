@@ -19,13 +19,17 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
+  ADVISORY_LOCK_SQL,
   assertProductionTarget,
   evaluateProductionLedger,
   formatViolation,
+  LEDGER_INSERT_SQL,
+  LEDGER_SELECT_SQL,
   loadApprovedMigrations,
   Phase11MigrationGateError,
   PHASE11_PRODUCTION_MIGRATIONS,
   PHASE11_STAGING_ONLY_MIGRATION,
+  runPhase11ProductionMigrationGate,
   STAGING_ONLY_RETIRED_NAME,
 } from './phase11-production-migration-gate.mjs';
 import {
@@ -474,5 +478,237 @@ test('Policy structure: no overlap between historical and phase11 predecessors',
       !policyData.phase11Predecessors.includes(version),
       `Version ${version} appears in both historical and phase11Predecessors`,
     );
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PART 7 — PENDING DISCOVERY AND THE APPLY DRIVER
+//
+// Regression coverage for the latent defect where the apply driver iterated
+// `report.pending` while evaluateProductionLedger never produced that field,
+// making `--apply` throw before it could execute anything.
+//
+// Every test here uses an in-memory stub client. No production credential, real
+// connection string, or CA is used; the fixtures above are structurally valid
+// fakes that only satisfy assertProductionTarget's shape checks.
+// ─────────────────────────────────────────────────────────────────
+
+const PHASE11_APPLY_ORDER = ['20260810000035', '20260810000036', '20260810000038', '20260810000039', '20260810000040'];
+
+function phase11ProductionEnvironment(overrides = {}) {
+  return {
+    PHASE11_PRODUCTION_DATABASE_URL: directUrl,
+    PHASE11_PRODUCTION_PROJECT_REF: projectRef,
+    PHASE11_PRODUCTION_DB_MODE: 'direct',
+    ...overrides,
+  };
+}
+
+/** Ledger containing every Phase 11 predecessor and nothing else. */
+function predecessorOnlyRows() {
+  return policyData.phase11Predecessors.map((version) => ({
+    version,
+    name: `migration_${version}`,
+    statements: ['BEGIN', 'COMMIT'],
+  }));
+}
+
+function appliedRow(migration) {
+  return { version: migration.version, name: migration.name, statements: [...migration.statements] };
+}
+
+function createStubClient({ rows = [] } = {}) {
+  const ledger = rows.map((row) => ({ ...row }));
+  const queries = [];
+  return {
+    queries,
+    ledger,
+    get inserts() {
+      return queries.filter((entry) => entry.sql === LEDGER_INSERT_SQL);
+    },
+    get lockAcquired() {
+      return queries.some((entry) => entry.sql === ADVISORY_LOCK_SQL);
+    },
+    async connect() {},
+    async end() {},
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (sql === LEDGER_SELECT_SQL) {
+        return { rows: ledger.map((row) => ({ ...row, statements: [...row.statements] })) };
+      }
+      if (sql === LEDGER_INSERT_SQL) {
+        ledger.push({ version: params[0], name: params[1], statements: [...params[2]] });
+        return { rows: [] };
+      }
+      return { rows: [{}] };
+    },
+  };
+}
+
+test('Pending: report exposes a pending collection (regression — was undefined)', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const report = evaluateProductionLedger(predecessorOnlyRows(), approvedMigrations, policyData);
+  assert(Array.isArray(report.pending), 'report.pending must be an array, not undefined');
+});
+
+test('Pending: all five Phase 11 migrations pending, in allowlist order', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const report = evaluateProductionLedger(predecessorOnlyRows(), approvedMigrations, policyData);
+  assert.equal(report.violations.length, 0);
+  assert.deepEqual(report.pending.map((migration) => migration.version), PHASE11_APPLY_ORDER);
+});
+
+test('Pending: already-applied migrations are excluded', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const rows = [...predecessorOnlyRows(), appliedRow(approvedMigrations[0]), appliedRow(approvedMigrations[1])];
+  const report = evaluateProductionLedger(rows, approvedMigrations, policyData);
+  assert.equal(report.violations.length, 0);
+  assert.deepEqual(report.pending.map((migration) => migration.version), PHASE11_APPLY_ORDER.slice(2));
+});
+
+test('Pending: empty when every Phase 11 migration is applied', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const rows = [...predecessorOnlyRows(), ...approvedMigrations.map(appliedRow)];
+  const report = evaluateProductionLedger(rows, approvedMigrations, policyData);
+  assert.equal(report.violations.length, 0);
+  assert.equal(report.pending.length, 0);
+});
+
+test('Pending: entries are full migration objects carrying statements to execute', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const report = evaluateProductionLedger(predecessorOnlyRows(), approvedMigrations, policyData);
+  for (const migration of report.pending) {
+    assert(Array.isArray(migration.statements) && migration.statements.length > 1);
+    assert.equal(typeof migration.name, 'string');
+    assert.match(migration.sha256, /^[0-9a-f]{64}$/);
+  }
+});
+
+test('Apply driver: reaches applyOneMigration and applies 35 → 36 → 38 → 39 → 40 in order', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const client = createStubClient({ rows: predecessorOnlyRows() });
+  const result = await runPhase11ProductionMigrationGate({
+    operation: 'apply',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+
+  assert.equal(result.stopped, false);
+  assert.deepEqual(result.applied, PHASE11_APPLY_ORDER);
+  assert.equal(client.inserts.length, 5);
+  assert.deepEqual(client.inserts.map((insert) => insert.params[0]), PHASE11_APPLY_ORDER);
+
+  // Proof the migration bodies ran, not just the ledger rows.
+  const executed = client.queries.map((entry) => entry.sql);
+  for (const statement of approvedMigrations[0].statements.slice(0, -1)) {
+    assert(executed.includes(statement), `Expected statement to be executed: ${statement.slice(0, 60)}`);
+  }
+  assert(client.lockAcquired, 'apply must acquire the advisory lock');
+});
+
+test('Apply driver: each ledger insert commits with its migration (insert immediately precedes COMMIT)', async () => {
+  const client = createStubClient({ rows: predecessorOnlyRows() });
+  await runPhase11ProductionMigrationGate({
+    operation: 'apply',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+  const executed = client.queries.map((entry) => entry.sql);
+  for (let index = 0; index < executed.length; index += 1) {
+    if (executed[index] === LEDGER_INSERT_SQL) {
+      assert.equal(executed[index + 1], 'COMMIT', 'ledger insert must be the last statement before COMMIT');
+    }
+  }
+});
+
+test('Apply driver: no mutation when nothing is pending (read-only outcome)', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const rows = [...predecessorOnlyRows(), ...approvedMigrations.map(appliedRow)];
+  const client = createStubClient({ rows });
+  const result = await runPhase11ProductionMigrationGate({
+    operation: 'apply',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+
+  assert.equal(result.stopped, false);
+  assert.deepEqual(result.applied, []);
+  assert.equal(client.inserts.length, 0, 'an empty pending set must produce no ledger write');
+});
+
+test('Apply driver: no mutation when preflight reports violations', async () => {
+  const rows = [...predecessorOnlyRows(), { version: '20260810000099', name: 'mystery', statements: ['BEGIN', 'COMMIT'] }];
+  const client = createStubClient({ rows });
+  const result = await runPhase11ProductionMigrationGate({
+    operation: 'apply',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+
+  assert.equal(result.stopped, true);
+  assert.deepEqual(result.applied, []);
+  assert.equal(client.inserts.length, 0);
+  assert.equal(client.lockAcquired, false, 'a violating preflight must not take the advisory lock');
+});
+
+test('Apply driver: missing predecessor blocks apply with no mutation', async () => {
+  const rows = predecessorOnlyRows().slice(1);
+  const client = createStubClient({ rows });
+  const result = await runPhase11ProductionMigrationGate({
+    operation: 'apply',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+  assert.equal(result.stopped, true);
+  assert.equal(client.inserts.length, 0);
+  assert.equal(client.lockAcquired, false);
+});
+
+test('Inspect mode: read-only — no advisory lock, no write', async () => {
+  const client = createStubClient({ rows: predecessorOnlyRows() });
+  const result = await runPhase11ProductionMigrationGate({
+    operation: 'inspect',
+    environment: phase11ProductionEnvironment(),
+    clientFactory: async () => client,
+  });
+  assert.deepEqual(result.applied, []);
+  assert.equal(client.inserts.length, 0);
+  assert.equal(client.lockAcquired, false);
+  assert(client.queries.some((entry) => entry.sql === 'BEGIN READ ONLY'));
+});
+
+// ─────────────────────────────────────────────────────────────────
+// PART 8 — PHASE 11 BOUNDARY IS UNCHANGED
+//
+// These assertions pin the Phase 11 apply set so that adding a later-phase
+// migration path can never silently widen it.
+// ─────────────────────────────────────────────────────────────────
+
+test('Boundary: Phase 11 apply set is exactly 35, 36, 38, 39, 40', () => {
+  assert.deepEqual(PHASE11_PRODUCTION_MIGRATIONS.map((migration) => migration.version), PHASE11_APPLY_ORDER);
+});
+
+test('Boundary: Phase 11 apply set excludes migration 37 and every later-phase migration', () => {
+  const versions = new Set(PHASE11_PRODUCTION_MIGRATIONS.map((migration) => migration.version));
+  assert(!versions.has('20260810000037'), 'staging-only 37 must never be in the Phase 11 apply set');
+  for (const version of ['20260810000041', '20260810000042', '20260810000043']) {
+    assert(!versions.has(version), `later-phase migration ${version} must not be in the Phase 11 apply set`);
+  }
+  assert.equal(PHASE11_STAGING_ONLY_MIGRATION.version, '20260810000037');
+});
+
+test('Boundary: every Phase 11 apply-set entry remains content-pinned by SHA-256', () => {
+  for (const migration of PHASE11_PRODUCTION_MIGRATIONS) {
+    assert.match(migration.sha256, /^[0-9a-f]{64}$/);
+    assert(migration.file.startsWith(migration.version));
+  }
+});
+
+test('Boundary: Phase 11 evaluation still reports phase11States for its own set only', async () => {
+  const approvedMigrations = await loadApprovedMigrations();
+  const report = evaluateProductionLedger(predecessorOnlyRows(), approvedMigrations, policyData);
+  assert.deepEqual(report.phase11States.map((state) => state.version), PHASE11_APPLY_ORDER);
+  for (const state of report.phase11States) {
+    assert.equal(state.classification, 'PHASE11_REQUIRED');
   }
 });

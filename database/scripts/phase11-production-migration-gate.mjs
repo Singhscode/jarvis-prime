@@ -14,10 +14,15 @@ const migrationDirectory = path.join('database', 'supabase', 'migrations');
 // Load policy at module init to catch configuration errors early
 let gPolicyData = null;
 
-const ADVISORY_LOCK_SQL = "select pg_advisory_lock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
-const ADVISORY_UNLOCK_SQL = "select pg_advisory_unlock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
-const LEDGER_SELECT_SQL = 'select version, coalesce(name, \'\') as name, statements from supabase_migrations.schema_migrations order by version';
-const LEDGER_INSERT_SQL = 'insert into supabase_migrations.schema_migrations(version, name, statements) values ($1, $2, $3)';
+// Exported so that a separate, later-phase production migration runner (for
+// example the Phase 12 Analytics runner) serialises against the SAME advisory
+// lock. Sharing one lock key means no two production migration runners can ever
+// mutate supabase_migrations.schema_migrations concurrently, regardless of which
+// phase dispatched them.
+export const ADVISORY_LOCK_SQL = "select pg_advisory_lock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
+export const ADVISORY_UNLOCK_SQL = "select pg_advisory_unlock(hashtext('jarvis-prime:phase11-production-migration-gate'))";
+export const LEDGER_SELECT_SQL = 'select version, coalesce(name, \'\') as name, statements from supabase_migrations.schema_migrations order by version';
+export const LEDGER_INSERT_SQL = 'insert into supabase_migrations.schema_migrations(version, name, statements) values ($1, $2, $3)';
 
 // Sentinel written when retiring migration 37 from production: keeps the version
 // in the ledger so Supabase CLI sees it as already-applied, but replaces the
@@ -69,11 +74,11 @@ export class Phase11MigrationGateError extends Error {
   }
 }
 
-function sha256(value) {
+export function sha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-function migrationName(file, version) {
+export function migrationName(file, version) {
   return file.slice(version.length + 1, -'.sql'.length);
 }
 
@@ -163,11 +168,11 @@ export function splitSupabaseStatements(source) {
   return statements;
 }
 
-function assertTransactionBounded(migration) {
+export function assertTransactionBounded(migration, errorCode = 'PHASE11_GATE_INVALID_TRANSACTION_BOUNDARY') {
   const first = migration.statements.at(0) || '';
   const last = migration.statements.at(-1) || '';
   if (!/\bBEGIN\s*$/i.test(first) || !/^COMMIT\s*$/i.test(last)) {
-    throw new Phase11MigrationGateError('PHASE11_GATE_INVALID_TRANSACTION_BOUNDARY');
+    throw new Phase11MigrationGateError(errorCode);
   }
 }
 
@@ -281,7 +286,7 @@ export function assertProductionTarget(environment = process.env) {
   };
 }
 
-function ledgerStatementsMatch(row, migration) {
+export function ledgerStatementsMatch(row, migration) {
   return row.name === migration.name
     && Array.isArray(row.statements)
     && row.statements.length === migration.statements.length
@@ -422,16 +427,33 @@ export function evaluateProductionLedger(rows, migrations, policyData) {
     }
   }
 
+  // Pending delivery set for apply mode.
+  //
+  // Derived exclusively from the approved allowlist collection that the caller
+  // passed in (`migrations`), filtered down to versions absent from the ledger.
+  // Allowlist order is preserved, so apply executes 35 → 36 → 38 → 39 → 40.
+  //
+  // Deriving `pending` from the allowlist — rather than from the ledger — is what
+  // makes the apply driver fail closed: a migration that is not in the
+  // hash-verified allowlist can never appear here, and therefore can never be
+  // executed. A version already present in the ledger is excluded, which makes
+  // apply idempotent (re-running with everything applied yields an empty set and
+  // performs no writes). A version present with mismatched statements is also
+  // excluded here and instead raises PHASE11_GATE_LEDGER_CHECKSUM_MISMATCH above,
+  // which blocks apply entirely.
+  const pending = phase11Required.filter((migration) => !byVersion.has(migration.version));
+
   return Object.freeze({
     byVersion,
     migrationDetails: Object.freeze(migrationDetails),
     phase11States: Object.freeze(phase11States),
+    pending: Object.freeze(pending),
     violations: Object.freeze(violations),
     hasViolations: violations.length > 0,
   });
 }
 
-async function readLedgerReadOnly(client) {
+export async function readLedgerReadOnly(client) {
   await client.query('BEGIN READ ONLY');
   try {
     const result = await client.query(LEDGER_SELECT_SQL);
@@ -470,13 +492,22 @@ export function createVerifiedPgClientConfig({ connectionString, certificateAuth
   return { connectionString: sanitizedConnectionUrl.toString(), ssl };
 }
 
-async function defaultClientFactory({ connectionString, certificateAuthority, root }) {
+export async function defaultClientFactory({ connectionString, certificateAuthority, root }) {
   const requireApiDependency = createRequire(path.join(root, 'apps', 'api', 'package.json'));
   const pg = requireApiDependency('pg');
   return new pg.Client(createVerifiedPgClientConfig({ connectionString, certificateAuthority }));
 }
 
-async function applyOneMigration(client, migration) {
+/**
+ * Execute one transaction-bounded migration.
+ *
+ * The migration's own first statement is BEGIN and its own last statement is
+ * COMMIT (enforced by assertTransactionBounded at load time). The ledger row is
+ * inserted inside that same transaction, immediately before COMMIT, so the
+ * schema change and its ledger record commit atomically — a partially applied
+ * migration can never be recorded as applied.
+ */
+export async function applyOneMigration(client, migration) {
   try {
     for (const statement of migration.statements.slice(0, -1)) await client.query(statement);
     await client.query(LEDGER_INSERT_SQL, [migration.version, migration.name, migration.statements]);
