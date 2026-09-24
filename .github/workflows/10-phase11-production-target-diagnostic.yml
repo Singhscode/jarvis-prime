@@ -27,4 +27,5 @@ jobs:
         env:
           PHASE11_PRODUCTION_DATABASE_URL: ${{ secrets.PHASE11_PRODUCTION_DATABASE_URL }}
           PHASE11_PRODUCTION_PROJECT_REF: ${{ vars.PHASE11_PRODUCTION_PROJECT_REF }}
+          PHASE11_PRODUCTION_DB_MODE: session-pooler
         run: node database/scripts/validate-phase11-production-target.mjs
