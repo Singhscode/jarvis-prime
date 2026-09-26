@@ -1,5 +1,35 @@
  # JARVIS PRIME Master Roadmap
 
+## Phase 13 — Production & DevOps
+
+⏳ **In progress**
+**Status:** Azure production configuration has been repointed from the deleted managed Supabase project to the self-hosted production instance. Database connectivity from production is not yet verified, and most Production & DevOps workstreams have not started. Phase 13 must not be marked complete until every acceptance criterion has evidence.
+
+### Done (September 26, 2026)
+
+- The Azure App Service `jarvis-prime-api` (resource group `jarvis-prime-rg`, no deployment slots) had `SUPABASE_URL` set to the deleted project `fytnwpnnvqecjmyhrzcx.supabase.co`. It now points to `https://supabase.jarvisprime.me`.
+- `SUPABASE_SERVICE_ROLE_KEY` in App Service was replaced with the JWT stored in Key Vault `kv-jarvis-prime-prod` (`SUPABASE-SERVICE-ROLE-KEY`). Key Vault `SUPABASE-URL` was updated to the self-hosted URL.
+- The App Service was restarted. `/health` returns 200. Protected routes return the application's own `MISSING_TOKEN` 401.
+- Self-hosted gateway preflight: TLS 1.3 with a valid `*.jarvisprime.me` certificate, traffic served through Cloudflare, Kong returns 401 for unauthenticated requests.
+- No `*.supabase.co` references remain in the active App Service settings, Key Vault, CI workflows, or application source. The only remaining reference is `supabase/.temp/linked-project.json`, which is Supabase CLI metadata and not a runtime dependency.
+- Local CI-equivalent suites pass against a disposable local database: 246 API unit, 82 web, 56 Phase 10–12 integration, and 111 gate/contract tests. None of these run against production.
+
+### Blocker
+
+- The self-hosted production gateway returns **401** for REST requests signed with the service-role key now configured in production. That key was not issued by, or is not accepted by, `supabase.jarvisprime.me`. Until a service-role key signed with the production instance's JWT secret is installed, production API operations that touch the database are expected to fail. The `/health` 200 and route-level 401s do not exercise the database, so they are not evidence of connectivity.
+
+### Not yet done or verified
+
+- An authenticated production smoke test covering login, logout, dashboard, CRM, clients, projects, tasks, communication, automation, analytics, scheduler, worker, and storage.
+- Ubuntu server audit: Docker restart policies, persistent volumes, reboot recovery, and confirming that PostgreSQL and Studio are private.
+- A database backup, backup integrity check, and an isolated restore test.
+- Documentation for disaster recovery, rollback, release process, and operations.
+- Monitoring, logging, and resource/disk alerting on the self-hosted server.
+- Staging deployment verification and a check of production/staging credential isolation.
+- A non-secret configuration backup kept outside the repository. The pre-change snapshot currently lives only in local `/tmp`.
+
+---
+
 ## Phase 12 — Analytics & Reporting
 
 ✅ **Complete**
