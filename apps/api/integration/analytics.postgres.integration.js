@@ -1,7 +1,7 @@
 // PostgreSQL Integration Tests for Phase 12 Analytics & Reporting
 // Verifies analytics queries against actual Supabase database with RLS enforcement.
 
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { URL } from 'node:url';
@@ -32,37 +32,49 @@ describe('Analytics PostgreSQL Integration', () => {
   let secondOwnerUserId = null;
 
   before(async () => {
-    // Create two test owners for isolation tests
-    const { data: owner1, error: owner1Error } = await db.auth.admin.createUser({
-      email: `owner1-analytics-${Date.now()}@test.example`,
-      password: 'test',
-      user_metadata: { role: 'client' },
-    });
+    // Two owners, used by the tenant-isolation assertions below.
+    //
+    // These rows are created directly in public.users, NOT through
+    // db.auth.admin.createUser. This product authenticates with its own
+    // identity store (apps/api/src/modules/auth + public.users); Supabase Auth
+    // is not the identity source here. analytics_daily_metrics.owner_user_id is
+    // a foreign key to public.users(id), so an auth.users row does not satisfy
+    // it and every insert in this suite failed with
+    // analytics_daily_metrics_owner_user_id_fkey. This now matches the fixture
+    // pattern already used by the communication-hub, finance-billing, and
+    // automation-control-plane integration suites.
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const owners = [
+      { email: `owner1-analytics-${unique}@test.example`, full_name: 'Analytics Owner One' },
+      { email: `owner2-analytics-${unique}@test.example`, full_name: 'Analytics Owner Two' },
+    ].map((owner) => ({ ...owner, email_normalized: owner.email, role: 'client', status: 'active' }));
 
-    const { data: owner2, error: owner2Error } = await db.auth.admin.createUser({
-      email: `owner2-analytics-${Date.now()}@test.example`,
-      password: 'test',
-      user_metadata: { role: 'client' },
-    });
-
-    if (owner1Error || owner2Error) {
-      throw new Error('Failed to create test owners');
+    const { data, error } = await db.from('users').insert(owners).select('id');
+    if (error || !data || data.length !== 2) {
+      throw new Error(`Failed to create test owners in public.users: ${error?.message || 'unexpected row count'}`);
     }
 
-    ownerUserId = owner1.user.id;
-    secondOwnerUserId = owner2.user.id;
+    ownerUserId = data[0].id;
+    secondOwnerUserId = data[1].id;
+  });
+
+  // (owner_user_id, metric_date) is UNIQUE. Without per-test cleanup the tests
+  // below all write overlapping dates for the same owner, so every test after
+  // the first failed with 23505 on a key an earlier test had already inserted.
+  // Clearing only the two fixture owners keeps each test independent of
+  // execution order while leaving any unrelated rows in the database untouched.
+  beforeEach(async () => {
+    const owners = [ownerUserId, secondOwnerUserId].filter(Boolean);
+    if (owners.length) await db.from('analytics_daily_metrics').delete().in('owner_user_id', owners);
   });
 
   after(async () => {
-    // Cleanup test data
-    if (ownerUserId) {
-      await db.from('analytics_daily_metrics').delete().eq('owner_user_id', ownerUserId);
-      await db.auth.admin.deleteUser(ownerUserId);
-    }
-
-    if (secondOwnerUserId) {
-      await db.from('analytics_daily_metrics').delete().eq('owner_user_id', secondOwnerUserId);
-      await db.auth.admin.deleteUser(secondOwnerUserId);
+    // Metrics are removed before the owner row. owner_user_id is ON DELETE
+    // CASCADE, so this is belt-and-braces rather than strictly required.
+    for (const id of [ownerUserId, secondOwnerUserId]) {
+      if (!id) continue;
+      await db.from('analytics_daily_metrics').delete().eq('owner_user_id', id);
+      await db.from('users').delete().eq('id', id);
     }
   });
 
@@ -200,12 +212,16 @@ describe('Analytics PostgreSQL Integration', () => {
       assert.equal(owner1Metrics.length, 1);
       assert.equal(owner1Metrics[0].crm_leads_created, 10);
 
-      // Verify count for direct query without RLS
+      // Verify count for direct query without RLS.
+      // Scoped to the two fixture owners: the service role bypasses RLS and can
+      // read every row in the table, so an unscoped count also picks up rows
+      // belonging to unrelated owners and cannot assert anything about isolation.
       const { count } = await db
         .from('analytics_daily_metrics')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .in('owner_user_id', [ownerUserId, secondOwnerUserId]);
 
-      assert.equal(count, 2);  // Service role sees both
+      assert.equal(count, 2);  // Service role sees both owners' rows
     });
 
     test('composite index enables efficient scoped queries', async () => {

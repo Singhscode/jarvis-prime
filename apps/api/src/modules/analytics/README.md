@@ -310,9 +310,9 @@ Dashboard metrics can be cached 1-6 hours:
 - Response formats
 - Currency conversion
 
-Run:
+Run (the whole `apps/api` unit suite; `node --test` discovers this file):
 ```bash
-npm run test -- apps/api/test/analytics.test.js
+npm run test --workspace=apps/api
 ```
 
 ### Integration Tests: `analytics.postgres.integration.js`
@@ -327,21 +327,48 @@ npm run test -- apps/api/test/analytics.test.js
 - Data type validation
 - Pagination
 
+Requires a running local Supabase stack and fails closed against any non-localhost
+host. Fixture owners are created directly in `public.users` (this product does not
+use Supabase Auth as its identity source).
+
 Run:
 ```bash
-npm run test -- apps/api/integration/analytics.postgres.integration.js
+supabase --workdir database start
+eval "$(supabase --workdir database status -o env)"
+SUPABASE_URL="$API_URL" SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+  npm run test:integration:analytics --workspace=apps/api
 ```
 
-## Migration
+## Migrations
 
-**File**: `database/supabase/migrations/20260810000041_add_analytics_schema.sql`
+Three migrations make up the analytics surface. All three are required — the read
+path calls the RPCs from the second, and the third corrects them.
 
-Creates:
+**`20260810000041_add_analytics_schema.sql`**
 - `analytics_daily_metrics` table
-- Composite unique index on (owner_user_id, metric_date)
-- Date index for efficient range queries
-- RLS policies for tenant isolation
-- Triggers for updated_at
+- Composite unique constraint on (owner_user_id, metric_date)
+- Index on (owner_user_id, metric_date DESC) for efficient range queries
+- RLS policy for tenant isolation
+- Trigger for updated_at
+
+**`20260810000042_add_analytics_rpcs.sql`**
+- `get_revenue_by_owner(owner, status)` — total invoiced revenue for a status
+- `get_monthly_revenue(owner, start, end)` — paid revenue grouped by month
+- `get_expenses_by_owner(owner, status)` — total expenses for a status
+- `get_prospect_stage_counts(client_id)` — legacy prospect funnel counts, not used
+  by this module
+- EXECUTE grants to `authenticated` and `service_role`
+
+**`20260810000043_fix_analytics_rpc_bigint_cast.sql`** (corrective)
+- `SUM(bigint)` returns `numeric` in PostgreSQL, but the three finance RPCs above
+  declare `RETURNS TABLE(total_amount_minor bigint)`. Calling any of them raised
+  `structure of query does not match function result type`. Migration 42 was
+  edited in place after it had already been applied, which has no effect on a
+  database that already recorded it, so this migration re-issues the three
+  function bodies with explicit `::bigint` casts via `CREATE OR REPLACE`.
+- Applied to production through the protected Phase 12 workflow
+  (`.github/workflows/12-phase12-analytics-production-migration.yml`), never by
+  `db:push`.
 
 Check migration status:
 ```bash

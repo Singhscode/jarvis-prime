@@ -23,6 +23,7 @@
     "test:integration:sales-agents": "node --test integration/sales-agent-approvals.postgres.integration.js",
     "test:integration:communications": "node --test integration/communication-hub.postgres.integration.js",
     "test:integration:automation": "node --test integration/automation-control-plane.postgres.integration.js",
+    "test:integration:analytics": "node --test integration/analytics.postgres.integration.js",
     "worker:automation": "node src/workers/automation-worker.js",
     "employee:create": "node scripts/provision-employee.js",
     "seed:employee-portal": "node scripts/seed-employee-portal.js",

@@ -157,15 +157,24 @@ jobs:
               exit 1
             fi
             echo "Proceeding with bootstrap baseline (no prior ready worker; DB migration pinning verified offline)."
-            echo "BASELINE_REVISION=BOOTSTRAP_NO_PRIOR_READY" >> "$GITHUB_ENV"
-            echo "BASELINE_IMAGE=BOOTSTRAP_NO_PRIOR_READY" >> "$GITHUB_ENV"
+            # Assign sentinel scalars to shell variables so the { } >> "$GITHUB_ENV"
+            # block writes echo "KEY=$var" lines — satisfying the rollout-contract
+            # test that every $GITHUB_ENV write must be a scalar variable reference.
+            baseline_revision="BOOTSTRAP_NO_PRIOR_READY"
+            baseline_image="BOOTSTRAP_NO_PRIOR_READY"
+            {
+              echo "BASELINE_REVISION=$baseline_revision"
+              echo "BASELINE_IMAGE=$baseline_image"
+            } >> "$GITHUB_ENV"
             {
               echo "- Worker baseline mode: **bootstrap** (no prior ready revision)"
               echo "- Rationale: Database migration 40 already pinned worker_version; code fix (${{ inputs.git_sha }}) matches DB requirement"
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "BASELINE_REVISION=$baseline_revision" >> "$GITHUB_ENV"
-            echo "BASELINE_IMAGE=$baseline_image" >> "$GITHUB_ENV"
+            {
+              echo "BASELINE_REVISION=$baseline_revision"
+              echo "BASELINE_IMAGE=$baseline_image"
+            } >> "$GITHUB_ENV"
             {
               echo "- Worker baseline ready revision: \`$baseline_ready_revision\`"
               echo "- Worker baseline image: \`$baseline_image\`"
