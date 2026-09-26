@@ -14,6 +14,14 @@
 - No `*.supabase.co` references remain in the active App Service settings, Key Vault, CI workflows, or application source. The only remaining reference is `supabase/.temp/linked-project.json`, which is Supabase CLI metadata and not a runtime dependency.
 - Local CI-equivalent suites pass against a disposable local database: 246 API unit, 82 web, 56 Phase 10–12 integration, and 111 gate/contract tests. None of these run against production.
 
+
+### Key Vault Reference Cutover (September 26, 2026 — Phase 13, Workstream W1-I)
+- App Service system-assigned managed identity enabled: `principalId: df104bee-f593-4ed6-9d56-3665a8c76ffe`, `type: SystemAssigned`.
+- RBAC role "Key Vault Secrets User" granted to managed identity on `kv-jarvis-prime-prod` vault (scope: `/subscriptions/981e5638-8768-454c-8d6e-ec7330767e2c/resourceGroups/jarvis-prime-rg/providers/Microsoft.KeyVault/vaults/kv-jarvis-prime-prod`). Role assignment ID: `33dd213a-7585-478b-a1e2-c199d593505b`.
+- `SUPABASE_SERVICE_ROLE_KEY` app setting replaced with Key Vault reference URI: `@Microsoft.KeyVault(SecretUri=https://kv-jarvis-prime-prod.vault.azure.net/secrets/SUPABASE-SERVICE-ROLE-KEY/)`.
+- Plain secret value no longer stored in App Service configuration. Only Key Vault holds the credential; App Service retrieves it at runtime via managed identity.
+- App Service restarted to apply configuration. System-assigned identity can now access the secret from Key Vault.
+- Security posture: Key Vault soft delete (90 days recovery), purge protection enabled, RBAC enforcement (no legacy access policies).
 ### Blocker
 
 - The self-hosted production gateway returns **401** for REST requests signed with the service-role key now configured in production. That key was not issued by, or is not accepted by, `supabase.jarvisprime.me`. Until a service-role key signed with the production instance's JWT secret is installed, production API operations that touch the database are expected to fail. The `/health` 200 and route-level 401s do not exercise the database, so they are not evidence of connectivity.
