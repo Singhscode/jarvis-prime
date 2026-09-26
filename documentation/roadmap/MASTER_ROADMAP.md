@@ -1,5 +1,94 @@
  # JARVIS PRIME Master Roadmap
 
+## Phase 12 — Analytics & Reporting
+
+✅ **Complete**
+**Completion date:** September 26, 2026
+**Status:** All analytics infrastructure, RPC functions, dashboard API, scheduled snapshot job, reporting UI, and integration suite are implemented and verified in production.
+
+### Major deliverables
+
+- `analytics_daily_metrics` table with `UNIQUE (owner_user_id, metric_date)` composite key, non-negativity and date-floor CHECK constraints, RLS, and a nightly upsert path that is idempotent on re-run.
+- Three SECURITY DEFINER RPC functions: `get_revenue_by_owner`, `get_monthly_revenue`, `get_expenses_by_owner`, all returning `bigint` (migration 43 corrected the numeric→bigint cast that was causing `structure of query does not match function result type`).
+- Analytics service and repository wired to 11 GET endpoints under `/api/analytics` (JWT+owner required); the dashboard calls the three finance RPCs in parallel with CRM, communication, and automation sources.
+- `analytics-daily-snapshot` scheduler job (cron `15 0 * * *`) calling `runDailySnapshotForAllOwners`; duplicate execution overwrites cleanly via the composite unique key.
+- `OwnerAnalyticsWorkspace.tsx` component hitting the real `/api/analytics/dashboard` endpoint; route reachable from the owner shell navigation.
+- Protected Phase 12 production migration workflow (`12-phase12-analytics-production-migration.yml`) with hash-pinned allowlist, confirmation token `APPLY_PHASE12_ANALYTICS_43`, mandatory preflight, independent post-apply ledger verification, and shared advisory lock with the Phase 11 gate.
+
+### Verification
+
+- 15/15 Postgres integration tests pass (fixture defect corrected: fixtures now use `public.users` consistent with other suites; `beforeEach` cleanup prevents UNIQUE collision; unscoped tenant-isolation count scoped to fixture owners).
+- 47/47 Phase 12 migration gate unit tests pass.
+- 246/246 API unit tests pass. 82/82 web tests pass.
+- Migration 43 applied to production via the protected workflow (run 35652376007). `PHASE12_VERIFIED 20260810000043 fix_analytics_rpc_bigint_cast applied sha256=e815794c…`.
+- Analytics integration suite wired into CI (`01-test.yml`); phase-12 gate unit tests wired into CI.
+
+### Remaining operational notes
+
+- `crm_leads_qualified` and `crm_leads_converted` snapshot columns have no current source and remain 0; no `crm_leads` qualification status field exists today.
+- `getDashboard(null)` callers in the legacy scheduler report jobs always 403 (they predate the analytics auth model); not a regression.
+- `get_prospect_stage_counts` RPC introduced by migration 42 is unscoped by owner; it is not called by the analytics module but should be reviewed before Phase 13 tightens the RPC grant surface.
+
+---
+
+## Phase 11 — Automation Platform
+
+✅ **Complete**
+**Completion date:** September 26, 2026
+**Status:** Automation registry, execution engine, worker compatibility contract, governance RPCs, scheduler, retry/drain safety, UI, integration suite, and production ACA deployment are all verified.
+
+### Major deliverables
+
+- Action registry: `ACT_ASSIGN`, `ACT_TASK`, `ACT_NOTIFY` (INTERNAL); `ACT_APOLLO_SEARCH` (APOLLO, read-only, feature-gated). Resolver fails closed on any unregistered code.
+- 14 automation migrations (23–31, 35, 36, 38, 39, 40) forming the durable work-item queue, recipe/governance system, and worker claim-drain hardening.
+- Worker constants `AUTOMATION_REGISTRY_V1` / `AUTOMATION_WORKER_V2` agree across `automation.execution.validation.js`, `automation-rollout-contract.json`, and the `automation_execution_contract` singleton row (CHECK constraint pinned by migration 40).
+- Lease tokens, heartbeats, `SKIP LOCKED` claiming, attempt phases, late-result suppression, advisory locks, and `automation_relinquish_unstarted_claim` make the queue safe under concurrent workers and graceful drain.
+- Immutable audit trail: `automation_run_events`, `automation_policy_decisions`, `automation_control_operations`.
+- Owner and employee web workspaces call 15+ real API endpoints; no mock data.
+- Phase 11 production worker deployed to ACA (`ca-phase11-automation-wkr-prod`) at SHA `c2849b52220df355d9f6886529e06cbefc2a7b27`; `AUTOMATION_WORKER_V2`, `worker_ready` confirmed, 0 restarts.
+
+### Verification
+
+- 33/33 automation Postgres integration tests pass. 53/53 gate unit tests pass. 11/11 rollout-contract tests pass.
+- Rollout-contract workflow 08 baseline-capture fix: bootstrap sentinel values now assigned to shell variables before `{ } >> $GITHUB_ENV` so the contract's scalar-write assertion passes.
+- `verify:automation:rollout-contract` exits 0.
+
+### Remaining operational notes
+
+- The `worker.run()` idle-backoff path (`idleCycles`, `resetIdle`) is dead code in production; the deployed entrypoint uses its own fixed-interval loop. Low priority.
+- Migration `20260810000037` (staging-only canary) falls outside the verifier's discovery regex — intentional but worth documenting for future verifier upgrades.
+
+---
+
+## Phase 10 — Communication Hub
+
+✅ **Complete**
+**Completion date:** September 26, 2026
+**Status:** Communication schema, RPCs, service, routes, delivery webhook, three portal pages, and integration suite are implemented and verified.
+
+### Major deliverables
+
+- 8 tables (`communication_threads`, `_participants`, `_messages`, `_attachments`, `_notifications`, `_preferences`, `_deliveries`, `_delivery_events`) with composite FK chains, immutability triggers on messages/attachments/events, UNIQUE idempotency keys, and `SKIP LOCKED` + lease-based delivery claiming.
+- 14 SECURITY DEFINER RPCs (all `REVOKE ALL ... FROM PUBLIC, anon, authenticated, service_role`; writes accessible to `service_role` via the 8 mutating RPCs only).
+- Private `communication-private` storage bucket. RLS enabled (deny-all by design; all access through service-role).
+- `communication_write_audit` writes to `audit_logs` inside the same transaction as thread creation, message send, and permanent delivery failure; audit failure rolls back the parent operation.
+- Actor scoping resolves owner → employee → client by business code, never raw UUID injection. Ownership enforced at service, RPC, and FK layers.
+- Idempotency: `UNIQUE (owner_user_id, created_by_user_id, create_idempotency_key)` on threads; `UNIQUE (owner_user_id, thread_id, sender_user_id, idempotency_key)` on messages; conflict returns existing result, request-hash mismatch raises `COMMUNICATION_IDEMPOTENCY_CONFLICT`.
+- Three web pages (`/dashboard/communications`, `/employee/communications`, `/client/communications`) with a shared `CommunicationWorkspace` component; all data calls hit real endpoints.
+- Inbound Resend webhook with Svix-style HMAC + 5-minute timestamp tolerance; `communication_record_delivery_event` is idempotent on `UNIQUE (provider, provider_event_id)`.
+
+### Verification
+
+- 8/8 Postgres integration tests pass (RLS/grants, thread creation + idempotency, concurrent sequence allocation, cross-tenant isolation, stale revocation, delivery retry bounds, audit rollback).
+- 13/13 API unit tests pass. 8/8 web tests pass.
+- Communication integration suite wired into CI (`test:integration:communications` in `01-test.yml`).
+
+### Known limitation (by design)
+
+- Outbound email delivery (`communication_deliveries` → Resend) is a hard-disabled stub (`communicationEmailDeliveryEnabled = false`). The DB-side lease/claim/retry infrastructure is complete; a background job must be wired in when the feature is enabled.
+- `COMMUNICATION_RESEND_WEBHOOK_SECRET` is now documented in `apps/api/.env.example` (was missing; added by PR #94).
+
+---
 ## Phase 14 — AI Foundation
 
 ✅ **Complete**
@@ -128,9 +217,9 @@ The Client Portal gives an external client member a minimal, read-only view of o
 ✅ Phase 7 Client Portal
 ✅ Phase 8 Owner Workspace
 ✅ Phase 9 Finance & Billing
-⏳ Phase 10 Communication Hub
-⏳ Phase 11 Automation Platform
-⏳ Phase 12 Analytics & Reporting
+✅ Phase 10 Communication Hub
+✅ Phase 11 Automation Platform
+✅ Phase 12 Analytics & Reporting
 ⏳ Phase 13 Production & DevOps
 ✅ Phase 14 AI Foundation
 ⏳ Phase 15 AI Sales Agents
