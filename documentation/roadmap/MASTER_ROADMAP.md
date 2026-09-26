@@ -14,9 +14,20 @@
 - No `*.supabase.co` references remain in the active App Service settings, Key Vault, CI workflows, or application source. The only remaining reference is `supabase/.temp/linked-project.json`, which is Supabase CLI metadata and not a runtime dependency.
 - Local CI-equivalent suites pass against a disposable local database: 246 API unit, 82 web, 56 Phase 10–12 integration, and 111 gate/contract tests. None of these run against production.
 
+
+### Key Vault Reference Cutover — ATTEMPTED (September 26, 2026 — Phase 13, Workstream W1-I)
+- App Service system-assigned managed identity enabled: `principalId: df104bee-f593-4ed6-9d56-3665a8c76ffe`, `type: SystemAssigned`. ✅ Successful.
+- RBAC role "Key Vault Secrets User" granted to managed identity on `kv-jarvis-prime-prod` vault. Role assignment ID: `33dd213a-7585-478b-a1e2-c199d593505b`. ✅ Verified.
+- Attempted `SUPABASE_SERVICE_ROLE_KEY` app setting replacement with Key Vault reference URI: `@Microsoft.KeyVault(SecretUri=https://kv-jarvis-prime-prod.vault.azure.net/secrets/SUPABASE-SERVICE-ROLE-KEY/)`. ❌ App startup failed.
+- **Startup Failure:** App Service container unable to start for 25+ minutes. Root cause: Key Vault reference resolution timing issue, likely RBAC propagation delay (< 2 minutes after assignment creation).
+- **Reverted:** Plain service-role JWT now stored in App Service config (temporary). Database connectivity not yet verified.
+- Key Vault infrastructure (managed identity + RBAC) remains in place for retry once RBAC propagation confirmed or alternative approach implemented.
+- Next: Verify database connectivity with current plain-secret config, then retry Key Vault reference approach or implement runtime secret fetching via Azure SDK.
 ### Blocker
 
-- The self-hosted production gateway returns **401** for REST requests signed with the service-role key now configured in production. That key was not issued by, or is not accepted by, `supabase.jarvisprime.me`. Until a service-role key signed with the production instance's JWT secret is installed, production API operations that touch the database are expected to fail. The `/health` 200 and route-level 401s do not exercise the database, so they are not evidence of connectivity.
+**Database Connectivity Not Yet Verified:** App Service has correct credentials (service-role key HTTP 200 verified independently against Supabase gateway at `https://supabase.jarvisprime.me/rest/v1/companies?select=id&limit=1`). However, end-to-end authenticated application database operations have not been tested. Blocker: No network access from configuration terminal to test `/health/deep` or authenticated `/api/crm/*` endpoints.
+
+**Key Vault Reference Implementation Failed:** Attempted to move `SUPABASE_SERVICE_ROLE_KEY` to Key Vault reference caused app startup failure (container unable to start for 25+ minutes). Root cause: Key Vault reference resolution timeout, likely RBAC propagation delay. Reverted to plain secret. Infrastructure remains in place for retry.
 
 ### Not yet done or verified
 
