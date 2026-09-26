@@ -47,3 +47,10 @@ Thumbs.db
 *.bak
 *.tmp
 *.old
+# Local env snapshots taken during CI runs / the self-hosted Supabase migration.
+# These can hold real credentials and must never be committed.
+*.cibak
+*.before-selfhosted
+
+# Supabase CLI local state at the repo root (same policy as database/supabase/.gitignore).
+supabase/.temp/
